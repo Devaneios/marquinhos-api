@@ -11,7 +11,7 @@ export class UserAuthService {
     this.discordService = new DiscordService();
   }
 
-  async create(userAuth: IUserAuth) {
+  async create(userAuth: { discordToken: string } & IUserAuth) {
     if (!this.containsOnlyAllowedKeys(userAuth)) {
       throw new Error('Missing keys');
     }
@@ -30,7 +30,11 @@ export class UserAuthService {
       throw new Error('Wrong credentials');
     }
 
-    return await this.userAuthModel.create(userAuth);
+    return await this.userAuthModel.create({
+      discordId: userAuth.discordId,
+      lastfmToken: userAuth.lastfmToken,
+      scrobblesOn: userAuth.scrobblesOn,
+    });
   }
 
   async delete(discordId: string, discordToken: string) {
@@ -70,7 +74,12 @@ export class UserAuthService {
   }
 
   private containsOnlyAllowedKeys(userAuth: IUserAuth) {
-    const allowedKeys = ['discordId', 'lastfmToken', 'scrobblesOn'];
+    const allowedKeys = [
+      'discordId',
+      'discordToken',
+      'lastfmToken',
+      'scrobblesOn',
+    ];
 
     const keys = Object.keys(userAuth);
 

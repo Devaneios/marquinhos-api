@@ -86,7 +86,7 @@ router.patch('/:discordId', async (req: Request, res: Response) => {
     return res
       .status(200)
       .json(
-        await userAuthService.exists(
+        await userAuthService.toggleScrobbles(
           req.params.discordId,
           req.body.discordToken,
         ),

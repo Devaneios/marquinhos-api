@@ -51,8 +51,8 @@ router.delete('/', async (req: Request, res: Response) => {
 });
 
 router.post('/:discordId', async (req: Request, res: Response) => {
-  if (!req.params.discordId) {
-    return res.status(400).json({ message: 'Discord ID is required' });
+  if (!req.params) {
+    return res.status(400).json({ message: 'Params are required' });
   }
 
   if (Object.keys(req.body).length === 0) {

@@ -6,6 +6,7 @@ const UserAuthSchema = new Schema<IUserAuth>({
   discordToken: { required: true, type: String },
   discordTokenExpiresAt: { required: true, type: Date },
   lastfmToken: { required: true, type: String },
+  scrobblesOn: { required: true, type: Boolean },
 });
 
 const UserAuthModel = model('users_auth', UserAuthSchema);

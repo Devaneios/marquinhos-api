@@ -3,4 +3,5 @@ export interface IUserAuth extends mongoose.Document {
   discordToken: string;
   discordTokenExpiresAt: Date;
   lastfmToken: string;
+  scrobblesOn: boolean;
 }

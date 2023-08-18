@@ -75,6 +75,7 @@ export class UserAuthService {
       'discordToken',
       'discordTokenExpiresAt',
       'lastfmToken',
+      'scrobblesOn',
     ];
 
     const keys = Object.keys(userAuth);

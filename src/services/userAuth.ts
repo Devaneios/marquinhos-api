@@ -70,13 +70,7 @@ export class UserAuthService {
   }
 
   private containsOnlyAllowedKeys(userAuth: IUserAuth) {
-    const allowedKeys = [
-      'discordId',
-      'discordToken',
-      'discordTokenExpiresAt',
-      'lastfmToken',
-      'scrobblesOn',
-    ];
+    const allowedKeys = ['discordId', 'lastfmToken', 'scrobblesOn'];
 
     const keys = Object.keys(userAuth);
 

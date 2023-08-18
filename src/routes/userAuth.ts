@@ -77,4 +77,27 @@ router.post('/:discordId', async (req: Request, res: Response) => {
   }
 });
 
+router.patch('/:discordId', async (req: Request, res: Response) => {
+  if (Object.keys(req.body).length === 0) {
+    return res.status(400).json({ message: 'Body is required' });
+  }
+
+  try {
+    return res
+      .status(200)
+      .json(
+        await userAuthService.exists(
+          req.params.discordId,
+          req.body.discordToken,
+        ),
+      );
+  } catch (error: any) {
+    if (errorMessages.includes(error.message)) {
+      return res.status(400).json({ message: error.message });
+    } else {
+      return res.status(500).json({ message: 'Unknown Error' });
+    }
+  }
+});
+
 export default router;

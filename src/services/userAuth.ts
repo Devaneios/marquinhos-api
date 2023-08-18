@@ -53,6 +53,30 @@ export class UserAuthService {
     return await this.userAuthModel.deleteOne({ discordId });
   }
 
+  async toggleScrobbles(discordId: string, discordToken: string) {
+    if (!discordId || !discordToken) {
+      throw new Error('Missing data');
+    }
+
+    if (!(await this.idAndTokenMatch(discordId, discordToken))) {
+      throw new Error('Wrong credentials');
+    }
+
+    const userAuth = await this.userAuthModel.findOne({ discordId });
+
+    if (!userAuth) {
+      throw new Error('User not found');
+    }
+
+    userAuth.scrobblesOn = !userAuth.scrobblesOn;
+
+    await userAuth.save();
+
+    return {
+      scrobblesOn: userAuth.scrobblesOn,
+    };
+  }
+
   async exists(discordId: string, discordToken: string) {
     if (!discordId || !discordToken) {
       throw new Error('Missing data');

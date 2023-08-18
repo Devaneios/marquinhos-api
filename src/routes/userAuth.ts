@@ -60,7 +60,14 @@ router.post('/:discordId', async (req: Request, res: Response) => {
   }
 
   try {
-    await userAuthService.exists(req.params.discordId, req.body.discordToken);
+    return res
+      .status(200)
+      .json(
+        await userAuthService.exists(
+          req.params.discordId,
+          req.body.discordToken,
+        ),
+      );
   } catch (error: any) {
     if (errorMessages.includes(error.message)) {
       return res.status(400).json({ message: error.message });
@@ -68,8 +75,6 @@ router.post('/:discordId', async (req: Request, res: Response) => {
       return res.status(500).json({ message: 'Unknown Error' });
     }
   }
-
-  return res.status(200).json({ message: 'User exists' });
 });
 
 export default router;

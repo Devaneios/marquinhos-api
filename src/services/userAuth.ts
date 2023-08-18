@@ -70,6 +70,7 @@ export class UserAuthService {
 
     return {
       discordId: userAuth.discordId,
+      scrobblesOn: userAuth.scrobblesOn,
     };
   }
 

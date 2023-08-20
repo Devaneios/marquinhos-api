@@ -4,8 +4,8 @@ const router = express.Router();
 
 const PRIVACY_POLICY = {
   title: 'Política de Privacidade para MarquinhosBOT',
-  date: 'Data Efetiva: 19 de agosto de 2023',
-  body: 'MarquinhosBOT está comprometido(a) em proteger a sua privacidade. Esta Política de Privacidade descreve como coletamos, usamos e protegemos as suas informações pessoais em relação ao uso do nosso bot no Discord.',
+  date: 'Atualizado 19 de agosto de 2023',
+  body: 'MarquinhosBOT ("nós," "nos," ou "nosso") está comprometido(a) em proteger a sua privacidade. Esta Política de Privacidade descreve como coletamos, usamos e protegemos as suas informações pessoais em relação ao uso do nosso bot no Discord.',
   sections: [
     {
       title: '1. Coleta de Dados',

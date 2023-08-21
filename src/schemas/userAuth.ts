@@ -3,7 +3,7 @@ import { IUserAuth } from '../types';
 
 const UserAuthSchema = new Schema<IUserAuth>({
   discordId: { required: true, type: String },
-  lastfmToken: { required: true, type: String },
+  lastfmToken: { required: false, type: String },
   scrobblesOn: { required: true, type: Boolean },
 });
 

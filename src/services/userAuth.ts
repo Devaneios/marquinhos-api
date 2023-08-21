@@ -37,7 +37,33 @@ export class UserAuthService {
     });
   }
 
-  async delete(discordId: string, discordToken: string) {
+  async deleteLastfmData(discordId: string, discordToken: string) {
+    if (!discordId || !discordToken) {
+      throw new Error('Missing data');
+    }
+
+    if (!(await this.userAlreadyExists(discordId))) {
+      throw new Error('User not found');
+    }
+
+    if (!(await this.idAndTokenMatch(discordId, discordToken))) {
+      throw new Error('Wrong credentials');
+    }
+
+    const userAuth = await this.userAuthModel.findOne({ discordId });
+
+    userAuth?.set({
+      lastfmToken: undefined,
+    });
+
+    await userAuth?.save();
+
+    return {
+      discordId: userAuth?.discordId,
+    };
+  }
+
+  async deleteAllData(discordId: string, discordToken: string) {
     if (!discordId || !discordToken) {
       throw new Error('Missing data');
     }
@@ -96,6 +122,24 @@ export class UserAuthService {
       discordId: userAuth.discordId,
       scrobblesOn: userAuth.scrobblesOn,
     };
+  }
+
+  async hasLastfmToken(discordId: string, discordToken: string) {
+    if (!discordId || !discordToken) {
+      throw new Error('Missing data');
+    }
+
+    if (!(await this.idAndTokenMatch(discordId, discordToken))) {
+      throw new Error('Wrong credentials');
+    }
+
+    const userAuth = await this.userAuthModel.findOne({ discordId });
+
+    if (!userAuth) {
+      throw new Error('User not found');
+    }
+
+    return !!userAuth.lastfmToken;
   }
 
   private containsOnlyAllowedKeys(userAuth: IUserAuth) {

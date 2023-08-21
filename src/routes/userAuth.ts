@@ -118,13 +118,13 @@ router.post(
     }
 
     try {
-      const lastfmTokenExists = await userAuthService.hasLastfmToken(
+      const lastfmStatus = await userAuthService.hasLastfmToken(
         req.params.discordId,
         req.body.discordToken,
       );
 
-      if (lastfmTokenExists) {
-        return res.status(200).json({ message: 'Lastfm token exists' });
+      if (lastfmStatus) {
+        return res.status(200).json(lastfmStatus);
       } else {
         return res.status(404).json({ message: 'Lastfm token not found' });
       }

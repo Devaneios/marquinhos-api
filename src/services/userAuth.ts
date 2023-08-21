@@ -139,7 +139,10 @@ export class UserAuthService {
       throw new Error('User not found');
     }
 
-    return !!userAuth.lastfmToken;
+    return {
+      discordId: userAuth.discordId,
+      scrobblesOn: userAuth.scrobblesOn,
+    };
   }
 
   private containsOnlyAllowedKeys(userAuth: IUserAuth) {

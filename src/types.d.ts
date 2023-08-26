@@ -1,5 +1,50 @@
-export interface IUserAuth extends mongoose.Document {
-  discordId: string;
-  lastfmToken?: string;
-  scrobblesOn: boolean;
+export interface IUser extends mongoose.Document {
+  id: string;
+  lastfmSessionToken?: string;
+  lastfmUsername?: string;
+  scrobblesOn?: boolean;
+}
+
+export interface IScrobble extends mongoose.Document {
+  track: Track;
+  playbackData: PlaybackData;
+}
+
+export type LastfmSessionResponse = {
+  sessionKey: string;
+  userName: string;
+};
+
+export type PlaybackData = {
+  title: string;
+  url?: string;
+  listeningUsersId: string[];
+  timestamp: Date;
+  guildId: string;
+  channelId: string;
+  providerName: string;
+};
+
+export type Track = {
+  artist: string;
+  name: string;
+  durationInMillis: number;
+  album?: string;
+  coverArtUrl?: string;
+};
+
+export interface ApiResponse<T> {
+  message?: string;
+  data?: T;
+  error?: {
+    code: string;
+    message: string;
+    details?: any;
+  };
+}
+
+declare module 'express' {
+  export interface Request {
+    user?: IUser;
+  }
 }

@@ -3,12 +3,15 @@ import { Express, Request, Response } from 'express';
 import dotevn from 'dotenv';
 import morgan from 'morgan';
 import cors from 'cors';
-import * as userAuth from './routes/userAuth';
-import * as privacyPolicy from './routes/privacyPolicy';
+import * as auth from './routes/auth.route';
+import * as user from './routes/user.route';
+import * as scrobble from './routes/scrobble.route';
+import * as privacyPolicy from './routes/privacyPolicy.route';
 import { mongoConnection } from './database/mongo';
 import http from 'http';
 import https from 'https';
 import fs from 'fs';
+import cookieParse from 'cookie-parser';
 
 process.env.NODE_ENV = 'production';
 
@@ -18,15 +21,21 @@ dotevn.config();
 
 const allowlist = [
   'http://localhost:4200',
-  'https://marquinhosbot-9a236.web.app',
+  'https://devaneios.guilhermeasper.dev.br:3105',
 ];
 
 const corsOptionsDelegate = function (req: Request, callback: Function) {
   let corsOptions;
   if (allowlist.indexOf(req.header('Origin') ?? '') !== -1) {
-    corsOptions = { origin: true };
+    corsOptions = {
+      origin: true,
+      credentials: true,
+    };
   } else {
-    corsOptions = { origin: false };
+    corsOptions = {
+      origin: false,
+      credentials: true,
+    };
   }
   callback(null, corsOptions);
 };
@@ -37,12 +46,16 @@ app.use(
   ),
 );
 
+app.use(cookieParse());
 app.use(express.json());
 app.use(cors(corsOptionsDelegate));
 app.use(express.urlencoded({ extended: true }));
 
-app.use('/user-auth', userAuth.default);
-app.use('/privacy-policy', privacyPolicy.default);
+app.use('/api/auth', auth.default);
+app.use('/api/user', user.default);
+app.use('/api/lastfm', user.default);
+app.use('/api/scrobble', scrobble.default);
+app.use('/api/privacy-policy', privacyPolicy.default);
 
 mongoConnection().then(() => {
   const httpServer = http.createServer(app);
@@ -55,5 +68,5 @@ mongoConnection().then(() => {
   );
 
   httpServer.listen(process.env.PORT || 3000);
-  httpsServer.listen(process.env.PORT || 12570);
+  httpsServer.listen(process.env.PORT || 3106);
 });

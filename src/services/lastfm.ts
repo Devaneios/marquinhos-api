@@ -24,13 +24,19 @@ SOFTWARE.
 
 import axios from 'axios';
 import md5 from 'crypto-js/md5';
-import { getUnixTime } from 'date-fns';
+import { getUnixTime, parseISO } from 'date-fns';
 import User from '../schemas/user';
 import { LastfmSessionResponse, PlaybackData, Track } from 'types';
+import Scrobble from '../schemas/scrobble';
 
 export class LastfmService {
   readonly apiRootUrl = 'https://ws.audioscrobbler.com/2.0';
   readonly userAgent = 'cordscrobbler/1.0.0';
+  private scrobblesDB: typeof Scrobble;
+
+  constructor() {
+    this.scrobblesDB = Scrobble;
+  }
 
   async getSession(token: string | undefined): Promise<LastfmSessionResponse> {
     if (!token) {
@@ -82,7 +88,7 @@ export class LastfmService {
       params.set(`track[${i}]`, track.name);
       params.set(
         `timestamp[${i}]`,
-        getUnixTime(playbacksData[i].timestamp).toString(),
+        getUnixTime(parseISO(playbacksData[i].timestamp.toString())).toString(),
       );
       if (track.album) {
         params.set(`album[${i}]`, track.album);
@@ -122,6 +128,20 @@ export class LastfmService {
     }
   }
 
+  async dispatchScrobbleFromQueue(scrobbleId: string) {
+    const scrobble = await this.scrobblesDB.findById(scrobbleId);
+
+    if (!scrobble) {
+      throw new Error('ScrobbleNotFound');
+    }
+
+    await this.dispatchScrobble(scrobble.track, scrobble.playbackData);
+
+    const deleted = await this.scrobblesDB.findByIdAndDelete(scrobbleId);
+
+    return deleted?._id;
+  }
+
   async addToScrobbleQueue(track: Track | null, playbackData: PlaybackData) {
     const thirtySecondsInMillis = 30000;
     const fourMinutesInMillis = 240000;
@@ -130,10 +150,10 @@ export class LastfmService {
       return;
     }
 
-    const timeUntilScrobbling = Math.min(
-      Math.floor(track.durationInMillis / 2),
-      fourMinutesInMillis,
-    );
+    const createdDocument = await this.scrobblesDB.create({
+      track,
+      playbackData,
+    });
 
     for (const userId of playbackData.listeningUsersId) {
       const registeredUser = await User.findOne({
@@ -149,9 +169,10 @@ export class LastfmService {
       }
     }
 
-    setTimeout(() => {
-      this.dispatchScrobble(track, playbackData);
-    }, timeUntilScrobbling);
+    return {
+      id: createdDocument._id,
+      trackDurationInMillis: track.durationInMillis,
+    };
   }
 
   async dispatchScrobble(track: Track, playbackData: PlaybackData) {

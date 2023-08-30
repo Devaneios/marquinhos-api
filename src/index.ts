@@ -53,7 +53,6 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use('/api/auth', auth.default);
 app.use('/api/user', user.default);
-app.use('/api/lastfm', user.default);
 app.use('/api/scrobble', scrobble.default);
 app.use('/api/privacy-policy', privacyPolicy.default);
 

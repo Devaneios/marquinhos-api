@@ -1,4 +1,7 @@
 import SpotifyWebApi from 'spotify-web-api-node';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 export class SpotifyService {
   spotifyApi: SpotifyWebApi;
@@ -12,7 +15,7 @@ export class SpotifyService {
 
   async getTrack(trackId: string) {
     try {
-      this._getAccessToken();
+      await this._getAccessToken();
       const track = await this.spotifyApi.getTrack(trackId);
 
       return {
@@ -23,13 +26,15 @@ export class SpotifyService {
         coverArtUrl: track.body.album.images[0].url,
       };
     } catch (error) {
+      console.log(error);
+
       throw new Error('SpotifyRequestUnknownError');
     }
   }
 
   async searchTracks(query: string) {
     try {
-      this._getAccessToken();
+      await this._getAccessToken();
       const track = await this.spotifyApi.searchTracks(query);
 
       if (!track.body.tracks?.items.length) {
@@ -44,6 +49,7 @@ export class SpotifyService {
         coverArtUrl: track.body.tracks.items[0].album.images[0].url,
       };
     } catch (error) {
+      console.log(error);
       throw new Error('SpotifyRequestUnknownError');
     }
   }

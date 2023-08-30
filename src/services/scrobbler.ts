@@ -14,9 +14,13 @@ export class ScrobblerService {
     this.parserService = new ParserService();
   }
 
-  async createScrobble(request: { playbackData: PlaybackData }) {
-    const track = await this.parserService.parseTrack(request.playbackData);
+  async addScrobbleToQueue(playbackData: PlaybackData) {
+    const track = await this.parserService.parseTrack(playbackData);
 
-    await this.lastfmService.addToScrobbleQueue(track, request.playbackData);
+    return await this.lastfmService.addToScrobbleQueue(track, playbackData);
+  }
+
+  async dispatchScrobble(id: string) {
+    return await this.lastfmService.dispatchScrobbleFromQueue(id);
   }
 }

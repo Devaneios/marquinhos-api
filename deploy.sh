@@ -27,9 +27,9 @@ User=guilherme
 
 KillMode=control-group
 
-WorkingDirectory=/home/$GITHUB_ACTIONS_USER/github-runners/actions-runner/_work/marquinhos-web-api/marquinhos-web-api/dist
+WorkingDirectory=/home/guilherme/github-runners/marquinhos-api-runner/_work/marquinhos-web-api/marquinhos-web-api/dist
 
-ExecStart=/home/$GITHUB_ACTIONS_USER/.nvm/versions/node/v18.13.0/bin/node ./index.js
+ExecStart=/home/guilherme/.nvm/versions/node/v18.13.0/bin/node ./index.js
 
 Restart=always
 

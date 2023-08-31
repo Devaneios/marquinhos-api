@@ -2,6 +2,17 @@
 
 source /etc/marquinhos/marquinhos-api.conf
 
+CERTIFICATE_PATH="/home/guilherme/certificates/marquinhos/server.crt"
+KEY_PATH="/home/guilherme/certificates/marquinhos/server.key"
+
+DESTINATION_DIR="/home/guilherme/github-runners/marquinhos-api-runner/_work/marquinhos-web-api/marquinhos-web-api/dist"
+
+cp "$CERTIFICATE_PATH" "$DESTINATION_DIR"
+cp "$KEY_PATH" "$DESTINATION_DIR"
+
+chmod 744 "$DESTINATION_DIR/server.key"
+chmod 744 "$DESTINATION_DIR/server.crt"
+
 service=$(cat << EOF
 [Unit]
 

@@ -1,15 +1,18 @@
-import { ApiResponse } from '../types';
+import { ApiResponse, LastfmTopListenedPeriod } from '../types';
 import { UserService } from '../services/user';
 import { Request, Response } from 'express';
 import { DiscordService } from '../services/discord';
+import { LastfmService } from '../services/lastfm';
 
 class UserController {
   userService: UserService;
   discordService: DiscordService;
+  lastfmService: LastfmService;
 
   constructor() {
     this.userService = new UserService();
     this.discordService = new DiscordService();
+    this.lastfmService = new LastfmService();
   }
 
   public async create(
@@ -165,6 +168,57 @@ class UserController {
       } else {
         return res.status(404).json({ message: 'Lastfm token not found' });
       }
+    } catch (error: any) {
+      console.log(error);
+      return res.status(500).json({ message: 'Unknown Error' });
+    }
+  }
+
+  public async getTopArtists(
+    req: Request,
+    res: Response,
+  ): Promise<Response<ApiResponse<any>>> {
+    const id = req.params.id;
+    const period = req.params.period as LastfmTopListenedPeriod;
+
+    try {
+      const topArtists = await this.userService.getTopArtists(id, period);
+
+      return res.status(200).json(topArtists);
+    } catch (error: any) {
+      console.log(error);
+      return res.status(500).json({ message: 'Unknown Error' });
+    }
+  }
+
+  public async getTopAlbums(
+    req: Request,
+    res: Response,
+  ): Promise<Response<ApiResponse<any>>> {
+    const id = req.params.id;
+    const period = req.params.period as LastfmTopListenedPeriod;
+
+    try {
+      const topAlbums = await this.userService.getTopAlbums(id, period);
+      console.log(topAlbums);
+      return res.status(200).json(topAlbums);
+    } catch (error: any) {
+      console.log(error);
+      return res.status(500).json({ message: 'Unknown Error' });
+    }
+  }
+
+  public async getTopTracks(
+    req: Request,
+    res: Response,
+  ): Promise<Response<ApiResponse<any>>> {
+    const id = req.params.id;
+    const period = req.params.period as LastfmTopListenedPeriod;
+
+    try {
+      const topTracks = await this.userService.getTopTracks(id, period);
+
+      return res.status(200).json(topTracks);
     } catch (error: any) {
       console.log(error);
       return res.status(500).json({ message: 'Unknown Error' });

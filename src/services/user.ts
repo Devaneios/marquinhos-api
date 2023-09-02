@@ -1,8 +1,9 @@
 import User from '../schemas/user';
-import { IUser } from 'types';
+import { IUser, LastfmTopListenedPeriod } from 'types';
 import { DiscordService } from './discord';
 import dotenv from 'dotenv';
 import { LastfmService } from './lastfm';
+import { SpotifyService } from './spotify';
 
 dotenv.config();
 
@@ -10,11 +11,13 @@ export class UserService {
   userDB: typeof User;
   discordService: DiscordService;
   lastfmService: LastfmService;
+  spotifyService: SpotifyService;
 
   constructor() {
     this.userDB = User;
     this.discordService = new DiscordService();
     this.lastfmService = new LastfmService();
+    this.spotifyService = new SpotifyService();
   }
 
   async create(id: string) {
@@ -127,5 +130,119 @@ export class UserService {
       id,
       scrobblesOn: user.scrobblesOn,
     };
+  }
+
+  async getLastfmUsername(id: string) {
+    const user = await this.userDB.findOne({ id });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    if (!user.lastfmUsername) {
+      return null;
+    }
+
+    return user.lastfmUsername;
+  }
+
+  async getTopArtists(id: string, period: LastfmTopListenedPeriod) {
+    const username = await this.getLastfmUsername(id);
+
+    if (!username) {
+      throw new Error('User not found');
+    }
+
+    const topArtists = await this.lastfmService.getTopArtists(username, period);
+
+    const artists = [];
+
+    for (const artist of topArtists) {
+      if (artists.length >= 10) {
+        break;
+      }
+      const spotifyArtist = await this.spotifyService.searchArtist(artist.name);
+
+      if (!spotifyArtist) {
+        continue;
+      }
+
+      if (!spotifyArtist.coverArtUrl) {
+        continue;
+      }
+
+      artists.push({
+        name: artist.name,
+        coverArtUrl: spotifyArtist.coverArtUrl,
+      });
+    }
+
+    return artists;
+  }
+
+  async getTopAlbums(id: string, period: LastfmTopListenedPeriod) {
+    const username = await this.getLastfmUsername(id);
+
+    if (!username) {
+      throw new Error('User not found');
+    }
+
+    const topAlbums = await this.lastfmService.getTopAlbums(username, period);
+
+    const albums = [];
+
+    for (const album of topAlbums) {
+      if (albums.length >= 10) {
+        break;
+      }
+      const spotifyAlbum = await this.spotifyService.searchAlbum(album.name);
+      if (!spotifyAlbum) {
+        continue;
+      }
+
+      if (!spotifyAlbum.coverArtUrl) {
+        continue;
+      }
+
+      albums.push({
+        name: album.name,
+        coverArtUrl: spotifyAlbum.coverArtUrl,
+      });
+    }
+
+    return albums;
+  }
+
+  async getTopTracks(id: string, period: LastfmTopListenedPeriod) {
+    const username = await this.getLastfmUsername(id);
+
+    if (!username) {
+      throw new Error('User not found');
+    }
+
+    const topTracks = await this.lastfmService.getTopTracks(username, period);
+
+    const tracks = [];
+
+    for (const track of topTracks) {
+      if (tracks.length >= 10) {
+        break;
+      }
+      const spotifyTrack = await this.spotifyService.searchTrack(track.name);
+      if (!spotifyTrack) {
+        continue;
+      }
+
+      if (!spotifyTrack.coverArtUrl) {
+        continue;
+      }
+
+      tracks.push({
+        name: track.name,
+        coverArtUrl: spotifyTrack.coverArtUrl,
+      });
+    }
+
+    return tracks;
   }
 }

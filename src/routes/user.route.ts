@@ -1,6 +1,7 @@
 import { verifyDiscordToken } from '../middlewares/userAuth';
 import UserController from '../controllers/user.controller';
 import express from 'express';
+import { checkToken } from '../middlewares/botAuth';
 
 const router = express.Router();
 const userController = new UserController();
@@ -40,6 +41,21 @@ router.patch(
   '/scrobble',
   verifyDiscordToken,
   userController.toggleScrobbles.bind(userController),
+);
+router.get(
+  '/top-artists/:period/:id',
+  checkToken,
+  userController.getTopArtists.bind(userController),
+);
+router.get(
+  '/top-albums/:period/:id',
+  checkToken,
+  userController.getTopAlbums.bind(userController),
+);
+router.get(
+  '/top-tracks/:period/:id',
+  checkToken,
+  userController.getTopTracks.bind(userController),
 );
 
 export default router;

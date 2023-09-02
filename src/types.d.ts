@@ -43,6 +43,14 @@ export interface ApiResponse<T> {
   };
 }
 
+export type LastfmTopListenedPeriod =
+  | '7day'
+  | '1month'
+  | '3month'
+  | '6month'
+  | '12month'
+  | 'overall';
+
 declare module 'express' {
   export interface Request {
     user?: IUser;

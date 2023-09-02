@@ -54,6 +54,69 @@ export class SpotifyService {
     }
   }
 
+  async searchArtist(query: string): Promise<any> {
+    try {
+      await this._getAccessToken();
+      const artist = await this.spotifyApi.search(query, ['artist'], {
+        limit: 1,
+      });
+
+      if (!artist.body.artists?.items.length) {
+        throw new Error('SpotifyArtistNotFound');
+      }
+
+      return {
+        name: artist.body.artists.items[0].name,
+        coverArtUrl: artist.body.artists.items[0].images[0]?.url,
+      };
+    } catch (error) {
+      console.log(error);
+      return null;
+    }
+  }
+
+  async searchAlbum(query: string) {
+    try {
+      await this._getAccessToken();
+      const album = await this.spotifyApi.search(query, ['album'], {
+        limit: 1,
+      });
+
+      if (!album.body.albums?.items.length) {
+        throw new Error('SpotifyAlbumNotFound');
+      }
+
+      return {
+        name: album.body.albums.items[0].name,
+        coverArtUrl: album.body.albums.items[0].images[0]?.url,
+      };
+    } catch (error) {
+      console.log(error);
+      throw new Error('SpotifyRequestUnknownError');
+    }
+  }
+
+  async searchTrack(query: string) {
+    try {
+      await this._getAccessToken();
+      const track = await this.spotifyApi.search(query, ['track'], {
+        limit: 1,
+      });
+
+      if (!track.body.tracks?.items.length) {
+        throw new Error('SpotifyTrackNotFound');
+      }
+
+      return {
+        name: track.body.tracks.items[0].name,
+        coverArtUrl: track.body.tracks.items[0].album.images[0]?.url,
+      };
+    } catch (error) {
+      console.log(error);
+      throw new Error('SpotifyRequestUnknownError');
+    }
+  }
+
   private async _getAccessToken() {
     const data = await this.spotifyApi.clientCredentialsGrant();
     this.spotifyApi.setAccessToken(data.body.access_token);

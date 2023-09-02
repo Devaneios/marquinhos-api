@@ -26,7 +26,12 @@ import axios from 'axios';
 import md5 from 'crypto-js/md5';
 import { getUnixTime, parseISO } from 'date-fns';
 import User from '../schemas/user';
-import { LastfmSessionResponse, PlaybackData, Track } from 'types';
+import {
+  LastfmSessionResponse,
+  LastfmTopListenedPeriod,
+  PlaybackData,
+  Track,
+} from 'types';
 import Scrobble from '../schemas/scrobble';
 
 export class LastfmService {
@@ -221,6 +226,84 @@ export class LastfmService {
       if (error?.response?.data?.error !== 9) {
         console.error(error);
       }
+    }
+  }
+
+  async getTopArtists(
+    userName: string | null,
+    period: LastfmTopListenedPeriod,
+  ) {
+    const params = new URLSearchParams();
+
+    params.set('method', 'user.gettopartists');
+    params.set('user', userName || '');
+    params.set('period', period);
+    params.set('limit', '20');
+
+    try {
+      const response = await this._performRequest(params, 'get', false);
+
+      const topArtists = response?.data.topartists;
+
+      return topArtists.artist.map((artist: any) => {
+        return {
+          name: artist.name,
+          mbid: artist.mbid,
+        };
+      });
+    } catch (error: any) {
+      console.error(error);
+      throw new Error('LastfmRequestUnknownError');
+    }
+  }
+
+  async getTopAlbums(userName: string | null, period: LastfmTopListenedPeriod) {
+    const params = new URLSearchParams();
+
+    params.set('method', 'user.gettopalbums');
+    params.set('user', userName || '');
+    params.set('period', period);
+    params.set('limit', '20');
+
+    try {
+      const response = await this._performRequest(params, 'get', false);
+
+      const topAlbums = response?.data.topalbums;
+
+      return topAlbums.album.map((album: any) => {
+        return {
+          name: album.name,
+          mbid: album.mbid,
+        };
+      });
+    } catch (error: any) {
+      console.error(error);
+      throw new Error('LastfmRequestUnknownError');
+    }
+  }
+
+  async getTopTracks(userName: string | null, period: LastfmTopListenedPeriod) {
+    const params = new URLSearchParams();
+
+    params.set('method', 'user.gettoptracks');
+    params.set('user', userName || '');
+    params.set('period', period);
+    params.set('limit', '20');
+
+    try {
+      const response = await this._performRequest(params, 'get', false);
+
+      const topTracks = response?.data.toptracks;
+
+      return topTracks.track.map((track: any) => {
+        return {
+          name: track.name,
+          mbid: track.mbid,
+        };
+      });
+    } catch (error: any) {
+      console.error(error);
+      throw new Error('LastfmRequestUnknownError');
     }
   }
 

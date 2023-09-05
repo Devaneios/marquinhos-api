@@ -248,7 +248,6 @@ export class LastfmService {
       return topArtists.artist.map((artist: any) => {
         return {
           name: artist.name,
-          mbid: artist.mbid,
         };
       });
     } catch (error: any) {
@@ -273,7 +272,7 @@ export class LastfmService {
       return topAlbums.album.map((album: any) => {
         return {
           name: album.name,
-          mbid: album.mbid,
+          artist: album.artist.name,
         };
       });
     } catch (error: any) {
@@ -298,7 +297,7 @@ export class LastfmService {
       return topTracks.track.map((track: any) => {
         return {
           name: track.name,
-          mbid: track.mbid,
+          artist: track.artist.name,
         };
       });
     } catch (error: any) {

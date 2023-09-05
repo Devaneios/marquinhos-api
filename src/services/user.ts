@@ -147,14 +147,18 @@ export class UserService {
   }
 
   async getTopArtists(id: string, period: LastfmTopListenedPeriod) {
-    const username = await this.getLastfmUsername(id);
+    const user = await this.userDB.findOne({ id });
 
-    if (!username) {
+    if (!user) {
       throw new Error('User not found');
     }
 
-    const profileName = (await this.lastfmService.getUserInfo(username))
-      .realname;
+    const username = user.lastfmUsername ?? '';
+    const sessionKey = user.lastfmSessionToken;
+
+    const profileName = (
+      await this.lastfmService.getUserInfo(sessionKey)
+    ).realname.split(' ')[0];
 
     const topArtists = await this.lastfmService.getTopArtists(username, period);
 
@@ -184,14 +188,18 @@ export class UserService {
   }
 
   async getTopAlbums(id: string, period: LastfmTopListenedPeriod) {
-    const username = await this.getLastfmUsername(id);
+    const user = await this.userDB.findOne({ id });
 
-    if (!username) {
+    if (!user) {
       throw new Error('User not found');
     }
 
-    const profileName = (await this.lastfmService.getUserInfo(username))
-      .realname;
+    const username = user.lastfmUsername ?? '';
+    const sessionKey = user.lastfmSessionToken;
+
+    const profileName = (
+      await this.lastfmService.getUserInfo(sessionKey)
+    ).realname.split(' ')[0];
 
     const topAlbums = await this.lastfmService.getTopAlbums(username, period);
 
@@ -202,7 +210,7 @@ export class UserService {
         break;
       }
       const spotifyAlbum = await this.spotifyService.searchAlbum(
-        `${album.name} ${album.artist.name}`,
+        `${album.name} ${album.artist}`,
       );
       if (!spotifyAlbum) {
         continue;
@@ -222,14 +230,18 @@ export class UserService {
   }
 
   async getTopTracks(id: string, period: LastfmTopListenedPeriod) {
-    const username = await this.getLastfmUsername(id);
+    const user = await this.userDB.findOne({ id });
 
-    if (!username) {
+    if (!user) {
       throw new Error('User not found');
     }
 
-    const profileName = (await this.lastfmService.getUserInfo(username))
-      .realname;
+    const username = user.lastfmUsername ?? '';
+    const sessionKey = user.lastfmSessionToken;
+
+    const profileName = (
+      await this.lastfmService.getUserInfo(sessionKey)
+    ).realname.split(' ')[0];
 
     const topTracks = await this.lastfmService.getTopTracks(username, period);
 
@@ -240,7 +252,7 @@ export class UserService {
         break;
       }
       const spotifyTrack = await this.spotifyService.searchTrack(
-        `${track.name} ${track.artist.name}`,
+        `${track.name} ${track.artist}`,
       );
       if (!spotifyTrack) {
         continue;

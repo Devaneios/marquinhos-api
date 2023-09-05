@@ -195,7 +195,9 @@ export class UserService {
       if (albums.length >= 10) {
         break;
       }
-      const spotifyAlbum = await this.spotifyService.searchAlbum(album.name);
+      const spotifyAlbum = await this.spotifyService.searchAlbum(
+        `${album.name} ${album.artist.name}`,
+      );
       if (!spotifyAlbum) {
         continue;
       }
@@ -228,7 +230,9 @@ export class UserService {
       if (tracks.length >= 10) {
         break;
       }
-      const spotifyTrack = await this.spotifyService.searchTrack(track.name);
+      const spotifyTrack = await this.spotifyService.searchTrack(
+        `${track.name} ${track.artist.name}`,
+      );
       if (!spotifyTrack) {
         continue;
       }

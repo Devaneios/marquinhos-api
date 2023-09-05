@@ -153,6 +153,9 @@ export class UserService {
       throw new Error('User not found');
     }
 
+    const profileName = (await this.lastfmService.getUserInfo(username))
+      .realname;
+
     const topArtists = await this.lastfmService.getTopArtists(username, period);
 
     const artists = [];
@@ -177,7 +180,7 @@ export class UserService {
       });
     }
 
-    return artists;
+    return { artists, profileName };
   }
 
   async getTopAlbums(id: string, period: LastfmTopListenedPeriod) {
@@ -186,6 +189,9 @@ export class UserService {
     if (!username) {
       throw new Error('User not found');
     }
+
+    const profileName = (await this.lastfmService.getUserInfo(username))
+      .realname;
 
     const topAlbums = await this.lastfmService.getTopAlbums(username, period);
 
@@ -212,7 +218,7 @@ export class UserService {
       });
     }
 
-    return albums;
+    return { albums, profileName };
   }
 
   async getTopTracks(id: string, period: LastfmTopListenedPeriod) {
@@ -221,6 +227,9 @@ export class UserService {
     if (!username) {
       throw new Error('User not found');
     }
+
+    const profileName = (await this.lastfmService.getUserInfo(username))
+      .realname;
 
     const topTracks = await this.lastfmService.getTopTracks(username, period);
 
@@ -247,6 +256,6 @@ export class UserService {
       });
     }
 
-    return tracks;
+    return { tracks, profileName };
   }
 }

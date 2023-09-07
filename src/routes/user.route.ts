@@ -38,7 +38,7 @@ router.delete(
   userController.deleteAllData.bind(userController),
 );
 router.patch(
-  '/scrobble',
+  '/toggle-scrobble',
   verifyDiscordToken,
   userController.toggleScrobbles.bind(userController),
 );

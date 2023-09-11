@@ -150,6 +150,7 @@ export class LastfmService {
   async addToScrobbleQueue(track: Track | null, playbackData: PlaybackData) {
     const thirtySecondsInMillis = 30000;
     const fourMinutesInMillis = 240000;
+    const scrobblesOnUsers = [];
 
     if (!track || track.durationInMillis < thirtySecondsInMillis) {
       return;
@@ -171,12 +172,14 @@ export class LastfmService {
           registeredUser.lastfmSessionToken,
           track.durationInMillis / 1000,
         );
+        scrobblesOnUsers.push(userId);
       }
     }
 
     return {
       id: createdDocument._id,
-      trackDurationInMillis: track.durationInMillis,
+      scrobblesOnUsers,
+      track,
     };
   }
 

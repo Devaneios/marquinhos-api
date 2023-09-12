@@ -167,7 +167,7 @@ export class LastfmService {
       });
 
       if (registeredUser?.scrobblesOn) {
-        this.updateNowPlaying(
+        await this.updateNowPlaying(
           track,
           registeredUser.lastfmSessionToken,
           track.durationInMillis / 1000,
@@ -357,4 +357,34 @@ export class LastfmService {
   getAuthorizationUrl = () => {
     return `https://www.last.fm/api/auth/?api_key=${process.env.LASTFM_API_KEY}&cb=${process.env.LASTFM_REDIRECT_URI}`;
   };
+
+  async removeUserFromScrobble(scrobbleId: string, userId: string) {
+    const scrobble = await this.scrobblesDB.findById(scrobbleId);
+
+    if (!scrobble) {
+      throw new Error('ScrobbleNotFound');
+    }
+
+    const userScrobbleList = scrobble.playbackData.listeningUsersId.filter(
+      (user) => user !== userId,
+    );
+
+    const newPlaybackData = {
+      ...scrobble.playbackData,
+      listeningUsersId: userScrobbleList,
+    };
+
+    if (scrobble.playbackData.listeningUsersId.length === 0) {
+      const deleted = await this.scrobblesDB.findByIdAndDelete(scrobbleId);
+
+      return deleted?._id;
+    } else {
+      await this.scrobblesDB.updateOne(
+        { _id: scrobbleId },
+        { $set: { playbackData: newPlaybackData } },
+      );
+
+      return scrobbleId;
+    }
+  }
 }

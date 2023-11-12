@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from 'express';
 
 export function checkToken(req: Request, res: Response, next: NextFunction) {
   const authorization = req.headers['authorization'] as string;
-  console.log(req.headers);
   const token = authorization && authorization.split(' ')[1];
   if (!token) {
     return res.status(401).json({ message: 'Token not provided' });

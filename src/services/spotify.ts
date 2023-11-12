@@ -35,7 +35,9 @@ export class SpotifyService {
   async searchTracks(query: string) {
     try {
       await this._getAccessToken();
-      const track = await this.spotifyApi.searchTracks(query);
+      const track = await this.spotifyApi.searchTracks(query, {
+        limit: 1,
+      });
 
       if (!track.body.tracks?.items.length) {
         throw new Error('SpotifyTrackNotFound');

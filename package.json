@@ -27,7 +27,7 @@
     "@types/mongodb": "^4.0.7",
     "@types/morgan": "^1.9.4",
     "@types/node": "^18.17.5",
-    "@types/spotify-web-api-node": "^5.0.7",
+    "@types/spotify-web-api-node": "^5.0.10",
     "typescript": "5.1.6"
   },
   "scripts": {

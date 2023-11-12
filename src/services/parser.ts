@@ -73,7 +73,7 @@ export class ParserService {
       },
       // Track (... by Artist)
       {
-        pattern: /(\w[\s\w]*?)\s+\([^)]*\s*by\s*([^)]+)+\)/,
+        pattern: /(\w[\s\w]*?)\s+by\s+([\w\s]+)$/,
         groups: { artist: 2, track: 1 },
       },
     ];

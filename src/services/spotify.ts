@@ -1,5 +1,6 @@
 import SpotifyWebApi from 'spotify-web-api-node';
 import dotenv from 'dotenv';
+import { Track } from 'types';
 
 dotenv.config();
 
@@ -32,7 +33,10 @@ export class SpotifyService {
     }
   }
 
-  async searchTracks(query: string) {
+  async searchTrack(
+    query: string,
+    trackPayload: 'full' | 'minimal',
+  ): Promise<Track | Pick<Track, 'name' | 'coverArtUrl'>> {
     try {
       await this._getAccessToken();
       const track = await this.spotifyApi.searchTracks(query, {
@@ -43,13 +47,20 @@ export class SpotifyService {
         throw new Error('SpotifyTrackNotFound');
       }
 
-      return {
-        artist: track.body.tracks.items[0].artists[0].name,
-        name: track.body.tracks.items[0].name,
-        durationInMillis: track.body.tracks.items[0].duration_ms,
-        album: track.body.tracks.items[0].album.name,
-        coverArtUrl: track.body.tracks.items[0].album.images[0].url,
-      };
+      if (trackPayload === 'minimal') {
+        return {
+          name: track.body.tracks.items[0].name,
+          coverArtUrl: track.body.tracks.items[0].album.images[0]?.url,
+        };
+      } else {
+        return {
+          artist: track.body.tracks.items[0].artists[0].name,
+          name: track.body.tracks.items[0].name,
+          durationInMillis: track.body.tracks.items[0].duration_ms,
+          album: track.body.tracks.items[0].album.name,
+          coverArtUrl: track.body.tracks.items[0].album.images[0].url,
+        };
+      }
     } catch (error) {
       console.log(error);
       throw new Error('SpotifyRequestUnknownError');
@@ -91,27 +102,6 @@ export class SpotifyService {
       return {
         name: album.body.albums.items[0].name,
         coverArtUrl: album.body.albums.items[0].images[0]?.url,
-      };
-    } catch (error) {
-      console.log(error);
-      throw new Error('SpotifyRequestUnknownError');
-    }
-  }
-
-  async searchTrack(query: string) {
-    try {
-      await this._getAccessToken();
-      const track = await this.spotifyApi.search(query, ['track'], {
-        limit: 1,
-      });
-
-      if (!track.body.tracks?.items.length) {
-        throw new Error('SpotifyTrackNotFound');
-      }
-
-      return {
-        name: track.body.tracks.items[0].name,
-        coverArtUrl: track.body.tracks.items[0].album.images[0]?.url,
       };
     } catch (error) {
       console.log(error);

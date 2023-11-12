@@ -253,6 +253,7 @@ export class UserService {
       }
       const spotifyTrack = await this.spotifyService.searchTrack(
         `${track.name} ${track.artist}`,
+        'minimal',
       );
       if (!spotifyTrack) {
         continue;

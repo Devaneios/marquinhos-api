@@ -387,4 +387,32 @@ export class LastfmService {
       return scrobbleId;
     }
   }
+  async addUserToScrobble(scrobbleId: string, userId: string) {
+    const user = await User.findOne({
+      id: userId,
+    });
+
+    if (!user) {
+      throw new Error('UserNotFound');
+    }
+
+    const scrobble = await this.scrobblesDB.findById(scrobbleId);
+
+    if (!scrobble) {
+      throw new Error('ScrobbleNotFound');
+    }
+
+    if (scrobble.playbackData.listeningUsersId.includes(userId)) {
+      throw new Error('UserAlreadyOnScrobble');
+    }
+
+    scrobble.playbackData.listeningUsersId.push(userId);
+
+    await this.scrobblesDB.updateOne(
+      { _id: scrobbleId },
+      { $set: { playbackData: scrobble.playbackData } },
+    );
+
+    return scrobbleId;
+  }
 }

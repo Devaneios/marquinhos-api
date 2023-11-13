@@ -27,4 +27,8 @@ export class ScrobblerService {
   async removeUserFromScrobble(scrobbleId: string, userId: string) {
     return await this.lastfmService.removeUserFromScrobble(scrobbleId, userId);
   }
+
+  async addUserToScrobble(scrobbleId: string, userId: string) {
+    return await this.lastfmService.addUserToScrobble(scrobbleId, userId);
+  }
 }

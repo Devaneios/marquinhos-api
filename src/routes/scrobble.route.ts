@@ -24,4 +24,10 @@ router.delete(
   scrobbleController.removeUserFromScrobble.bind(scrobbleController),
 );
 
+router.post(
+  '/:scrobbleId/:userId',
+  checkToken,
+  scrobbleController.addUserToScrobble.bind(scrobbleController),
+);
+
 export default router;

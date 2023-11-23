@@ -13,8 +13,6 @@ import https from 'https';
 import fs from 'fs';
 import cookieParse from 'cookie-parser';
 
-process.env.NODE_ENV = 'production';
-
 const app: Express = express();
 
 dotevn.config();
@@ -66,6 +64,6 @@ mongoConnection().then(() => {
     app,
   );
 
-  httpServer.listen(process.env.PORT || 3000);
-  httpsServer.listen(process.env.PORT || 3106);
+  httpServer.listen(process.env.HTTP_PORT || 3000);
+  httpsServer.listen(process.env.HTTPS_PORT || 3106);
 });

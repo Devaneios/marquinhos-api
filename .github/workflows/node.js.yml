@@ -1,4 +1,4 @@
-name: Node.js CI
+name: Node.js CI/CD
 
 on:
   push:
@@ -14,17 +14,23 @@ jobs:
       matrix:
         node-version: [18.x]
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout Repository
+        uses: actions/checkout@v3
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
-      - run: npm ci
-      - run: npm run build
+      - name: Install Dependencies and Build
+        run: |
+          npm ci
+          npm run build
+
   deploy:
     needs: build
     runs-on: [self-hosted, Linux, X64]
     steps:
-      - run: chmod +x ./deploy.sh
-      - run: echo ${{ secrets.DVNS_CLUSTER_PASSWORD }} | sudo -S ./deploy.sh
+      - name: Make deploy.sh executable
+        run: chmod +x ./deploy.sh
+      - name: Execute deploy.sh
+        run: echo "${{ secrets.DVNS_CLUSTER_PASSWORD }}" | sudo -S ./deploy.sh "$(pwd)/dist"

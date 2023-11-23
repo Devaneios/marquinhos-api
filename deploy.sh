@@ -1,14 +1,12 @@
 #!/bin/bash
 
-source /etc/marquinhos/marquinhos-api.conf
+MARQUINHOS_PATH="/etc/marquinhos"
+source "$MARQUINHOS_PATH/marquinhos-api.conf"
 
-CERTIFICATE_PATH="/home/guilherme/certificates/marquinhos/server.crt"
-KEY_PATH="/home/guilherme/certificates/marquinhos/server.key"
+DESTINATION_DIR="$1"
 
-DESTINATION_DIR="/home/guilherme/github-runners/devaneios-runner/_work/marquinhos-web-api/marquinhos-web-api/dist"
-
-cp "$CERTIFICATE_PATH" "$DESTINATION_DIR"
-cp "$KEY_PATH" "$DESTINATION_DIR"
+cp "$MARQUINHOS_PATH/server.crt" "$DESTINATION_DIR"
+cp "$MARQUINHOS_PATH/server.key" "$DESTINATION_DIR"
 
 chmod 744 "$DESTINATION_DIR/server.key"
 chmod 744 "$DESTINATION_DIR/server.crt"
@@ -33,14 +31,15 @@ Environment="DISCORD_REDIRECT_URI=$DISCORD_REDIRECT_URI"
 Environment="LASTFM_REDIRECT_URI=$LASTFM_REDIRECT_URI"
 Environment="SPOTIFY_CLIENT_ID=$SPOTIFY_CLIENT_ID"
 Environment="SPOTIFY_CLIENT_SECRET=$SPOTIFY_CLIENT_SECRET"
+Environment="NODE_ENV=production"
 
 User=guilherme
 
 KillMode=control-group
 
-WorkingDirectory=/home/guilherme/github-runners/devaneios-runner/_work/marquinhos-web-api/marquinhos-web-api/dist
+WorkingDirectory=$DESTINATION_DIR
 
-ExecStart=/home/guilherme/.nvm/versions/node/v18.13.0/bin/node ./index.js
+ExecStart=node ./index.js
 
 Restart=always
 

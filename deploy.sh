@@ -1,15 +1,14 @@
 #!/bin/bash
 
-MARQUINHOS_PATH="/etc/marquinhos"
-source "$MARQUINHOS_PATH/marquinhos-api.conf"
+source "/etc/marquinhos/marquinhos-api.conf"
 
 DESTINATION_DIR="$1"
 
-cp "$MARQUINHOS_PATH/server.crt" "$DESTINATION_DIR"
-cp "$MARQUINHOS_PATH/server.key" "$DESTINATION_DIR"
+cp "/etc/ssl/certificate.crt" "$DESTINATION_DIR"
+cp "/etc/ssl/private.key" "$DESTINATION_DIR"
 
-chmod 744 "$DESTINATION_DIR/server.key"
-chmod 744 "$DESTINATION_DIR/server.crt"
+chmod 744 "$DESTINATION_DIR/certificate.crt"
+chmod 744 "$DESTINATION_DIR/private.key"
 
 service=$(cat << EOF
 [Unit]

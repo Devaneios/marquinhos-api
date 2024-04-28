@@ -55,8 +55,8 @@ mongoConnection().then(() => {
   if (process.env.NODE_ENV === 'production') {
     const httpsServer = https.createServer(
       {
-        key: fs.readFileSync('server.key').toString(),
-        cert: fs.readFileSync('server.crt').toString(),
+        key: fs.readFileSync('private.key').toString(),
+        cert: fs.readFileSync('certificate.crt').toString(),
       },
       app,
     );

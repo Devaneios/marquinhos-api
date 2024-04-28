@@ -7,7 +7,7 @@
     "axios": "^1.4.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
-    "crypto-js": "^4.1.1",
+    "crypto-js": "^4.2.0",
     "date-fns": "^2.30.0",
     "dotenv": "^16.3.1",
     "eslint": "^8.47.0",
@@ -31,9 +31,8 @@
     "typescript": "5.1.6"
   },
   "scripts": {
-    "build": "npm run tsc",
-    "tsc": "tsc -p tsconfig.json",
-    "dev": "tsc --watch & NODE_ENV=development nodemon dist",
+    "build": "tsc -p tsconfig.json",
+    "dev": "npm run build && npm run start",
     "test": "tsc && ./node_modules/.bin/mocha dist/**/*.spec.js",
     "lint": "tslint 'src/**/*.ts' --fix",
     "clean": "rm -rf dist/ .logs/",

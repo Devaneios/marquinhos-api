@@ -17,10 +17,7 @@ const app: Express = express();
 
 dotevn.config();
 
-const allowlist = [
-  'http://localhost:4200',
-  'https://devaneios.guilhermeasper.dev.br:3105',
-];
+const allowlist = ['http://localhost:4200', 'https://marquinhos-74154.web.app'];
 
 const corsOptionsDelegate = function (req: Request, callback: Function) {
   let corsOptions;

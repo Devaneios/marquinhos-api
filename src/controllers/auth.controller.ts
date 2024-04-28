@@ -36,6 +36,8 @@ class AuthController {
 
       res.set('Authorization', `Bearer ${encryptedToken}`);
       res.set('Refresh-Token', encryptedRefreshToken);
+      res.set('Access-Control-Expose-Headers', 'Authorization, Refresh-Token');
+      res.set('Access-Control-Allow-Headers', 'Authorization, Refresh-Token');
 
       return res.status(200).json({ message: 'Authenticated successfully' });
     } catch (error) {
@@ -67,6 +69,8 @@ class AuthController {
       const encryptedToken = encryptToken(response.access_token);
 
       res.set('Authorization', `Bearer ${encryptedToken}`);
+      res.set('Access-Control-Expose-Headers', 'Authorization');
+      res.set('Access-Control-Allow-Headers', 'Authorization');
 
       return res.status(200).json({ message: 'Token refreshed' });
     } catch (error) {

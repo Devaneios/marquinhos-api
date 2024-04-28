@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { DiscordService } from '../services/discord';
 import { UserService } from '../services/user';
+import { decryptToken } from '../utils/crypto';
 
 const discordService = new DiscordService();
 const userService = new UserService();
@@ -10,16 +11,25 @@ export async function verifyDiscordToken(
   res: Response,
   next: NextFunction,
 ) {
-  const cookies = req.cookies;
+  const authorization = req.headers['authorization'] as string;
+  const access_token = authorization && authorization.split(' ')[1];
 
-  if (!cookies.access_token) {
+  if (!access_token) {
     return res.status(401).json({ message: 'Token not provided' });
   }
 
+  const decryptedToken = decryptToken(access_token);
+
+  if (!decryptedToken) {
+    return res.status(500).json({ message: 'Internal Server Error' });
+  }
+
   try {
-    const discordUser = await discordService.getDiscordUser(
-      cookies.access_token,
-    );
+    const discordUser = await discordService.getDiscordUser(decryptedToken);
+
+    if (!discordUser) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
 
     const user = await userService.userDB.findOne({
       id: discordUser.id,
@@ -34,38 +44,7 @@ export async function verifyDiscordToken(
     });
     next();
   } catch (error) {
-    console.log(error);
-    try {
-      const response = await discordService.refreshToken(cookies.refresh_token);
-
-      const discordUser = await discordService.getDiscordUser(
-        response.access_token,
-      );
-
-      const user = await userService.userDB.findOne({
-        id: discordUser.id,
-      });
-
-      if (!user) {
-        return res.status(401).json({ message: 'User not found' });
-      }
-
-      Object.defineProperty(req, 'user', {
-        value: discordUser,
-      });
-
-      res.cookie('access_token', response.access_token, {
-        maxAge: response.expires_in,
-        httpOnly: true,
-        sameSite: 'none',
-        secure: true,
-        path: '/',
-      });
-
-      next();
-    } catch (error) {
-      console.log(error);
-      return res.status(500).json({ error: 'Internal Server Error' });
-    }
+    console.error(error);
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 }

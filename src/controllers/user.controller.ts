@@ -3,6 +3,7 @@ import { UserService } from '../services/user';
 import { Request, Response } from 'express';
 import { DiscordService } from '../services/discord';
 import { LastfmService } from '../services/lastfm';
+import { decryptToken } from '../utils/crypto';
 
 class UserController {
   userService: UserService;
@@ -20,13 +21,21 @@ class UserController {
     res: Response,
   ): Promise<Response<ApiResponse<void>>> {
     try {
-      const cookies = req.cookies;
+      const authorization = req.headers['authorization'] as string;
+      const access_token = authorization && authorization.split(' ')[1];
+      const decryptedToken = decryptToken(access_token);
+
+      if (!decryptedToken) {
+        return res.status(500).json({ message: 'Internal Server Error' });
+      }
+
       const discordUser = await this.discordService.getDiscordUser(
-        cookies.access_token,
+        decryptedToken,
       );
+      console.log(req.headers);
       await this.userService.create(discordUser.id);
     } catch (error: any) {
-      console.log(error);
+      console.error(error);
 
       if (error.message === 'User already exists') {
         return res.status(409).json({ message: error.message });
@@ -54,7 +63,7 @@ class UserController {
     try {
       await this.userService.enableLastfm(req.user.id, token);
     } catch (error: any) {
-      console.log(error);
+      console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
 
@@ -72,7 +81,7 @@ class UserController {
     try {
       return res.status(200).json(req.user);
     } catch (error: any) {
-      console.log(error);
+      console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
   }
@@ -90,7 +99,7 @@ class UserController {
         .status(200)
         .json(await this.userService.toggleScrobbles(req.user.id));
     } catch (error: any) {
-      console.log(error);
+      console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
   }
@@ -106,7 +115,7 @@ class UserController {
     try {
       await this.userService.deleteLastfmData(req.user.id);
     } catch (error: any) {
-      console.log(error);
+      console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
 
@@ -124,7 +133,7 @@ class UserController {
     try {
       await this.userService.deleteAllData(req.user.id);
     } catch (error: any) {
-      console.log(error);
+      console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
 
@@ -145,7 +154,7 @@ class UserController {
     try {
       return res.status(200).json(await this.userService.exists(req.params.id));
     } catch (error: any) {
-      console.log(error);
+      console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
   }
@@ -169,7 +178,7 @@ class UserController {
         return res.status(404).json({ message: 'Lastfm token not found' });
       }
     } catch (error: any) {
-      console.log(error);
+      console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
   }
@@ -186,7 +195,7 @@ class UserController {
 
       return res.status(200).json(topArtists);
     } catch (error: any) {
-      console.log(error);
+      console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
   }
@@ -203,7 +212,7 @@ class UserController {
       console.log(topAlbums);
       return res.status(200).json(topAlbums);
     } catch (error: any) {
-      console.log(error);
+      console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
   }
@@ -220,7 +229,7 @@ class UserController {
 
       return res.status(200).json(topTracks);
     } catch (error: any) {
-      console.log(error);
+      console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
   }

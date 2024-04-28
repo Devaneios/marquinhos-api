@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { DiscordService } from '../services/discord';
 import { ApiResponse } from '../types';
 import { LastfmService } from '../services/lastfm';
+import { decryptToken, encryptToken } from '../utils/crypto';
 
 class AuthController {
   private discordService: DiscordService;
@@ -20,32 +21,25 @@ class AuthController {
 
     if (!code) {
       return res.status(400).json({
-        error: 'Code not found',
+        error: 'Code not provided',
       });
     }
 
     try {
       const response = await this.discordService.requestToken(code);
+      const encryptedToken = encryptToken(response.access_token);
+      const encryptedRefreshToken = encryptToken(response.refresh_token);
 
-      res.cookie('access_token', response.access_token, {
-        maxAge: Date.now() + response.expires_in,
-        httpOnly: true,
-        sameSite: 'none',
-        secure: true,
-        path: '/',
-      });
+      if (!encryptedToken || !encryptedRefreshToken) {
+        return res.status(500).json({ error: 'Internal Server Error' });
+      }
 
-      res.cookie('refresh_token', response.refresh_token, {
-        maxAge: Date.now() + 30 * 24 * 60 * 60 * 1000,
-        httpOnly: true,
-        sameSite: 'none',
-        secure: true,
-        path: '/',
-      });
+      res.set('Authorization', `Bearer ${encryptedToken}`);
+      res.set('Refresh-Token', encryptedRefreshToken);
 
       return res.status(200).json({ message: 'Authenticated successfully' });
     } catch (error) {
-      console.log(error);
+      console.error(error);
       return res.status(500).json({ error: 'Internal Server Error' });
     }
   }
@@ -54,38 +48,31 @@ class AuthController {
     req: Request,
     res: Response,
   ): Promise<Response<ApiResponse<void>>> {
-    const refresh_token = req.cookies.refresh_token;
+    const refresh_token = req.headers['Refresh-Token'] as string;
 
     if (!refresh_token) {
       return res.status(400).json({ error: 'Refresh token not found' });
     }
+    const decryptedRefreshToken = decryptToken(refresh_token);
+
+    if (!decryptedRefreshToken) {
+      return res.status(500).json({ error: 'Internal Server Error' });
+    }
 
     try {
-      const response = await this.discordService.refreshToken(refresh_token);
+      const response = await this.discordService.refreshToken(
+        decryptedRefreshToken,
+      );
 
-      res.cookie('access_token', response.access_token, {
-        maxAge: response.expires_in,
-        httpOnly: true,
-        sameSite: 'none',
-        secure: true,
-        path: '/',
-      });
+      const encryptedToken = encryptToken(response.access_token);
+
+      res.set('Authorization', `Bearer ${encryptedToken}`);
 
       return res.status(200).json({ message: 'Token refreshed' });
     } catch (error) {
-      console.log(error);
+      console.error(error);
       return res.status(500).json({ error: 'Internal Server Error' });
     }
-  }
-
-  public async logout(
-    req: Request,
-    res: Response,
-  ): Promise<Response<ApiResponse<void>>> {
-    res.clearCookie('access_token');
-    res.clearCookie('refresh_token');
-
-    return res.status(200).json({ message: 'Logged out successfully' });
   }
 
   public discordLoginUrl(

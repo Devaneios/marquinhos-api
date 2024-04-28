@@ -27,7 +27,7 @@ export class SpotifyService {
         coverArtUrl: track.body.album.images[0].url,
       };
     } catch (error) {
-      console.log(error);
+      console.error(error);
 
       throw new Error('SpotifyRequestUnknownError');
     }
@@ -62,7 +62,7 @@ export class SpotifyService {
         };
       }
     } catch (error) {
-      console.log(error);
+      console.error(error);
       throw new Error('SpotifyRequestUnknownError');
     }
   }
@@ -83,7 +83,7 @@ export class SpotifyService {
         coverArtUrl: artist.body.artists.items[0].images[0]?.url,
       };
     } catch (error) {
-      console.log(error);
+      console.error(error);
       return null;
     }
   }
@@ -104,7 +104,7 @@ export class SpotifyService {
         coverArtUrl: album.body.albums.items[0].images[0]?.url,
       };
     } catch (error) {
-      console.log(error);
+      console.error(error);
       throw new Error('SpotifyRequestUnknownError');
     }
   }

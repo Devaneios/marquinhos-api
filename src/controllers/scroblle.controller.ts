@@ -16,7 +16,7 @@ class ScrobbleController {
       );
       return res.status(200).json({ data, message: 'Scrobble added to queue' });
     } catch (error: any) {
-      console.log(error);
+      console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
   }
@@ -26,7 +26,7 @@ class ScrobbleController {
       const id = await this.scrobblerService.dispatchScrobble(req.params.id);
       return res.status(200).json({ data: id, message: 'Scrobbled' });
     } catch (error: any) {
-      console.log(error);
+      console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
   }
@@ -39,7 +39,7 @@ class ScrobbleController {
       );
       return res.status(200).json({ data: id, message: 'User removed' });
     } catch (error: any) {
-      console.log(error);
+      console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
   }
@@ -52,7 +52,7 @@ class ScrobbleController {
       );
       return res.status(200).json({ data: id, message: 'User removed' });
     } catch (error: any) {
-      console.log(error);
+      console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
   }

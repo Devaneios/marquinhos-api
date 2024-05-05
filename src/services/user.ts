@@ -159,31 +159,34 @@ export class UserService {
     const profileName = (
       await this.lastfmService.getUserInfo(sessionKey)
     ).realname.split(' ')[0];
-
     const topArtists = await this.lastfmService.getTopArtists(username, period);
-
-    const artists = [];
+    const artistsPromises: any = [];
 
     for (const artist of topArtists) {
-      if (artists.length >= 10) {
-        break;
-      }
-      const spotifyArtist = await this.spotifyService.searchArtist(artist.name);
-
-      if (!spotifyArtist) {
-        continue;
-      }
-
-      if (!spotifyArtist.coverArtUrl) {
-        continue;
-      }
-
-      artists.push({
-        name: artist.name,
-        coverArtUrl: spotifyArtist.coverArtUrl,
-      });
+      const spotifyArtist = this.spotifyService.searchArtist(artist.name);
+      artistsPromises.push(spotifyArtist);
     }
 
+    const spotifyArtsits = await Promise.all(artistsPromises);
+
+    const artists = spotifyArtsits
+      .map((artist: any) => {
+        if (!artist) {
+          return;
+        }
+
+        if (!artist.coverArtUrl) {
+          return;
+        }
+
+        return {
+          name: artist.name,
+          coverArtUrl: artist.coverArtUrl,
+        };
+      })
+      .filter((artist: any) => artist !== null && artist !== undefined)
+      .slice(0, 10);
+    // TODO: Return not found artists
     return { artists, profileName };
   }
 
@@ -203,29 +206,33 @@ export class UserService {
 
     const topAlbums = await this.lastfmService.getTopAlbums(username, period);
 
-    const albums = [];
+    const albumsPrmises: any = [];
 
     for (const album of topAlbums) {
-      if (albums.length >= 10) {
-        break;
-      }
-      const spotifyAlbum = await this.spotifyService.searchAlbum(
-        `${album.name} ${album.artist}`,
-      );
-      if (!spotifyAlbum) {
-        continue;
-      }
-
-      if (!spotifyAlbum.coverArtUrl) {
-        continue;
-      }
-
-      albums.push({
-        name: album.name,
-        coverArtUrl: spotifyAlbum.coverArtUrl,
-      });
+      const spotifyAlbum = this.spotifyService.searchAlbum(album.name);
+      albumsPrmises.push(spotifyAlbum);
     }
 
+    const spotifyAlbums = await Promise.all(albumsPrmises);
+
+    const albums = spotifyAlbums
+      .map((album: any) => {
+        if (!album) {
+          return;
+        }
+
+        if (!album.coverArtUrl) {
+          return;
+        }
+
+        return {
+          name: album.name,
+          coverArtUrl: album.coverArtUrl,
+        };
+      })
+      .filter((album: any) => album !== null && album !== undefined)
+      .slice(0, 10);
+    // TODO: Return not found albums
     return { albums, profileName };
   }
 
@@ -245,30 +252,37 @@ export class UserService {
 
     const topTracks = await this.lastfmService.getTopTracks(username, period);
 
-    const tracks = [];
+    const tracksPromises: any = [];
 
     for (const track of topTracks) {
-      if (tracks.length >= 10) {
-        break;
-      }
-      const spotifyTrack = await this.spotifyService.searchTrack(
+      const spotifyTrack = this.spotifyService.searchTrack(
         `${track.name} ${track.artist}`,
         'minimal',
       );
-      if (!spotifyTrack) {
-        continue;
-      }
-
-      if (!spotifyTrack.coverArtUrl) {
-        continue;
-      }
-
-      tracks.push({
-        name: track.name,
-        coverArtUrl: spotifyTrack.coverArtUrl,
-      });
+      tracksPromises.push(spotifyTrack);
     }
 
+    const spotifyTracks = await Promise.all(tracksPromises);
+
+    const tracks = spotifyTracks
+      .map((track: any) => {
+        if (!track) {
+          return;
+        }
+
+        if (!track.coverArtUrl) {
+          return;
+        }
+
+        return {
+          name: track.name,
+          coverArtUrl: track.coverArtUrl,
+        };
+      })
+      .filter((track: any) => track !== null && track !== undefined)
+      .slice(0, 10);
+
+    // TODO: Return not found tracks
     return { tracks, profileName };
   }
 }

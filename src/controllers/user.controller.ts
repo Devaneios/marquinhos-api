@@ -206,7 +206,7 @@ class UserController {
 
     try {
       const topAlbums = await this.userService.getTopAlbums(id, period);
-      console.log(topAlbums);
+
       return res.status(200).json(topAlbums);
     } catch (error: any) {
       console.error(error);

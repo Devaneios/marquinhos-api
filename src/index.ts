@@ -11,7 +11,6 @@ import { mongoConnection } from './database/mongo';
 import http from 'http';
 import https from 'https';
 import fs from 'fs';
-import cookieParse from 'cookie-parser';
 
 const app: Express = express();
 
@@ -41,7 +40,6 @@ app.use(
   ),
 );
 
-app.use(cookieParse());
 app.use(express.json());
 app.use(cors(corsOptionsDelegate));
 app.use(express.urlencoded({ extended: true }));

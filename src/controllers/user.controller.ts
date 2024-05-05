@@ -137,9 +137,6 @@ class UserController {
       return res.status(500).json({ message: 'Unknown Error' });
     }
 
-    res.cookie('access_token', '', { maxAge: 0 });
-    res.cookie('refresh_token', '', { maxAge: 0 });
-
     return res.status(200).json({ message: 'User deleted' });
   }
 

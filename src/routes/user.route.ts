@@ -21,7 +21,6 @@ router.get(
   verifyDiscordToken,
   userController.lastfmStatus.bind(userController),
 );
-router.post('/create', userController.create.bind(userController));
 router.post(
   '/enable-lastfm',
   verifyDiscordToken,

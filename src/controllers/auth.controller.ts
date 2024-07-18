@@ -3,12 +3,15 @@ import { DiscordService } from '../services/discord';
 import { ApiResponse } from '../types';
 import { LastfmService } from '../services/lastfm';
 import { decryptToken, encryptToken } from '../utils/crypto';
+import { UserService } from '../services/user';
 
 class AuthController {
   private discordService: DiscordService;
   private lastfmService: LastfmService;
+  private userService: UserService;
 
   constructor() {
+    this.userService = new UserService();
     this.discordService = new DiscordService();
     this.lastfmService = new LastfmService();
   }
@@ -48,6 +51,13 @@ class AuthController {
         'Access-Control-Allow-Headers',
         'Authorization, Refresh-Token, Expires-In, Created-At',
       );
+
+      const discordUser = await this.discordService.getDiscordUser(
+        response.access_token,
+      );
+
+      if (!(await this.userService.exists(discordUser.id)))
+        await this.userService.create(discordUser.id);
 
       return res.status(200).json({ message: 'Authenticated successfully' });
     } catch (error) {

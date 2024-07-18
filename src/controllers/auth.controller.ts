@@ -27,6 +27,7 @@ class AuthController {
 
     try {
       const response = await this.discordService.requestToken(code);
+
       const encryptedToken = encryptToken(response.access_token);
       const encryptedRefreshToken = encryptToken(response.refresh_token);
 
@@ -34,10 +35,19 @@ class AuthController {
         return res.status(500).json({ error: 'Internal Server Error' });
       }
 
+      res.set('Created-At', new Date().toISOString());
+      res.set('Expires-In', response.expires_in.toString());
       res.set('Authorization', `Bearer ${encryptedToken}`);
       res.set('Refresh-Token', encryptedRefreshToken);
-      res.set('Access-Control-Expose-Headers', 'Authorization, Refresh-Token');
-      res.set('Access-Control-Allow-Headers', 'Authorization, Refresh-Token');
+
+      res.set(
+        'Access-Control-Expose-Headers',
+        'Authorization, Refresh-Token, Expires-In, Created-At',
+      );
+      res.set(
+        'Access-Control-Allow-Headers',
+        'Authorization, Refresh-Token, Expires-In, Created-At',
+      );
 
       return res.status(200).json({ message: 'Authenticated successfully' });
     } catch (error) {

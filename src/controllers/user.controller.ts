@@ -32,7 +32,6 @@ class UserController {
       const discordUser = await this.discordService.getDiscordUser(
         decryptedToken,
       );
-      console.log(req.headers);
       await this.userService.create(discordUser.id);
     } catch (error: any) {
       console.error(error);

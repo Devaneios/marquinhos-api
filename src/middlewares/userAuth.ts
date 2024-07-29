@@ -27,6 +27,12 @@ export async function verifyDiscordToken(
   try {
     const discordUser = await discordService.getDiscordUser(decryptedToken);
 
+    const highestRole = await discordService.getDiscordGuildUserHighestRole(
+      decryptedToken,
+    );
+
+    discordUser.highestRole = highestRole;
+
     if (!discordUser) {
       return res.status(403).json({ message: 'Unauthorized' });
     }

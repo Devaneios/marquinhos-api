@@ -13,6 +13,45 @@ export class DiscordService {
     return data;
   };
 
+  getDiscordGuildUserHighestRole = async (token: string) => {
+    const guildUserResponse = await fetch(
+      'https://discord.com/api/users/@me/guilds/305861924648779779/member',
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    const guildUser = await guildUserResponse.json();
+
+    const guildRolesResponse = await axios.get(
+      `https://discord.com/api/guilds/305861924648779779/roles`,
+      {
+        headers: {
+          'User-Agent': 'DiscordBot',
+          Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+        },
+      },
+    );
+
+    const guildRoles = guildRolesResponse.data;
+
+    let highestRole: any = null;
+
+    guildRoles.forEach((role: any) => {
+      if (guildUser.roles.includes(role.id)) {
+        if (!highestRole) {
+          highestRole = role;
+        } else if (role.position > highestRole.position) {
+          highestRole = role;
+        }
+      }
+    });
+
+    return highestRole?.name ?? '';
+  };
+
   requestToken = async (code: string) => {
     const body = new URLSearchParams({
       client_id: process.env.DISCORD_CLIENT_ID ?? '',
@@ -20,7 +59,7 @@ export class DiscordService {
       grant_type: 'authorization_code',
       code,
       redirect_uri: process.env.DISCORD_REDIRECT_URI ?? '',
-      scope: 'identify',
+      scope: 'identify+guilds.members.read',
     });
 
     const response = await axios.post(
@@ -66,6 +105,6 @@ export class DiscordService {
   };
 
   getAuthorizationUrl = () => {
-    return `https://discord.com/oauth2/authorize?response_type=code&client_id=${process.env.DISCORD_CLIENT_ID}&scope=identify&redirect_uri=${process.env.DISCORD_REDIRECT_URI}&prompt=none`;
+    return `https://discord.com/oauth2/authorize?response_type=code&client_id=${process.env.DISCORD_CLIENT_ID}&scope=identify+guilds.members.read&redirect_uri=${process.env.DISCORD_REDIRECT_URI}&prompt=none`;
   };
 }

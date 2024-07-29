@@ -35,12 +35,12 @@ export class DiscordService {
       },
     );
 
-    const guildRoles = guildRolesResponse.data;
+    const guildRoles = guildRolesResponse?.data;
 
     let highestRole: any = null;
 
     guildRoles.forEach((role: any) => {
-      if (guildUser.roles.includes(role.id)) {
+      if (guildUser?.roles.includes(role.id)) {
         if (!highestRole) {
           highestRole = role;
         } else if (role.position > highestRole.position) {

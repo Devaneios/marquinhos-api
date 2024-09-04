@@ -4,8 +4,8 @@ source "/etc/marquinhos/marquinhos-api.conf"
 
 DESTINATION_DIR="$1"
 
-cp "/etc/ssl/certificate.crt" "$DESTINATION_DIR"
-cp "/etc/ssl/private.key" "$DESTINATION_DIR"
+cp "/etc/ssl/dvns-certificate.crt" "$DESTINATION_DIR"
+cp "/etc/ssl/dvns-private.key" "$DESTINATION_DIR"
 
 chmod 744 "$DESTINATION_DIR/certificate.crt"
 chmod 744 "$DESTINATION_DIR/private.key"

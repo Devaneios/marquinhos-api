@@ -4,10 +4,12 @@
   "description": "Marquinhos API",
   "main": "dist",
   "dependencies": {
+    "@types/uuid": "^10.0.0",
     "axios": "^1.4.0",
     "cors": "^2.8.5",
     "crypto-js": "^4.2.0",
     "date-fns": "^2.30.0",
+    "discord-api-types": "^0.37.115",
     "dotenv": "^16.3.1",
     "eslint": "^8.47.0",
     "express": "^4.18.2",
@@ -15,7 +17,8 @@
     "mongoose": "^7.4.3",
     "morgan": "^1.10.0",
     "spotify-web-api-node": "^5.0.2",
-    "tslib": "^2.6.1"
+    "tslib": "^2.6.1",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@types/axios": "^0.14.0",

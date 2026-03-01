@@ -1,0 +1,32 @@
+services:
+  marquinhos-web-api:
+    build: .
+    image: marquinhos-web-api:latest
+    container_name: marquinhos-web-api
+    env_file:
+      - /etc/marquinhos/marquinhos-api.conf
+    environment:
+      - NODE_ENV=production
+    ports:
+      - "3000:3000"
+      - "3106:3106"
+    volumes:
+      - /etc/ssl/dvns-certificate.crt:/app/dvns-certificate.crt:ro
+      - /etc/ssl/dvns-private.key:/app/dvns-private.key:ro
+    restart: on-failure:5
+    healthcheck:
+      test: ['CMD', 'pgrep', '-f', 'bun']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: '100m'
+        max-file: '10'

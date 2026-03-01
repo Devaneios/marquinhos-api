@@ -1,7 +1,11 @@
 import { db } from '../database/sqlite';
 
 type Rarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythical';
-type StatKey = 'total_scrobbles' | 'total_commands' | 'total_voice_joins' | 'games_won';
+type StatKey =
+  | 'total_scrobbles'
+  | 'total_commands'
+  | 'total_voice_joins'
+  | 'games_won';
 
 interface TierDef {
   tier: number;
@@ -30,7 +34,12 @@ const BASE_ACHIEVEMENTS: Record<string, BaseDef> = {
       { tier: 1, name: 'Primeiro Ouvinte', rarity: 'common', icon: '🎵' },
       { tier: 2, name: 'Descobridor Curioso', rarity: 'rare', icon: '🎶' },
       { tier: 3, name: 'Curador de Raridades', rarity: 'epic', icon: '🎼' },
-      { tier: 4, name: 'Descobridor de Talentos', rarity: 'legendary', icon: '🎹' },
+      {
+        tier: 4,
+        name: 'Descobridor de Talentos',
+        rarity: 'legendary',
+        icon: '🎹',
+      },
       { tier: 5, name: 'Visionário Musical', rarity: 'mythical', icon: '🌟' },
     ],
     reasons: [
@@ -80,14 +89,20 @@ const BASE_ACHIEVEMENTS: Record<string, BaseDef> = {
   },
   'season-listener': {
     name: 'Ouvinte Sazonal',
-    description: 'Adapte sua música às estações participando da comunidade de voz',
+    description:
+      'Adapte sua música às estações participando da comunidade de voz',
     statKey: 'total_voice_joins',
     thresholds: { 1: 5, 2: 20, 3: 50, 4: 100 },
     evolutionPath: [
       { tier: 1, name: 'Ouvinte de Verão', rarity: 'common', icon: '🌱' },
       { tier: 2, name: 'Guardião do Outono', rarity: 'rare', icon: '🌸' },
       { tier: 3, name: 'Espírito do Inverno', rarity: 'epic', icon: '☀️' },
-      { tier: 4, name: 'Florescer da Primavera', rarity: 'legendary', icon: '🍂' },
+      {
+        tier: 4,
+        name: 'Florescer da Primavera',
+        rarity: 'legendary',
+        icon: '🍂',
+      },
       { tier: 5, name: 'Senhor das Estações', rarity: 'mythical', icon: '❄️' },
     ],
     reasons: [
@@ -148,9 +163,10 @@ export interface EvolutionResult {
 export class EvolutiveAchievementsService {
   checkAndEvolveAll(userId: string, guildId: string): EvolutionResult[] {
     const stats = db
-      .query<UserStatsRow, { $userId: string; $guildId: string }>(
-        'SELECT total_commands, total_scrobbles, total_voice_joins, total_games, games_won FROM user_stats WHERE user_id = $userId AND guild_id = $guildId',
-      )
+      .query<
+        UserStatsRow,
+        { $userId: string; $guildId: string }
+      >('SELECT total_commands, total_scrobbles, total_voice_joins, total_games, games_won FROM user_stats WHERE user_id = $userId AND guild_id = $guildId')
       .get({ $userId: userId, $guildId: guildId });
 
     if (!stats) return [];
@@ -161,25 +177,37 @@ export class EvolutiveAchievementsService {
       const statValue = stats[def.statKey];
 
       let row = db
-        .query<EvolutiveRow, { $userId: string; $guildId: string; $baseId: string }>(
-          'SELECT * FROM evolutive_achievements WHERE user_id = $userId AND guild_id = $guildId AND base_id = $baseId',
-        )
+        .query<
+          EvolutiveRow,
+          { $userId: string; $guildId: string; $baseId: string }
+        >('SELECT * FROM evolutive_achievements WHERE user_id = $userId AND guild_id = $guildId AND base_id = $baseId')
         .get({ $userId: userId, $guildId: guildId, $baseId: baseId });
 
       // Auto-initialize at tier 1 when the user first qualifies
       if (!row && statValue >= 1) {
         const now = Date.now();
         const initialLog: EvolutionEvent[] = [
-          { tier: 1, evolvedAt: new Date(now).toISOString(), reason: 'Primeiro passo desbloqueado!' },
+          {
+            tier: 1,
+            evolvedAt: new Date(now).toISOString(),
+            reason: 'Primeiro passo desbloqueado!',
+          },
         ];
         db.query(
           'INSERT INTO evolutive_achievements (user_id, guild_id, base_id, current_tier, unlocked_at, last_evolved, evolution_log) VALUES ($userId, $guildId, $baseId, 1, $now, NULL, $log)',
-        ).run({ $userId: userId, $guildId: guildId, $baseId: baseId, $now: now, $log: JSON.stringify(initialLog) });
+        ).run({
+          $userId: userId,
+          $guildId: guildId,
+          $baseId: baseId,
+          $now: now,
+          $log: JSON.stringify(initialLog),
+        });
 
         row = db
-          .query<EvolutiveRow, { $userId: string; $guildId: string; $baseId: string }>(
-            'SELECT * FROM evolutive_achievements WHERE user_id = $userId AND guild_id = $guildId AND base_id = $baseId',
-          )
+          .query<
+            EvolutiveRow,
+            { $userId: string; $guildId: string; $baseId: string }
+          >('SELECT * FROM evolutive_achievements WHERE user_id = $userId AND guild_id = $guildId AND base_id = $baseId')
           .get({ $userId: userId, $guildId: guildId, $baseId: baseId });
       }
 
@@ -195,7 +223,8 @@ export class EvolutiveAchievementsService {
       log.push({
         tier: nextTierDef.tier,
         evolvedAt: new Date(now).toISOString(),
-        reason: def.reasons[Math.min(nextTierDef.tier - 2, def.reasons.length - 1)],
+        reason:
+          def.reasons[Math.min(nextTierDef.tier - 2, def.reasons.length - 1)],
       });
 
       db.query(
@@ -209,29 +238,42 @@ export class EvolutiveAchievementsService {
         $baseId: baseId,
       });
 
-      evolutions.push({ baseId, newTier: nextTierDef.tier, newTierName: nextTierDef.name, icon: nextTierDef.icon });
+      evolutions.push({
+        baseId,
+        newTier: nextTierDef.tier,
+        newTierName: nextTierDef.name,
+        icon: nextTierDef.icon,
+      });
     }
 
     return evolutions;
   }
 
-  getUserEvolutiveAchievements(userId: string, guildId: string): EvolutiveAchievement[] {
+  getUserEvolutiveAchievements(
+    userId: string,
+    guildId: string,
+  ): EvolutiveAchievement[] {
     const rows = db
-      .query<EvolutiveRow, { $userId: string; $guildId: string }>(
-        'SELECT * FROM evolutive_achievements WHERE user_id = $userId AND guild_id = $guildId',
-      )
+      .query<
+        EvolutiveRow,
+        { $userId: string; $guildId: string }
+      >('SELECT * FROM evolutive_achievements WHERE user_id = $userId AND guild_id = $guildId')
       .all({ $userId: userId, $guildId: guildId });
 
     const stats = db
-      .query<UserStatsRow, { $userId: string; $guildId: string }>(
-        'SELECT total_commands, total_scrobbles, total_voice_joins, total_games, games_won FROM user_stats WHERE user_id = $userId AND guild_id = $guildId',
-      )
+      .query<
+        UserStatsRow,
+        { $userId: string; $guildId: string }
+      >('SELECT total_commands, total_scrobbles, total_voice_joins, total_games, games_won FROM user_stats WHERE user_id = $userId AND guild_id = $guildId')
       .get({ $userId: userId, $guildId: guildId });
 
-    return rows.map(row => {
+    return rows.map((row) => {
       const def = BASE_ACHIEVEMENTS[row.base_id];
       const tierDef = def.evolutionPath[row.current_tier - 1];
-      const nextThreshold = row.current_tier < 5 ? (def.thresholds[row.current_tier] ?? null) : null;
+      const nextThreshold =
+        row.current_tier < 5
+          ? (def.thresholds[row.current_tier] ?? null)
+          : null;
 
       return {
         baseId: row.base_id,
@@ -250,14 +292,18 @@ export class EvolutiveAchievementsService {
     });
   }
 
-  getEvolutionTimeline(userId: string, guildId: string): { baseId: string; name: string; events: EvolutionEvent[] }[] {
+  getEvolutionTimeline(
+    userId: string,
+    guildId: string,
+  ): { baseId: string; name: string; events: EvolutionEvent[] }[] {
     const rows = db
-      .query<EvolutiveRow, { $userId: string; $guildId: string }>(
-        'SELECT * FROM evolutive_achievements WHERE user_id = $userId AND guild_id = $guildId ORDER BY unlocked_at ASC',
-      )
+      .query<
+        EvolutiveRow,
+        { $userId: string; $guildId: string }
+      >('SELECT * FROM evolutive_achievements WHERE user_id = $userId AND guild_id = $guildId ORDER BY unlocked_at ASC')
       .all({ $userId: userId, $guildId: guildId });
 
-    return rows.map(row => ({
+    return rows.map((row) => ({
       baseId: row.base_id,
       name: BASE_ACHIEVEMENTS[row.base_id]?.name ?? row.base_id,
       events: JSON.parse(row.evolution_log) as EvolutionEvent[],

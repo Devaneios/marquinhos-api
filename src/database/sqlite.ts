@@ -126,9 +126,15 @@ db.run(`
   )
 `);
 
-db.run('CREATE INDEX IF NOT EXISTS idx_user_game_results_user ON user_game_results(user_id, guild_id)');
-db.run('CREATE INDEX IF NOT EXISTS idx_game_results_guild_type ON game_results(guild_id, game_type)');
-db.run('CREATE INDEX IF NOT EXISTS idx_user_levels_leaderboard ON user_levels(guild_id, level DESC, total_xp DESC)');
+db.run(
+  'CREATE INDEX IF NOT EXISTS idx_user_game_results_user ON user_game_results(user_id, guild_id)',
+);
+db.run(
+  'CREATE INDEX IF NOT EXISTS idx_game_results_guild_type ON game_results(guild_id, game_type)',
+);
+db.run(
+  'CREATE INDEX IF NOT EXISTS idx_user_levels_leaderboard ON user_levels(guild_id, level DESC, total_xp DESC)',
+);
 
 const cleanupStmt = db.prepare(
   `DELETE FROM scrobbles_queue WHERE created_at < (unixepoch() - ${TTL_SECONDS})`,

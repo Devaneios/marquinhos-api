@@ -164,7 +164,10 @@ export class GamificationService {
     }
 
     const achievCount = db
-      .query<{ count: number }, []>('SELECT COUNT(*) as count FROM achievements')
+      .query<
+        { count: number },
+        []
+      >('SELECT COUNT(*) as count FROM achievements')
       .get();
     if (!achievCount || achievCount.count === 0) {
       const insertAchiev = db.prepare(
@@ -191,11 +194,15 @@ export class GamificationService {
   }
 
   private ensureUser(userId: string, guildId: string): void {
-    db.query('INSERT OR IGNORE INTO user_levels (user_id, guild_id) VALUES ($userId, $guildId)').run({
+    db.query(
+      'INSERT OR IGNORE INTO user_levels (user_id, guild_id) VALUES ($userId, $guildId)',
+    ).run({
       $userId: userId,
       $guildId: guildId,
     });
-    db.query('INSERT OR IGNORE INTO user_stats (user_id, guild_id) VALUES ($userId, $guildId)').run({
+    db.query(
+      'INSERT OR IGNORE INTO user_stats (user_id, guild_id) VALUES ($userId, $guildId)',
+    ).run({
       $userId: userId,
       $guildId: guildId,
     });
@@ -204,18 +211,20 @@ export class GamificationService {
   getUserLevel(userId: string, guildId: string): UserLevel {
     this.ensureUser(userId, guildId);
     return db
-      .query<UserLevel, { $userId: string; $guildId: string }>(
-        'SELECT * FROM user_levels WHERE user_id = $userId AND guild_id = $guildId',
-      )
+      .query<
+        UserLevel,
+        { $userId: string; $guildId: string }
+      >('SELECT * FROM user_levels WHERE user_id = $userId AND guild_id = $guildId')
       .get({ $userId: userId, $guildId: guildId })!;
   }
 
   private applyLevelUps(userId: string, guildId: string): boolean {
     let leveled = false;
     let row = db
-      .query<UserLevel, { $userId: string; $guildId: string }>(
-        'SELECT * FROM user_levels WHERE user_id = $userId AND guild_id = $guildId',
-      )
+      .query<
+        UserLevel,
+        { $userId: string; $guildId: string }
+      >('SELECT * FROM user_levels WHERE user_id = $userId AND guild_id = $guildId')
       .get({ $userId: userId, $guildId: guildId })!;
 
     while (row.xp >= this.getRequiredXP(row.level)) {
@@ -224,9 +233,10 @@ export class GamificationService {
         'UPDATE user_levels SET level = level + 1, xp = xp - $required WHERE user_id = $userId AND guild_id = $guildId',
       ).run({ $required: required, $userId: userId, $guildId: guildId });
       row = db
-        .query<UserLevel, { $userId: string; $guildId: string }>(
-          'SELECT * FROM user_levels WHERE user_id = $userId AND guild_id = $guildId',
-        )
+        .query<
+          UserLevel,
+          { $userId: string; $guildId: string }
+        >('SELECT * FROM user_levels WHERE user_id = $userId AND guild_id = $guildId')
         .get({ $userId: userId, $guildId: guildId })!;
       leveled = true;
     }
@@ -237,9 +247,10 @@ export class GamificationService {
     this.ensureUser(userId, guildId);
 
     const config = db
-      .query<XpConfig, { $eventType: string }>(
-        'SELECT * FROM xp_config WHERE event_type = $eventType',
-      )
+      .query<
+        XpConfig,
+        { $eventType: string }
+      >('SELECT * FROM xp_config WHERE event_type = $eventType')
       .get({ $eventType: eventType });
 
     if (!config) throw new Error(`Unknown event type: ${eventType}`);
@@ -247,9 +258,10 @@ export class GamificationService {
     // Cooldown check
     if (config.cooldown_ms !== null) {
       const cooldown = db
-        .query<{ last_gain: number }, { $userId: string; $guildId: string; $eventType: string }>(
-          'SELECT last_gain FROM xp_cooldowns WHERE user_id = $userId AND guild_id = $guildId AND event_type = $eventType',
-        )
+        .query<
+          { last_gain: number },
+          { $userId: string; $guildId: string; $eventType: string }
+        >('SELECT last_gain FROM xp_cooldowns WHERE user_id = $userId AND guild_id = $guildId AND event_type = $eventType')
         .get({ $userId: userId, $guildId: guildId, $eventType: eventType });
 
       if (cooldown && Date.now() - cooldown.last_gain < config.cooldown_ms) {
@@ -263,7 +275,12 @@ export class GamificationService {
 
       db.query(
         'INSERT INTO xp_cooldowns (user_id, guild_id, event_type, last_gain) VALUES ($userId, $guildId, $eventType, $now) ON CONFLICT (user_id, guild_id, event_type) DO UPDATE SET last_gain = excluded.last_gain',
-      ).run({ $userId: userId, $guildId: guildId, $eventType: eventType, $now: Date.now() });
+      ).run({
+        $userId: userId,
+        $guildId: guildId,
+        $eventType: eventType,
+        $now: Date.now(),
+      });
     }
 
     // Update activity counters
@@ -284,44 +301,66 @@ export class GamificationService {
     // Apply XP
     db.query(
       'UPDATE user_levels SET xp = xp + $amount, total_xp = total_xp + $amount, last_xp_gain = $now WHERE user_id = $userId AND guild_id = $guildId',
-    ).run({ $amount: config.xp_amount, $now: Date.now(), $userId: userId, $guildId: guildId });
+    ).run({
+      $amount: config.xp_amount,
+      $now: Date.now(),
+      $userId: userId,
+      $guildId: guildId,
+    });
 
     const leveledUp = this.applyLevelUps(userId, guildId);
     const userLevel = this.getUserLevel(userId, guildId);
-    const unlockedAchievements = this.checkAndAwardAchievements(userId, guildId);
+    const unlockedAchievements = this.checkAndAwardAchievements(
+      userId,
+      guildId,
+    );
     evolutiveService.checkAndEvolveAll(userId, guildId);
 
-    return { userLevel, onCooldown: false, leveledUp, newLevel: leveledUp ? userLevel.level : undefined, unlockedAchievements };
+    return {
+      userLevel,
+      onCooldown: false,
+      leveledUp,
+      newLevel: leveledUp ? userLevel.level : undefined,
+      unlockedAchievements,
+    };
   }
 
   checkAndAwardAchievements(userId: string, guildId: string): string[] {
     const stats = db
-      .query<UserStats, { $userId: string; $guildId: string }>(
-        'SELECT * FROM user_stats WHERE user_id = $userId AND guild_id = $guildId',
-      )
+      .query<
+        UserStats,
+        { $userId: string; $guildId: string }
+      >('SELECT * FROM user_stats WHERE user_id = $userId AND guild_id = $guildId')
       .get({ $userId: userId, $guildId: guildId });
 
     const userLevel = db
-      .query<UserLevel, { $userId: string; $guildId: string }>(
-        'SELECT * FROM user_levels WHERE user_id = $userId AND guild_id = $guildId',
-      )
+      .query<
+        UserLevel,
+        { $userId: string; $guildId: string }
+      >('SELECT * FROM user_levels WHERE user_id = $userId AND guild_id = $guildId')
       .get({ $userId: userId, $guildId: guildId });
 
     if (!stats || !userLevel) return [];
 
-    const achievements = db.query<Achievement, []>('SELECT * FROM achievements').all();
+    const achievements = db
+      .query<Achievement, []>('SELECT * FROM achievements')
+      .all();
     const unlocked: string[] = [];
 
     for (const achievement of achievements) {
       const existing = db
-        .query<{ n: number }, { $userId: string; $guildId: string; $id: string }>(
-          'SELECT 1 as n FROM user_achievements WHERE user_id = $userId AND guild_id = $guildId AND achievement_id = $id',
-        )
+        .query<
+          { n: number },
+          { $userId: string; $guildId: string; $id: string }
+        >('SELECT 1 as n FROM user_achievements WHERE user_id = $userId AND guild_id = $guildId AND achievement_id = $id')
         .get({ $userId: userId, $guildId: guildId, $id: achievement.id });
 
       if (existing) continue;
 
-      const condition = JSON.parse(achievement.condition) as { type: string; threshold: number };
+      const condition = JSON.parse(achievement.condition) as {
+        type: string;
+        threshold: number;
+      };
       let met = false;
 
       switch (condition.type) {
@@ -351,31 +390,52 @@ export class GamificationService {
     return unlocked;
   }
 
-  unlockAchievement(userId: string, guildId: string, achievementId: string): boolean {
+  unlockAchievement(
+    userId: string,
+    guildId: string,
+    achievementId: string,
+  ): boolean {
     this.ensureUser(userId, guildId);
 
     const achievement = db
-      .query<Achievement, { $id: string }>('SELECT * FROM achievements WHERE id = $id')
+      .query<
+        Achievement,
+        { $id: string }
+      >('SELECT * FROM achievements WHERE id = $id')
       .get({ $id: achievementId });
 
     if (!achievement) return false;
 
     const existing = db
-      .query<{ n: number }, { $userId: string; $guildId: string; $achievementId: string }>(
-        'SELECT 1 as n FROM user_achievements WHERE user_id = $userId AND guild_id = $guildId AND achievement_id = $achievementId',
-      )
-      .get({ $userId: userId, $guildId: guildId, $achievementId: achievementId });
+      .query<
+        { n: number },
+        { $userId: string; $guildId: string; $achievementId: string }
+      >('SELECT 1 as n FROM user_achievements WHERE user_id = $userId AND guild_id = $guildId AND achievement_id = $achievementId')
+      .get({
+        $userId: userId,
+        $guildId: guildId,
+        $achievementId: achievementId,
+      });
 
     if (existing) return false;
 
     db.query(
       'INSERT INTO user_achievements (user_id, guild_id, achievement_id, unlocked_at) VALUES ($userId, $guildId, $achievementId, $now)',
-    ).run({ $userId: userId, $guildId: guildId, $achievementId: achievementId, $now: Date.now() });
+    ).run({
+      $userId: userId,
+      $guildId: guildId,
+      $achievementId: achievementId,
+      $now: Date.now(),
+    });
 
     if (achievement.reward_xp > 0) {
       db.query(
         'UPDATE user_levels SET xp = xp + $amount, total_xp = total_xp + $amount WHERE user_id = $userId AND guild_id = $guildId',
-      ).run({ $amount: achievement.reward_xp, $userId: userId, $guildId: guildId });
+      ).run({
+        $amount: achievement.reward_xp,
+        $userId: userId,
+        $guildId: guildId,
+      });
       this.applyLevelUps(userId, guildId);
     }
 
@@ -424,38 +484,42 @@ export class GamificationService {
       $reward_xp: data.reward_xp,
     });
     return db
-      .query<Achievement, { $id: string }>('SELECT * FROM achievements WHERE id = $id')
+      .query<
+        Achievement,
+        { $id: string }
+      >('SELECT * FROM achievements WHERE id = $id')
       .get({ $id: data.id })!;
   }
 
   getLeaderboard(guildId: string, limit: number = 10): UserLevel[] {
     return db
-      .query<UserLevel, { $guildId: string; $limit: number }>(
-        'SELECT * FROM user_levels WHERE guild_id = $guildId ORDER BY level DESC, total_xp DESC LIMIT $limit',
-      )
+      .query<
+        UserLevel,
+        { $guildId: string; $limit: number }
+      >('SELECT * FROM user_levels WHERE guild_id = $guildId ORDER BY level DESC, total_xp DESC LIMIT $limit')
       .all({ $guildId: guildId, $limit: limit });
   }
 
   recordGameResult(input: GameResultInput): void {
     const now = Date.now();
 
-    const winXp =
-      (
-        db
-          .query<{ xp_amount: number }, { $event: string }>(
-            'SELECT xp_amount FROM xp_config WHERE event_type = $event',
-          )
-          .get({ $event: 'game_win' }) ?? { xp_amount: 20 }
-      ).xp_amount;
+    const winXp = (
+      db
+        .query<
+          { xp_amount: number },
+          { $event: string }
+        >('SELECT xp_amount FROM xp_config WHERE event_type = $event')
+        .get({ $event: 'game_win' }) ?? { xp_amount: 20 }
+    ).xp_amount;
 
-    const participateXp =
-      (
-        db
-          .query<{ xp_amount: number }, { $event: string }>(
-            'SELECT xp_amount FROM xp_config WHERE event_type = $event',
-          )
-          .get({ $event: 'game_participate' }) ?? { xp_amount: 5 }
-      ).xp_amount;
+    const participateXp = (
+      db
+        .query<
+          { xp_amount: number },
+          { $event: string }
+        >('SELECT xp_amount FROM xp_config WHERE event_type = $event')
+        .get({ $event: 'game_participate' }) ?? { xp_amount: 5 }
+    ).xp_amount;
 
     db.query(
       'INSERT OR IGNORE INTO game_results (id, guild_id, game_type, played_at, duration_ms) VALUES ($id, $guildId, $gameType, $playedAt, $durationMs)',
@@ -483,7 +547,12 @@ export class GamificationService {
 
       db.query(
         'UPDATE user_levels SET xp = xp + $amount, total_xp = total_xp + $amount, last_xp_gain = $now WHERE user_id = $userId AND guild_id = $guildId',
-      ).run({ $amount: xpAwarded, $now: now, $userId: player.userId, $guildId: input.guildId });
+      ).run({
+        $amount: xpAwarded,
+        $now: now,
+        $userId: player.userId,
+        $guildId: input.guildId,
+      });
 
       db.query(
         'UPDATE user_stats SET total_games = total_games + 1, games_won = games_won + $wonIncrement WHERE user_id = $userId AND guild_id = $guildId',
@@ -501,13 +570,17 @@ export class GamificationService {
   getUserGameStats(
     userId: string,
     guildId: string,
-  ): { stats: UserStats; byGame: { game_type: string; games_played: number; wins: number }[] } {
+  ): {
+    stats: UserStats;
+    byGame: { game_type: string; games_played: number; wins: number }[];
+  } {
     this.ensureUser(userId, guildId);
 
     const stats = db
-      .query<UserStats, { $userId: string; $guildId: string }>(
-        'SELECT * FROM user_stats WHERE user_id = $userId AND guild_id = $guildId',
-      )
+      .query<
+        UserStats,
+        { $userId: string; $guildId: string }
+      >('SELECT * FROM user_stats WHERE user_id = $userId AND guild_id = $guildId')
       .get({ $userId: userId, $guildId: guildId })!;
 
     const byGame = db
@@ -532,10 +605,20 @@ export class GamificationService {
   getGameLeaderboard(
     guildId: string,
     gameType: string,
-  ): { user_id: string; wins: number; games_played: number; total_xp_earned: number }[] {
+  ): {
+    user_id: string;
+    wins: number;
+    games_played: number;
+    total_xp_earned: number;
+  }[] {
     return db
       .query<
-        { user_id: string; wins: number; games_played: number; total_xp_earned: number },
+        {
+          user_id: string;
+          wins: number;
+          games_played: number;
+          total_xp_earned: number;
+        },
         { $guildId: string; $gameType: string }
       >(
         `SELECT ugr.user_id,

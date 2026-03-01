@@ -1,5 +1,10 @@
 import { Request, Response } from 'express';
-import { AddXpResult, GamificationService, UserAchievement, UserLevel } from '../services/gamification';
+import {
+  AddXpResult,
+  GamificationService,
+  UserAchievement,
+  UserLevel,
+} from '../services/gamification';
 
 // Transform helpers — convert snake_case DB rows to camelCase for bot/web consumers
 function formatLevel(row: UserLevel) {
@@ -64,12 +69,19 @@ class GamificationController {
       };
 
       if (!userId || !guildId || !eventType) {
-        return res.status(400).json({ message: 'userId, guildId, and eventType are required' });
+        return res
+          .status(400)
+          .json({ message: 'userId, guildId, and eventType are required' });
       }
 
       const result = this.service.addXP(userId, guildId, eventType);
       const data = formatAddXpResult(result);
-      return res.status(200).json({ data, message: result.onCooldown ? 'On cooldown' : 'XP added' });
+      return res
+        .status(200)
+        .json({
+          data,
+          message: result.onCooldown ? 'On cooldown' : 'XP added',
+        });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
@@ -108,11 +120,22 @@ class GamificationController {
       };
 
       if (!userId || !guildId || !achievementId) {
-        return res.status(400).json({ message: 'userId, guildId, and achievementId are required' });
+        return res
+          .status(400)
+          .json({ message: 'userId, guildId, and achievementId are required' });
       }
 
-      const unlocked = this.service.unlockAchievement(userId, guildId, achievementId);
-      return res.status(200).json({ data: { unlocked }, message: unlocked ? 'Achievement unlocked' : 'Already unlocked' });
+      const unlocked = this.service.unlockAchievement(
+        userId,
+        guildId,
+        achievementId,
+      );
+      return res
+        .status(200)
+        .json({
+          data: { unlocked },
+          message: unlocked ? 'Achievement unlocked' : 'Already unlocked',
+        });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
@@ -162,19 +185,36 @@ class GamificationController {
 
   recordGameResult(req: Request, res: Response) {
     try {
-      const { sessionId, guildId, gameType, durationMs, results } = req.body as {
-        sessionId: string;
-        guildId: string;
-        gameType: string;
-        durationMs?: number;
-        results: { userId: string; position: number }[];
-      };
+      const { sessionId, guildId, gameType, durationMs, results } =
+        req.body as {
+          sessionId: string;
+          guildId: string;
+          gameType: string;
+          durationMs?: number;
+          results: { userId: string; position: number }[];
+        };
 
-      if (!sessionId || !guildId || !gameType || !Array.isArray(results) || results.length === 0) {
-        return res.status(400).json({ message: 'sessionId, guildId, gameType, and results are required' });
+      if (
+        !sessionId ||
+        !guildId ||
+        !gameType ||
+        !Array.isArray(results) ||
+        results.length === 0
+      ) {
+        return res
+          .status(400)
+          .json({
+            message: 'sessionId, guildId, gameType, and results are required',
+          });
       }
 
-      this.service.recordGameResult({ sessionId, guildId, gameType, durationMs, results });
+      this.service.recordGameResult({
+        sessionId,
+        guildId,
+        gameType,
+        durationMs,
+        results,
+      });
       return res.status(200).json({ message: 'Game result recorded' });
     } catch (error) {
       console.error(error);

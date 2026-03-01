@@ -85,7 +85,7 @@ export class ParserService {
     if (spotifyTrackIdMatch) {
       try {
         return await this.spotifyService.getTrack(spotifyTrackIdMatch);
-      } catch (_error: Error) {
+      } catch (_error: unknown) {
         throw new Error('SpotifyRequestUnknownError');
       }
     }
@@ -128,7 +128,7 @@ export class ParserService {
         filteredTitle,
         'full',
       )) as Track;
-    } catch (error: Error) {
+    } catch (error: unknown) {
       console.error(error);
     }
 

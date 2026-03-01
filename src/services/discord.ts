@@ -46,19 +46,17 @@ export class DiscordService {
     let highestRole: { id: string; position: number; name: string } | null =
       null;
 
-    guildRoles.forEach(
-      (role: { id: string; position: number; name: string }) => {
-        if (guildUser?.roles.includes(role.id)) {
-          if (!highestRole) {
-            highestRole = role;
-          } else if (role.position > highestRole.position) {
-            highestRole = role;
-          }
+    for (const role of guildRoles) {
+      if (guildUser?.roles.includes(role.id)) {
+        if (!highestRole) {
+          highestRole = role;
+        } else if (role.position > highestRole.position) {
+          highestRole = role;
         }
-      },
-    );
+      }
+    }
 
-    return highestRole?.name ?? '';
+    return highestRole?.name || '';
   };
 
   requestToken = async (code: string) => {

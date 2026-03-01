@@ -36,6 +36,14 @@ import Scrobble from '../schemas/scrobble';
 import User from '../schemas/user';
 // URLSearchParams is available globally in Node.js >= 15 but we import for clarity
 
+interface LastfmErrorResponse {
+  response?: {
+    data?: {
+      error?: number;
+    };
+  };
+}
+
 export class LastfmService {
   readonly apiRootUrl = 'https://ws.audioscrobbler.com/2.0';
   readonly userAgent = 'cordscrobbler/1.0.0';
@@ -56,13 +64,14 @@ export class LastfmService {
     let request;
     try {
       request = await this._performRequest(params, 'get', true);
-    } catch (error: Error) {
-      if (error?.response?.data?.error === 14) {
+    } catch (error: unknown) {
+      const err = error as LastfmErrorResponse;
+      if (err?.response?.data?.error === 14) {
         throw new Error('LastfmTokenNotAuthorized');
       }
       if (
-        error?.response?.data?.error === 11 &&
-        error?.response?.data?.error === 16
+        err?.response?.data?.error === 11 ||
+        err?.response?.data?.error === 16
       ) {
         throw new Error('LastfmServiceUnavailable');
       } else {
@@ -104,8 +113,9 @@ export class LastfmService {
 
     try {
       await this._performRequest(params, 'post', true);
-    } catch (error: Error) {
-      if (error?.response?.data?.error === 9) {
+    } catch (error: unknown) {
+      const err = error as LastfmErrorResponse;
+      if (err?.response?.data?.error === 9) {
         throw new Error('LastfmInvalidSessionKey');
       } else {
         console.error(error);
@@ -125,8 +135,9 @@ export class LastfmService {
       const response = await this._performRequest(params, 'get', true);
 
       return response?.data.user;
-    } catch (error: Error) {
-      if (error?.response?.data?.error === 9) {
+    } catch (error: unknown) {
+      const err = error as LastfmErrorResponse;
+      if (err?.response?.data?.error === 9) {
         throw new Error('LastfmInvalidSessionKey');
       } else {
         console.error(error);
@@ -226,8 +237,9 @@ export class LastfmService {
 
     try {
       const _response = await this._performRequest(params, 'post', true);
-    } catch (error: Error) {
-      if (error?.response?.data?.error !== 9) {
+    } catch (error: unknown) {
+      const err = error as LastfmErrorResponse;
+      if (err?.response?.data?.error !== 9) {
         console.error(error);
       }
     }
@@ -254,7 +266,7 @@ export class LastfmService {
           name: artist.name,
         };
       });
-    } catch (error: Error) {
+    } catch (error: unknown) {
       console.error(error);
       throw new Error('LastfmRequestUnknownError');
     }
@@ -281,7 +293,7 @@ export class LastfmService {
           };
         },
       );
-    } catch (error: Error) {
+    } catch (error: unknown) {
       console.error(error);
       throw new Error('LastfmRequestUnknownError');
     }
@@ -308,7 +320,7 @@ export class LastfmService {
           };
         },
       );
-    } catch (error: Error) {
+    } catch (error: unknown) {
       console.error(error);
       throw new Error('LastfmRequestUnknownError');
     }

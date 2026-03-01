@@ -1,7 +1,7 @@
-import { verifyDiscordToken } from '../middlewares/userAuth';
-import UserController from '../controllers/user.controller';
 import express from 'express';
+import UserController from '../controllers/user.controller';
 import { checkToken } from '../middlewares/botAuth';
+import { verifyDiscordToken } from '../middlewares/userAuth';
 
 const router = express.Router();
 const userController = new UserController();

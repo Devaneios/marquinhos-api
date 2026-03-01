@@ -22,10 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
+import { URLSearchParams } from 'url';
 import axios from 'axios';
 import md5 from 'crypto-js/md5';
 import { getUnixTime, parseISO } from 'date-fns';
-import User from '../schemas/user';
 import {
   LastfmSessionResponse,
   LastfmTopListenedPeriod,
@@ -33,6 +33,8 @@ import {
   Track,
 } from 'types';
 import Scrobble from '../schemas/scrobble';
+import User from '../schemas/user';
+// URLSearchParams is available globally in Node.js >= 15 but we import for clarity
 
 export class LastfmService {
   readonly apiRootUrl = 'https://ws.audioscrobbler.com/2.0';
@@ -54,7 +56,7 @@ export class LastfmService {
     let request;
     try {
       request = await this._performRequest(params, 'get', true);
-    } catch (error: any) {
+    } catch (error: Error) {
       if (error?.response?.data?.error === 14) {
         throw new Error('LastfmTokenNotAuthorized');
       }
@@ -102,7 +104,7 @@ export class LastfmService {
 
     try {
       await this._performRequest(params, 'post', true);
-    } catch (error: any) {
+    } catch (error: Error) {
       if (error?.response?.data?.error === 9) {
         throw new Error('LastfmInvalidSessionKey');
       } else {
@@ -123,7 +125,7 @@ export class LastfmService {
       const response = await this._performRequest(params, 'get', true);
 
       return response?.data.user;
-    } catch (error: any) {
+    } catch (error: Error) {
       if (error?.response?.data?.error === 9) {
         throw new Error('LastfmInvalidSessionKey');
       } else {
@@ -149,7 +151,6 @@ export class LastfmService {
 
   async addToScrobbleQueue(track: Track | null, playbackData: PlaybackData) {
     const thirtySecondsInMillis = 30000;
-    const fourMinutesInMillis = 240000;
     const scrobblesOnUsers = [];
 
     if (!track || track.durationInMillis < thirtySecondsInMillis) {
@@ -224,8 +225,8 @@ export class LastfmService {
     }
 
     try {
-      await this._performRequest(params, 'post', true);
-    } catch (error: any) {
+      const _response = await this._performRequest(params, 'post', true);
+    } catch (error: Error) {
       if (error?.response?.data?.error !== 9) {
         console.error(error);
       }
@@ -248,12 +249,12 @@ export class LastfmService {
 
       const topArtists = response?.data.topartists;
 
-      return topArtists.artist.map((artist: any) => {
+      return topArtists.artist.map((artist: { name: string }) => {
         return {
           name: artist.name,
         };
       });
-    } catch (error: any) {
+    } catch (error: Error) {
       console.error(error);
       throw new Error('LastfmRequestUnknownError');
     }
@@ -272,13 +273,15 @@ export class LastfmService {
 
       const topAlbums = response?.data.topalbums;
 
-      return topAlbums.album.map((album: any) => {
-        return {
-          name: album.name,
-          artist: album.artist.name,
-        };
-      });
-    } catch (error: any) {
+      return topAlbums.album.map(
+        (album: { name: string; artist: { name: string } }) => {
+          return {
+            name: album.name,
+            artist: album.artist.name,
+          };
+        },
+      );
+    } catch (error: Error) {
       console.error(error);
       throw new Error('LastfmRequestUnknownError');
     }
@@ -297,13 +300,15 @@ export class LastfmService {
 
       const topTracks = response?.data.toptracks;
 
-      return topTracks.track.map((track: any) => {
-        return {
-          name: track.name,
-          artist: track.artist.name,
-        };
-      });
-    } catch (error: any) {
+      return topTracks.track.map(
+        (track: { name: string; artist: { name: string } }) => {
+          return {
+            name: track.name,
+            artist: track.artist.name,
+          };
+        },
+      );
+    } catch (error: Error) {
       console.error(error);
       throw new Error('LastfmRequestUnknownError');
     }

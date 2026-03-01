@@ -85,7 +85,7 @@ export class ParserService {
     if (spotifyTrackIdMatch) {
       try {
         return await this.spotifyService.getTrack(spotifyTrackIdMatch);
-      } catch (error: any) {
+      } catch (_error: Error) {
         throw new Error('SpotifyRequestUnknownError');
       }
     }
@@ -113,10 +113,7 @@ export class ParserService {
     for (const regExp of youtubeTitleRegExps) {
       const artistTrack = filteredTitle.match(regExp.pattern);
       if (artistTrack) {
-        filteredTitle =
-          artistTrack[regExp.groups.artist] +
-          ' ' +
-          artistTrack[regExp.groups.track];
+        filteredTitle = `${artistTrack[regExp.groups.artist]} ${artistTrack[regExp.groups.track]}`;
         break;
       }
     }
@@ -131,7 +128,7 @@ export class ParserService {
         filteredTitle,
         'full',
       )) as Track;
-    } catch (error: any) {
+    } catch (error: Error) {
       console.error(error);
     }
 

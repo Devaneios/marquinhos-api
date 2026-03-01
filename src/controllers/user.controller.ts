@@ -1,8 +1,8 @@
-import { ApiResponse, LastfmTopListenedPeriod } from '../types';
-import { UserService } from '../services/user';
 import { Request, Response } from 'express';
 import { DiscordService } from '../services/discord';
 import { LastfmService } from '../services/lastfm';
+import { UserService } from '../services/user';
+import { ApiResponse, LastfmTopListenedPeriod } from '../types';
 import { decryptToken } from '../utils/crypto';
 
 class UserController {
@@ -29,11 +29,10 @@ class UserController {
         return res.status(500).json({ message: 'Internal Server Error' });
       }
 
-      const discordUser = await this.discordService.getDiscordUser(
-        decryptedToken,
-      );
+      const discordUser =
+        await this.discordService.getDiscordUser(decryptedToken);
       await this.userService.create(discordUser.id);
-    } catch (error: any) {
+    } catch (error: Error) {
       console.error(error);
 
       if (error.message === 'User already exists') {
@@ -61,7 +60,7 @@ class UserController {
 
     try {
       await this.userService.enableLastfm(req.user.id, token);
-    } catch (error: any) {
+    } catch (error: Error) {
       console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
@@ -79,7 +78,7 @@ class UserController {
 
     try {
       return res.status(200).json(req.user);
-    } catch (error: any) {
+    } catch (error: Error) {
       console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
@@ -97,7 +96,7 @@ class UserController {
       return res
         .status(200)
         .json(await this.userService.toggleScrobbles(req.user.id));
-    } catch (error: any) {
+    } catch (error: Error) {
       console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
@@ -113,7 +112,7 @@ class UserController {
 
     try {
       await this.userService.deleteLastfmData(req.user.id);
-    } catch (error: any) {
+    } catch (error: Error) {
       console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
@@ -131,7 +130,7 @@ class UserController {
 
     try {
       await this.userService.deleteAllData(req.user.id);
-    } catch (error: any) {
+    } catch (error: Error) {
       console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
@@ -149,7 +148,7 @@ class UserController {
 
     try {
       return res.status(200).json(await this.userService.exists(req.params.id));
-    } catch (error: any) {
+    } catch (error: Error) {
       console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
@@ -173,16 +172,13 @@ class UserController {
       } else {
         return res.status(404).json({ message: 'Lastfm token not found' });
       }
-    } catch (error: any) {
+    } catch (error: Error) {
       console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
   }
 
-  public async getTopArtists(
-    req: Request,
-    res: Response,
-  ): Promise<Response<ApiResponse<any>>> {
+  public async getTopArtists(req: Request, res: Response): Promise<Response> {
     const id = req.params.id;
     const period = req.params.period as LastfmTopListenedPeriod;
 
@@ -190,16 +186,13 @@ class UserController {
       const topArtists = await this.userService.getTopArtists(id, period);
 
       return res.status(200).json(topArtists);
-    } catch (error: any) {
+    } catch (error: Error) {
       console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
   }
 
-  public async getTopAlbums(
-    req: Request,
-    res: Response,
-  ): Promise<Response<ApiResponse<any>>> {
+  public async getTopAlbums(req: Request, res: Response): Promise<Response> {
     const id = req.params.id;
     const period = req.params.period as LastfmTopListenedPeriod;
 
@@ -207,16 +200,13 @@ class UserController {
       const topAlbums = await this.userService.getTopAlbums(id, period);
 
       return res.status(200).json(topAlbums);
-    } catch (error: any) {
+    } catch (error: Error) {
       console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
   }
 
-  public async getTopTracks(
-    req: Request,
-    res: Response,
-  ): Promise<Response<ApiResponse<any>>> {
+  public async getTopTracks(req: Request, res: Response): Promise<Response> {
     const id = req.params.id;
     const period = req.params.period as LastfmTopListenedPeriod;
 
@@ -224,7 +214,7 @@ class UserController {
       const topTracks = await this.userService.getTopTracks(id, period);
 
       return res.status(200).json(topTracks);
-    } catch (error: any) {
+    } catch (error: Error) {
       console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }

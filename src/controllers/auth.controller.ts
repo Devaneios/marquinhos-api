@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
 import { DiscordService } from '../services/discord';
-import { ApiResponse } from '../types';
 import { LastfmService } from '../services/lastfm';
-import { decryptToken, encryptToken } from '../utils/crypto';
 import { UserService } from '../services/user';
+import { ApiResponse } from '../types';
+import { decryptToken, encryptToken } from '../utils/crypto';
 
 class AuthController {
   private discordService: DiscordService;

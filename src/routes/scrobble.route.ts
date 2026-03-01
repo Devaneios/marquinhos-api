@@ -1,8 +1,6 @@
-import { checkToken } from '../middlewares/botAuth';
+import express from 'express';
 import ScrobbleController from '../controllers/scroblle.controller';
-import { Request, Response } from 'express';
-
-const express = require('express');
+import { checkToken } from '../middlewares/botAuth';
 const router = express.Router();
 const scrobbleController = new ScrobbleController();
 

@@ -1,7 +1,7 @@
-import User from '../schemas/user';
-import { IUser, LastfmTopListenedPeriod } from 'types';
-import { DiscordService } from './discord';
 import dotenv from 'dotenv';
+import { LastfmTopListenedPeriod, Track } from 'types';
+import User from '../schemas/user';
+import { DiscordService } from './discord';
 import { LastfmService } from './lastfm';
 import { SpotifyService } from './spotify';
 
@@ -160,7 +160,10 @@ export class UserService {
       await this.lastfmService.getUserInfo(sessionKey)
     ).realname.split(' ')[0];
     const topArtists = await this.lastfmService.getTopArtists(username, period);
-    const artistsPromises: any = [];
+    const artistsPromises: Promise<{
+      name: string;
+      coverArtUrl?: string;
+    } | null>[] = [];
 
     for (const artist of topArtists) {
       const spotifyArtist = this.spotifyService.searchArtist(artist.name);
@@ -170,7 +173,7 @@ export class UserService {
     const spotifyArtsits = await Promise.all(artistsPromises);
 
     const artists = spotifyArtsits
-      .map((artist: any) => {
+      .map((artist) => {
         if (!artist) {
           return;
         }
@@ -184,7 +187,10 @@ export class UserService {
           coverArtUrl: artist.coverArtUrl,
         };
       })
-      .filter((artist: any) => artist !== null && artist !== undefined)
+      .filter(
+        (artist): artist is { name: string; coverArtUrl: string } =>
+          artist !== null && artist !== undefined,
+      )
       .slice(0, 10);
     // TODO: Return not found artists
     return { artists, profileName };
@@ -206,17 +212,18 @@ export class UserService {
 
     const topAlbums = await this.lastfmService.getTopAlbums(username, period);
 
-    const albumsPrmises: any = [];
+    const albumsPromises: Promise<{ name: string; coverArtUrl?: string }>[] =
+      [];
 
     for (const album of topAlbums) {
       const spotifyAlbum = this.spotifyService.searchAlbum(album.name);
-      albumsPrmises.push(spotifyAlbum);
+      albumsPromises.push(spotifyAlbum);
     }
 
-    const spotifyAlbums = await Promise.all(albumsPrmises);
+    const spotifyAlbums = await Promise.all(albumsPromises);
 
     const albums = spotifyAlbums
-      .map((album: any) => {
+      .map((album) => {
         if (!album) {
           return;
         }
@@ -230,7 +237,10 @@ export class UserService {
           coverArtUrl: album.coverArtUrl,
         };
       })
-      .filter((album: any) => album !== null && album !== undefined)
+      .filter(
+        (album): album is { name: string; coverArtUrl: string } =>
+          album !== null && album !== undefined,
+      )
       .slice(0, 10);
     // TODO: Return not found albums
     return { albums, profileName };
@@ -252,7 +262,7 @@ export class UserService {
 
     const topTracks = await this.lastfmService.getTopTracks(username, period);
 
-    const tracksPromises: any = [];
+    const tracksPromises: Promise<Pick<Track, 'name' | 'coverArtUrl'>>[] = [];
 
     for (const track of topTracks) {
       const spotifyTrack = this.spotifyService.searchTrack(
@@ -265,7 +275,7 @@ export class UserService {
     const spotifyTracks = await Promise.all(tracksPromises);
 
     const tracks = spotifyTracks
-      .map((track: any) => {
+      .map((track) => {
         if (!track) {
           return;
         }
@@ -279,7 +289,10 @@ export class UserService {
           coverArtUrl: track.coverArtUrl,
         };
       })
-      .filter((track: any) => track !== null && track !== undefined)
+      .filter(
+        (track): track is { name: string; coverArtUrl: string } =>
+          track !== null && track !== undefined,
+      )
       .slice(0, 10);
 
     // TODO: Return not found tracks

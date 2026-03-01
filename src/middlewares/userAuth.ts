@@ -27,9 +27,8 @@ export async function verifyDiscordToken(
   try {
     const discordUser = await discordService.getDiscordUser(decryptedToken);
 
-    const highestRole = await discordService.getDiscordGuildUserHighestRole(
-      decryptedToken,
-    );
+    const highestRole =
+      await discordService.getDiscordGuildUserHighestRole(decryptedToken);
 
     discordUser.highestRole = highestRole;
 

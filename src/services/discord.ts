@@ -1,4 +1,6 @@
+import { URLSearchParams } from 'url';
 import axios from 'axios';
+// URLSearchParams is available globally in Node.js >= 15 but we import for clarity
 
 export class DiscordService {
   getDiscordUser = async (token: string) => {
@@ -35,19 +37,26 @@ export class DiscordService {
       },
     );
 
-    const guildRoles = guildRolesResponse?.data;
+    const guildRoles = guildRolesResponse?.data as Array<{
+      id: string;
+      position: number;
+      name: string;
+    }>;
 
-    let highestRole: any = null;
+    let highestRole: { id: string; position: number; name: string } | null =
+      null;
 
-    guildRoles.forEach((role: any) => {
-      if (guildUser?.roles.includes(role.id)) {
-        if (!highestRole) {
-          highestRole = role;
-        } else if (role.position > highestRole.position) {
-          highestRole = role;
+    guildRoles.forEach(
+      (role: { id: string; position: number; name: string }) => {
+        if (guildUser?.roles.includes(role.id)) {
+          if (!highestRole) {
+            highestRole = role;
+          } else if (role.position > highestRole.position) {
+            highestRole = role;
+          }
         }
-      }
-    });
+      },
+    );
 
     return highestRole?.name ?? '';
   };

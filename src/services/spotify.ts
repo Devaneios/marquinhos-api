@@ -1,5 +1,5 @@
-import SpotifyWebApi from 'spotify-web-api-node';
 import dotenv from 'dotenv';
+import SpotifyWebApi from 'spotify-web-api-node';
 import { Track } from 'types';
 
 dotenv.config();
@@ -67,7 +67,9 @@ export class SpotifyService {
     }
   }
 
-  async searchArtist(query: string): Promise<any> {
+  async searchArtist(
+    query: string,
+  ): Promise<{ name: string; coverArtUrl?: string } | null> {
     try {
       await this._getAccessToken();
       const artist = await this.spotifyApi.search(query, ['artist'], {

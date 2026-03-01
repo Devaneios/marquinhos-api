@@ -1,6 +1,5 @@
-import { id } from 'date-fns/locale';
-import { ScrobblerService } from '../services/scrobbler';
 import { Request, Response } from 'express';
+import { ScrobblerService } from '../services/scrobbler';
 
 class ScrobbleController {
   scrobblerService: ScrobblerService;
@@ -15,7 +14,7 @@ class ScrobbleController {
         req.body.playbackData,
       );
       return res.status(200).json({ data, message: 'Scrobble added to queue' });
-    } catch (error: any) {
+    } catch (error: Error) {
       console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
@@ -25,7 +24,7 @@ class ScrobbleController {
     try {
       const id = await this.scrobblerService.dispatchScrobble(req.params.id);
       return res.status(200).json({ data: id, message: 'Scrobbled' });
-    } catch (error: any) {
+    } catch (error: Error) {
       console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
@@ -38,7 +37,7 @@ class ScrobbleController {
         req.params.userId,
       );
       return res.status(200).json({ data: id, message: 'User removed' });
-    } catch (error: any) {
+    } catch (error: Error) {
       console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }
@@ -51,7 +50,7 @@ class ScrobbleController {
         req.params.userId,
       );
       return res.status(200).json({ data: id, message: 'User removed' });
-    } catch (error: any) {
+    } catch (error: Error) {
       console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
     }

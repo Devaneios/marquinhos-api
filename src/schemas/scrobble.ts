@@ -1,6 +1,5 @@
 import { Schema, model } from 'mongoose';
-import { IScrobble, IUser } from '../types';
-import { PlaybackData, Track } from '../types';
+import { IScrobble, PlaybackData, Track } from '../types';
 
 const ScrobbleSchema = new Schema<IScrobble>(
   {

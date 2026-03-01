@@ -1,16 +1,13 @@
-import express from 'express';
-import { Express, Request, Response } from 'express';
-import dotevn from 'dotenv';
-import morgan from 'morgan';
 import cors from 'cors';
-import * as auth from './routes/auth.route';
-import * as user from './routes/user.route';
-import * as scrobble from './routes/scrobble.route';
-import * as privacyPolicy from './routes/privacyPolicy.route';
-import { mongoConnection } from './database/mongo';
+import dotevn from 'dotenv';
+import express, { Express, Request } from 'express';
 import http from 'http';
-import https from 'https';
-import fs from 'fs';
+import morgan from 'morgan';
+import './database/sqlite';
+import * as auth from './routes/auth.route';
+import * as privacyPolicy from './routes/privacyPolicy.route';
+import * as scrobble from './routes/scrobble.route';
+import * as user from './routes/user.route';
 
 const app: Express = express();
 
@@ -49,7 +46,5 @@ app.use('/api/user', user.default);
 app.use('/api/scrobble', scrobble.default);
 app.use('/api/privacy-policy', privacyPolicy.default);
 
-mongoConnection().then(() => {
-  const httpServer = http.createServer(app);
-  httpServer.listen(process.env.HTTP_PORT || 3000);
-});
+const httpServer = http.createServer(app);
+httpServer.listen(process.env.HTTP_PORT || 3000);

@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import { DiscordService } from '../services/discord';
 import { UserService } from '../services/user';
 import { decryptToken } from '../utils/crypto';
@@ -36,9 +36,7 @@ export async function verifyDiscordToken(
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
-    const user = await userService.userDB.findOne({
-      id: discordUser.id,
-    });
+    const user = await userService.exists(discordUser.id);
 
     if (!user) {
       return res.status(401).json({ message: 'User not found' });

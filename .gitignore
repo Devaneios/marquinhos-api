@@ -1,5 +1,7 @@
 /node_modules
 /out
+marquinhos.db
+marquinhos.db*
 
 .env
 node_modules/

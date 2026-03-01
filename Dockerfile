@@ -23,6 +23,8 @@ COPY --from=builder /app/node_modules ./node_modules
 # Copy source (Bun runs TypeScript natively)
 COPY src/ ./src/
 
+RUN mkdir -p /app/data && chown marquinhos:marquinhos /app/data
+
 USER marquinhos
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \

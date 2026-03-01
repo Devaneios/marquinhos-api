@@ -1,5 +1,5 @@
-import { URLSearchParams } from 'url';
 import axios from 'axios';
+import { URLSearchParams } from 'url';
 // URLSearchParams is available globally in Node.js >= 15 but we import for clarity
 
 export class DiscordService {

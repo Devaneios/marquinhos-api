@@ -12,6 +12,7 @@ services:
     volumes:
       - /etc/ssl/dvns-certificate.crt:/app/dvns-certificate.crt:ro
       - /etc/ssl/dvns-private.key:/app/dvns-private.key:ro
+      - marquinhos-sqlite-data:/app/data
     restart: on-failure:5
     healthcheck:
       test: ['CMD', 'pgrep', '-f', 'bun']
@@ -35,3 +36,7 @@ services:
 networks:
   marquinhos-net:
     external: true
+
+volumes:
+  marquinhos-sqlite-data:
+    driver: local

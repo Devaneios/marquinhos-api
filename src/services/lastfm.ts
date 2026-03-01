@@ -22,7 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
-import { URLSearchParams } from 'url';
 import axios from 'axios';
 import md5 from 'crypto-js/md5';
 import { getUnixTime, parseISO } from 'date-fns';
@@ -32,8 +31,8 @@ import {
   PlaybackData,
   Track,
 } from 'types';
-import Scrobble from '../schemas/scrobble';
-import User from '../schemas/user';
+import { URLSearchParams } from 'url';
+import { db } from '../database/sqlite';
 // URLSearchParams is available globally in Node.js >= 15 but we import for clarity
 
 interface LastfmErrorResponse {
@@ -44,14 +43,21 @@ interface LastfmErrorResponse {
   };
 }
 
+type ScrobbleRow = {
+  id: string;
+  track: string;
+  playback_data: string;
+};
+
+type UserRow = {
+  id: string;
+  lastfm_session_token: string | null;
+  scrobbles_on: number | null;
+};
+
 export class LastfmService {
   readonly apiRootUrl = 'https://ws.audioscrobbler.com/2.0';
   readonly userAgent = 'cordscrobbler/1.0.0';
-  private scrobblesDB: typeof Scrobble;
-
-  constructor() {
-    this.scrobblesDB = Scrobble;
-  }
 
   async getSession(token: string | undefined): Promise<LastfmSessionResponse> {
     if (!token) {
@@ -147,17 +153,22 @@ export class LastfmService {
   }
 
   async dispatchScrobbleFromQueue(scrobbleId: string) {
-    const scrobble = await this.scrobblesDB.findById(scrobbleId);
+    const row = db
+      .prepare('SELECT track, playback_data FROM scrobbles_queue WHERE id = ?')
+      .get(scrobbleId) as Pick<ScrobbleRow, 'track' | 'playback_data'> | null;
 
-    if (!scrobble) {
+    if (!row) {
       throw new Error('ScrobbleNotFound');
     }
 
-    await this.dispatchScrobble(scrobble.track, scrobble.playbackData);
+    const track = JSON.parse(row.track) as Track;
+    const playbackData = JSON.parse(row.playback_data) as PlaybackData;
 
-    const deleted = await this.scrobblesDB.findByIdAndDelete(scrobbleId);
+    await this.dispatchScrobble(track, playbackData);
 
-    return deleted?._id;
+    db.prepare('DELETE FROM scrobbles_queue WHERE id = ?').run(scrobbleId);
+
+    return scrobbleId;
   }
 
   async addToScrobbleQueue(track: Track | null, playbackData: PlaybackData) {
@@ -168,20 +179,27 @@ export class LastfmService {
       return;
     }
 
-    const createdDocument = await this.scrobblesDB.create({
-      track,
-      playbackData,
-    });
+    const id = crypto.randomUUID();
+    const createdAt = Math.floor(Date.now() / 1000);
+
+    db.prepare(
+      'INSERT INTO scrobbles_queue (id, track, playback_data, created_at) VALUES (?, ?, ?, ?)',
+    ).run(id, JSON.stringify(track), JSON.stringify(playbackData), createdAt);
 
     for (const userId of playbackData.listeningUsersId) {
-      const registeredUser = await User.findOne({
-        id: userId,
-      });
+      const registeredUser = db
+        .prepare(
+          'SELECT lastfm_session_token, scrobbles_on FROM users WHERE id = ?',
+        )
+        .get(userId) as Pick<
+        UserRow,
+        'lastfm_session_token' | 'scrobbles_on'
+      > | null;
 
-      if (registeredUser?.scrobblesOn) {
+      if (registeredUser?.scrobbles_on === 1) {
         await this.updateNowPlaying(
           track,
-          registeredUser.lastfmSessionToken,
+          registeredUser.lastfm_session_token ?? undefined,
           track.durationInMillis / 1000,
         );
         scrobblesOnUsers.push(userId);
@@ -189,7 +207,7 @@ export class LastfmService {
     }
 
     return {
-      id: createdDocument._id,
+      id,
       scrobblesOnUsers,
       track,
     };
@@ -199,15 +217,20 @@ export class LastfmService {
     const scrobblingRequestPromises: Promise<void>[] = [];
 
     for (const userId of playbackData.listeningUsersId) {
-      const registeredUser = await User.findOne({
-        id: userId,
-      });
+      const registeredUser = db
+        .prepare(
+          'SELECT lastfm_session_token, scrobbles_on FROM users WHERE id = ?',
+        )
+        .get(userId) as Pick<
+        UserRow,
+        'lastfm_session_token' | 'scrobbles_on'
+      > | null;
 
-      if (registeredUser?.scrobblesOn) {
+      if (registeredUser?.scrobbles_on === 1) {
         const scrobblingRequestPromise = this.scrobble(
           [track],
           [playbackData],
-          registeredUser.lastfmSessionToken,
+          registeredUser.lastfm_session_token ?? undefined,
         );
         scrobblingRequestPromises.push(scrobblingRequestPromise);
       }
@@ -376,58 +399,60 @@ export class LastfmService {
   };
 
   async removeUserFromScrobble(scrobbleId: string, userId: string) {
-    const scrobble = await this.scrobblesDB.findById(scrobbleId);
+    const row = db
+      .prepare('SELECT playback_data FROM scrobbles_queue WHERE id = ?')
+      .get(scrobbleId) as Pick<ScrobbleRow, 'playback_data'> | null;
 
-    if (!scrobble) {
+    if (!row) {
       throw new Error('ScrobbleNotFound');
     }
 
-    const userScrobbleList = scrobble.playbackData.listeningUsersId.filter(
+    const playbackData = JSON.parse(row.playback_data) as PlaybackData;
+    const updatedUsers = playbackData.listeningUsersId.filter(
       (user) => user !== userId,
     );
 
-    const newPlaybackData = {
-      ...scrobble.playbackData,
-      listeningUsersId: userScrobbleList,
-    };
-
-    if (scrobble.playbackData.listeningUsersId.length === 0) {
-      const deleted = await this.scrobblesDB.findByIdAndDelete(scrobbleId);
-
-      return deleted?._id;
+    if (updatedUsers.length === 0) {
+      db.prepare('DELETE FROM scrobbles_queue WHERE id = ?').run(scrobbleId);
     } else {
-      await this.scrobblesDB.updateOne(
-        { _id: scrobbleId },
-        { $set: { playbackData: newPlaybackData } },
-      );
-
-      return scrobbleId;
+      const newPlaybackData: PlaybackData = {
+        ...playbackData,
+        listeningUsersId: updatedUsers,
+      };
+      db.prepare(
+        'UPDATE scrobbles_queue SET playback_data = ? WHERE id = ?',
+      ).run(JSON.stringify(newPlaybackData), scrobbleId);
     }
+
+    return scrobbleId;
   }
+
   async addUserToScrobble(scrobbleId: string, userId: string) {
-    const user = await User.findOne({
-      id: userId,
-    });
+    const user = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
 
     if (!user) {
       throw new Error('UserNotFound');
     }
 
-    const scrobble = await this.scrobblesDB.findById(scrobbleId);
+    const row = db
+      .prepare('SELECT playback_data FROM scrobbles_queue WHERE id = ?')
+      .get(scrobbleId) as Pick<ScrobbleRow, 'playback_data'> | null;
 
-    if (!scrobble) {
+    if (!row) {
       throw new Error('ScrobbleNotFound');
     }
 
-    if (scrobble.playbackData.listeningUsersId.includes(userId)) {
+    const playbackData = JSON.parse(row.playback_data) as PlaybackData;
+
+    if (playbackData.listeningUsersId.includes(userId)) {
       throw new Error('UserAlreadyOnScrobble');
     }
 
-    scrobble.playbackData.listeningUsersId.push(userId);
+    playbackData.listeningUsersId.push(userId);
 
-    await this.scrobblesDB.updateOne(
-      { _id: scrobbleId },
-      { $set: { playbackData: scrobble.playbackData } },
+    db.prepare('UPDATE scrobbles_queue SET playback_data = ? WHERE id = ?').run(
+      JSON.stringify(playbackData),
+      scrobbleId,
     );
 
     return scrobbleId;

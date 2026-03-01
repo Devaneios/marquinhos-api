@@ -1,39 +1,44 @@
 import dotenv from 'dotenv';
 import { LastfmTopListenedPeriod, Track } from 'types';
-import User from '../schemas/user';
+import { db } from '../database/sqlite';
 import { DiscordService } from './discord';
 import { LastfmService } from './lastfm';
 import { SpotifyService } from './spotify';
 
 dotenv.config();
 
+type UserRow = {
+  id: string;
+  lastfm_session_token: string | null;
+  lastfm_username: string | null;
+  scrobbles_on: number | null;
+};
+
 export class UserService {
-  userDB: typeof User;
   discordService: DiscordService;
   lastfmService: LastfmService;
   spotifyService: SpotifyService;
 
   constructor() {
-    this.userDB = User;
     this.discordService = new DiscordService();
     this.lastfmService = new LastfmService();
     this.spotifyService = new SpotifyService();
   }
 
   async create(id: string) {
-    const user = await this.userDB.findOne({ id });
+    const existing = db.prepare('SELECT id FROM users WHERE id = ?').get(id);
 
-    if (user) {
+    if (existing) {
       throw new Error('User already exists');
     }
 
-    return await this.userDB.create({
-      id,
-    });
+    db.prepare('INSERT INTO users (id) VALUES (?)').run(id);
+
+    return { id };
   }
 
   async enableLastfm(id: string, token: string) {
-    const user = await this.userDB.findOne({ id });
+    const user = db.prepare('SELECT id FROM users WHERE id = ?').get(id);
 
     if (!user) {
       throw new Error('User not found');
@@ -45,116 +50,114 @@ export class UserService {
       throw new Error('Invalid token');
     }
 
-    user.lastfmSessionToken = sessionToken.sessionKey;
-    user.lastfmUsername = sessionToken.userName;
-    user.scrobblesOn = true;
+    db.prepare(
+      'UPDATE users SET lastfm_session_token = ?, lastfm_username = ?, scrobbles_on = 1 WHERE id = ?',
+    ).run(sessionToken.sessionKey, sessionToken.userName, id);
 
-    await user.save();
-
-    return {
-      id,
-    };
+    return { id };
   }
 
   async deleteLastfmData(id: string) {
-    const user = await this.userDB.findOne({ id });
+    const user = db.prepare('SELECT id FROM users WHERE id = ?').get(id);
 
     if (!user) {
       throw new Error('User not found');
     }
 
-    user.lastfmSessionToken = undefined;
-    user.lastfmUsername = undefined;
-    user.scrobblesOn = undefined;
+    db.prepare(
+      'UPDATE users SET lastfm_session_token = NULL, lastfm_username = NULL, scrobbles_on = NULL WHERE id = ?',
+    ).run(id);
 
-    await user.save();
-
-    return {
-      id,
-    };
+    return { id };
   }
 
   async deleteAllData(id: string) {
-    return await this.userDB.deleteOne({ id });
+    db.prepare('DELETE FROM users WHERE id = ?').run(id);
   }
 
   async toggleScrobbles(id: string) {
-    const user = await this.userDB.findOne({ id });
+    const row = db
+      .prepare('SELECT scrobbles_on FROM users WHERE id = ?')
+      .get(id) as Pick<UserRow, 'scrobbles_on'> | null;
 
-    if (!user) {
+    if (!row) {
       throw new Error('User not found');
     }
 
-    user.scrobblesOn = !user.scrobblesOn;
+    const newValue = row.scrobbles_on ? 0 : 1;
 
-    await user.save();
-
-    return {
+    db.prepare('UPDATE users SET scrobbles_on = ? WHERE id = ?').run(
+      newValue,
       id,
-      scrobblesOn: user.scrobblesOn,
-    };
+    );
+
+    return { id, scrobblesOn: newValue === 1 };
   }
 
   async exists(id: string) {
-    const user = await this.userDB.findOne({ id });
+    const row = db.prepare('SELECT id FROM users WHERE id = ?').get(id);
 
-    if (!user) {
+    if (!row) {
       return null;
     }
 
-    return {
-      id,
-    };
+    return { id };
   }
 
   async hasValidLastfmSessionToken(id: string) {
-    const user = await this.userDB.findOne({ id });
+    const row = db
+      .prepare(
+        'SELECT lastfm_session_token, scrobbles_on FROM users WHERE id = ?',
+      )
+      .get(id) as Pick<UserRow, 'lastfm_session_token' | 'scrobbles_on'> | null;
 
-    if (!user) {
+    if (!row) {
       throw new Error('User not found');
     }
 
-    if (!user.lastfmSessionToken) {
+    if (!row.lastfm_session_token) {
       return null;
     }
 
     const lastfmUser = await this.lastfmService.getUserInfo(
-      user.lastfmSessionToken,
+      row.lastfm_session_token,
     );
 
     if (!lastfmUser) {
       return null;
     }
 
-    return {
-      id,
-      scrobblesOn: user.scrobblesOn,
-    };
+    return { id, scrobblesOn: row.scrobbles_on === 1 };
   }
 
   async getLastfmUsername(id: string) {
-    const user = await this.userDB.findOne({ id });
+    const row = db
+      .prepare('SELECT lastfm_username FROM users WHERE id = ?')
+      .get(id) as Pick<UserRow, 'lastfm_username'> | null;
 
-    if (!user) {
+    if (!row) {
       throw new Error('User not found');
     }
 
-    if (!user.lastfmUsername) {
-      return null;
-    }
-
-    return user.lastfmUsername;
+    return row.lastfm_username ?? null;
   }
 
   async getTopArtists(id: string, period: LastfmTopListenedPeriod) {
-    const user = await this.userDB.findOne({ id });
+    const row = db
+      .prepare(
+        'SELECT lastfm_username, lastfm_session_token FROM users WHERE id = ?',
+      )
+      .get(id) as Pick<
+      UserRow,
+      'lastfm_username' | 'lastfm_session_token'
+    > | null;
 
-    if (!user) {
+    if (!row) {
       throw new Error('User not found');
     }
 
-    const username = user.lastfmUsername ?? '';
-    const sessionKey = user.lastfmSessionToken;
+    const username = row.lastfm_username ?? '';
+    const sessionKey = row.lastfm_session_token ?? undefined;
 
     const profileName = (
       await this.lastfmService.getUserInfo(sessionKey)
@@ -197,14 +200,21 @@ export class UserService {
   }
 
   async getTopAlbums(id: string, period: LastfmTopListenedPeriod) {
-    const user = await this.userDB.findOne({ id });
+    const row = db
+      .prepare(
+        'SELECT lastfm_username, lastfm_session_token FROM users WHERE id = ?',
+      )
+      .get(id) as Pick<
+      UserRow,
+      'lastfm_username' | 'lastfm_session_token'
+    > | null;
 
-    if (!user) {
+    if (!row) {
       throw new Error('User not found');
     }
 
-    const username = user.lastfmUsername ?? '';
-    const sessionKey = user.lastfmSessionToken;
+    const username = row.lastfm_username ?? '';
+    const sessionKey = row.lastfm_session_token ?? undefined;
 
     const profileName = (
       await this.lastfmService.getUserInfo(sessionKey)
@@ -247,14 +257,21 @@ export class UserService {
   }
 
   async getTopTracks(id: string, period: LastfmTopListenedPeriod) {
-    const user = await this.userDB.findOne({ id });
+    const row = db
+      .prepare(
+        'SELECT lastfm_username, lastfm_session_token FROM users WHERE id = ?',
+      )
+      .get(id) as Pick<
+      UserRow,
+      'lastfm_username' | 'lastfm_session_token'
+    > | null;
 
-    if (!user) {
+    if (!row) {
       throw new Error('User not found');
     }
 
-    const username = user.lastfmUsername ?? '';
-    const sessionKey = user.lastfmSessionToken;
+    const username = row.lastfm_username ?? '';
+    const sessionKey = row.lastfm_session_token ?? undefined;
 
     const profileName = (
       await this.lastfmService.getUserInfo(sessionKey)

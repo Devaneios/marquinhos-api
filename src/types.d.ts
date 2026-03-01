@@ -1,11 +1,12 @@
-export interface IUser extends mongoose.Document {
+export interface IUser {
   id: string;
   lastfmSessionToken?: string;
   lastfmUsername?: string;
   scrobblesOn?: boolean;
 }
 
-export interface IScrobble extends mongoose.Document {
+export interface IScrobble {
+  id: string;
   track: Track;
   playbackData: PlaybackData;
 }

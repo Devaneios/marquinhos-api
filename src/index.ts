@@ -50,18 +50,6 @@ app.use('/api/scrobble', scrobble.default);
 app.use('/api/privacy-policy', privacyPolicy.default);
 
 mongoConnection().then(() => {
-  if (process.env.NODE_ENV === 'production') {
-    const httpsServer = https.createServer(
-      {
-        key: fs.readFileSync('dvns-private.key').toString(),
-        cert: fs.readFileSync('dvns-certificate.crt').toString(),
-      },
-      app,
-    );
-
-    httpsServer.listen(process.env.HTTPS_PORT || 3106);
-  } else {
-    const httpServer = http.createServer(app);
-    httpServer.listen(process.env.HTTP_PORT || 3000);
-  }
+  const httpServer = http.createServer(app);
+  httpServer.listen(process.env.HTTP_PORT || 3000);
 });

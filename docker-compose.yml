@@ -8,7 +8,6 @@ services:
     environment:
       - NODE_ENV=production
     ports:
-      - "3000:3000"
       - "3106:3106"
     volumes:
       - /etc/ssl/dvns-certificate.crt:/app/dvns-certificate.crt:ro
@@ -25,8 +24,14 @@ services:
         limits:
           cpus: '1.0'
           memory: 512M
+    networks:
+      - marquinhos-net
     logging:
       driver: json-file
       options:
         max-size: '100m'
         max-file: '10'
+
+networks:
+  marquinhos-net:
+    external: true

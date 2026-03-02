@@ -76,12 +76,10 @@ class GamificationController {
 
       const result = this.service.addXP(userId, guildId, eventType);
       const data = formatAddXpResult(result);
-      return res
-        .status(200)
-        .json({
-          data,
-          message: result.onCooldown ? 'On cooldown' : 'XP added',
-        });
+      return res.status(200).json({
+        data,
+        message: result.onCooldown ? 'On cooldown' : 'XP added',
+      });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
@@ -130,12 +128,10 @@ class GamificationController {
         guildId,
         achievementId,
       );
-      return res
-        .status(200)
-        .json({
-          data: { unlocked },
-          message: unlocked ? 'Achievement unlocked' : 'Already unlocked',
-        });
+      return res.status(200).json({
+        data: { unlocked },
+        message: unlocked ? 'Achievement unlocked' : 'Already unlocked',
+      });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ message: 'Unknown Error' });
@@ -201,11 +197,9 @@ class GamificationController {
         !Array.isArray(results) ||
         results.length === 0
       ) {
-        return res
-          .status(400)
-          .json({
-            message: 'sessionId, guildId, gameType, and results are required',
-          });
+        return res.status(400).json({
+          message: 'sessionId, guildId, gameType, and results are required',
+        });
       }
 
       this.service.recordGameResult({

@@ -23,8 +23,8 @@ SOFTWARE.
  */
 
 import axios from 'axios';
-import md5 from 'crypto-js/md5';
 import crypto from 'crypto';
+import md5 from 'crypto-js/md5';
 import { getUnixTime, parseISO } from 'date-fns';
 import {
   LastfmSessionResponse,

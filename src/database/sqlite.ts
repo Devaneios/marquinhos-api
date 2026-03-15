@@ -136,6 +136,28 @@ db.run(
   'CREATE INDEX IF NOT EXISTS idx_user_levels_leaderboard ON user_levels(guild_id, level DESC, total_xp DESC)',
 );
 
+db.run(`
+  CREATE TABLE IF NOT EXISTS maze_sessions (
+    id          TEXT    NOT NULL PRIMARY KEY,
+    user_id     TEXT    NOT NULL,
+    guild_id    TEXT    NOT NULL,
+    game_mode   TEXT    NOT NULL CHECK(game_mode IN ('open','foggy')),
+    maze_width  INTEGER NOT NULL,
+    maze_height INTEGER NOT NULL,
+    maze_grid   TEXT    NOT NULL,
+    player_x    INTEGER NOT NULL,
+    player_y    INTEGER NOT NULL,
+    moves_count INTEGER NOT NULL DEFAULT 0,
+    status      TEXT    NOT NULL DEFAULT 'active' CHECK(status IN ('active','completed','abandoned')),
+    started_at  INTEGER NOT NULL,
+    completed_at INTEGER
+  )
+`);
+
+db.run(
+  'CREATE INDEX IF NOT EXISTS idx_maze_sessions_user ON maze_sessions(user_id, guild_id, status)',
+);
+
 const cleanupStmt = db.prepare(
   `DELETE FROM scrobbles_queue WHERE created_at < (unixepoch() - ${TTL_SECONDS})`,
 );
@@ -147,5 +169,15 @@ setInterval(() => {
     console.error('SQLite TTL cleanup error:', err);
   }
 }, CLEANUP_INTERVAL_MS);
+
+// Abandon orphaned maze sessions older than 7 days on startup
+try {
+  const sevenDaysAgo = Math.floor(Date.now() / 1000) - 7 * 24 * 60 * 60;
+  db.query(
+    "UPDATE maze_sessions SET status = 'abandoned' WHERE status = 'active' AND started_at < $cutoff",
+  ).run({ $cutoff: sevenDaysAgo });
+} catch (err) {
+  console.error('Maze session cleanup error:', err);
+}
 
 console.log(`SQLite database opened at: ${SQLITE_PATH}`);

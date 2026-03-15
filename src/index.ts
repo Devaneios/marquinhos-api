@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import './database/sqlite';
 import * as auth from './routes/auth.route';
 import evolutiveAchievementsRouter from './routes/evolutiveAchievements.route';
+import mazeRouter from './routes/maze.route';
 import gamificationRouter from './routes/gamification.route';
 import * as privacyPolicy from './routes/privacyPolicy.route';
 import * as scrobble from './routes/scrobble.route';
@@ -46,12 +47,17 @@ app.use(express.urlencoded({ extended: true }));
 
 new GamificationService().initializeDefaults();
 
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok' });
+});
+
 app.use('/api/auth', auth.default);
 app.use('/api/user', user.default);
 app.use('/api/scrobble', scrobble.default);
 app.use('/api/privacy-policy', privacyPolicy.default);
 app.use('/api/gamification', gamificationRouter);
 app.use('/api/evolutive-achievements', evolutiveAchievementsRouter);
+app.use('/api/games/maze', mazeRouter);
 
 const httpServer = http.createServer(app);
 httpServer.listen(process.env.HTTP_PORT || 3000);

@@ -7,6 +7,7 @@ services:
       - /etc/marquinhos/marquinhos-api.conf
     environment:
       - NODE_ENV=production
+      - SQLITE_PATH=/app/data/marquinhos.db
     ports:
       - "3106:3106"
     volumes:

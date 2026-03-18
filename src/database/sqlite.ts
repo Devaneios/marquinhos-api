@@ -158,6 +158,47 @@ db.run(
   'CREATE INDEX IF NOT EXISTS idx_maze_sessions_user ON maze_sessions(user_id, guild_id, status)',
 );
 
+db.run(`
+  CREATE TABLE IF NOT EXISTS wordle_used_words (
+    word    TEXT    NOT NULL PRIMARY KEY,
+    used_at INTEGER NOT NULL
+  )
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS wordle_config (
+    guild_id   TEXT    NOT NULL PRIMARY KEY,
+    channel_id TEXT    NOT NULL,
+    updated_at INTEGER NOT NULL
+  )
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS wordle_daily (
+    guild_id        TEXT    NOT NULL PRIMARY KEY,
+    word            TEXT    NOT NULL,
+    word_date       TEXT    NOT NULL,
+    players_count   INTEGER NOT NULL DEFAULT 0,
+    winners_count   INTEGER NOT NULL DEFAULT 0,
+    total_attempts  INTEGER NOT NULL DEFAULT 0,
+    created_at      INTEGER NOT NULL
+  )
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS wordle_sessions (
+    id        TEXT    NOT NULL PRIMARY KEY,
+    user_id   TEXT    NOT NULL,
+    guild_id  TEXT    NOT NULL,
+    word_date TEXT    NOT NULL,
+    guesses   TEXT    NOT NULL DEFAULT '[]',
+    solved    INTEGER NOT NULL DEFAULT 0,
+    attempts  INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    UNIQUE(user_id, guild_id, word_date)
+  )
+`);
+
 const cleanupStmt = db.prepare(
   `DELETE FROM scrobbles_queue WHERE created_at < (unixepoch() - ${TTL_SECONDS})`,
 );

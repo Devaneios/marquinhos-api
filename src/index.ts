@@ -8,6 +8,7 @@ import * as auth from './routes/auth.route';
 import evolutiveAchievementsRouter from './routes/evolutiveAchievements.route';
 import mazeRouter from './routes/maze.route';
 import gamificationRouter from './routes/gamification.route';
+import wordleRouter from './routes/wordle.route';
 import * as privacyPolicy from './routes/privacyPolicy.route';
 import * as scrobble from './routes/scrobble.route';
 import * as user from './routes/user.route';
@@ -58,6 +59,7 @@ app.use('/api/privacy-policy', privacyPolicy.default);
 app.use('/api/gamification', gamificationRouter);
 app.use('/api/evolutive-achievements', evolutiveAchievementsRouter);
 app.use('/api/games/maze', mazeRouter);
+app.use('/api/wordle', wordleRouter);
 
 const httpServer = http.createServer(app);
 httpServer.listen(process.env.HTTP_PORT || 3000);

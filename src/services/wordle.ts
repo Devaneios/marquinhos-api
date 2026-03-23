@@ -49,7 +49,7 @@ export interface ForceNewWordResult {
   wordLength: number;
 }
 
-// Load wordlist once at startup — all words, no length filter
+// Answer bank: wordlist.txt (used for picking daily words)
 const WORDLIST_PATH = join(__dirname, '../../wordlist.txt');
 let wordlistCache: string[] | null = null;
 
@@ -63,8 +63,19 @@ function getWordlist(): string[] {
   return wordlistCache;
 }
 
-function getWordlistSet(): Set<string> {
-  return new Set(getWordlist());
+// Validation bank: valid-guesses.txt (pre-built union of wordlist + ICF, 5–12 chars)
+const VALID_GUESSES_PATH = join(__dirname, '../../valid-guesses.txt');
+let validationSetCache: Set<string> | null = null;
+
+export function getValidationSet(): Set<string> {
+  if (validationSetCache) return validationSetCache;
+  const raw = readFileSync(VALID_GUESSES_PATH, 'utf-8');
+  const words = raw
+    .split('\n')
+    .map((w) => w.trim())
+    .filter((w) => w.length > 0);
+  validationSetCache = new Set(words);
+  return validationSetCache;
 }
 
 function getRecifeDate(): string {
@@ -110,13 +121,29 @@ export class WordleService {
     const usedSet = new Set(usedRows.map((r) => r.word));
 
     const wordlist = getWordlist();
-    const available = wordlist.filter((w) => !usedSet.has(w));
+    // Only pick words of reasonable length for playability
+    const MIN_LENGTH = 5;
+    const MAX_LENGTH = 12;
+    const available = wordlist.filter(
+      (w) => !usedSet.has(w) && w.length >= MIN_LENGTH && w.length <= MAX_LENGTH,
+    );
 
     if (available.length === 0) {
       throw new Error('No available words left in the wordlist');
     }
 
-    const word = available[Math.floor(Math.random() * available.length)];
+    // Group by length and pick a length uniformly, then a word within that group.
+    // This ensures balanced distribution across word lengths over time.
+    const byLength = new Map<number, string[]>();
+    for (const w of available) {
+      const len = w.length;
+      if (!byLength.has(len)) byLength.set(len, []);
+      byLength.get(len)!.push(w);
+    }
+    const lengths = Array.from(byLength.keys());
+    const chosenLength = lengths[Math.floor(Math.random() * lengths.length)];
+    const pool = byLength.get(chosenLength)!;
+    const word = pool[Math.floor(Math.random() * pool.length)];
     const now = Math.floor(Date.now() / 1000);
 
     // Save to used words
@@ -162,9 +189,8 @@ export class WordleService {
   ): GuessResult | { error: string } {
     const normalizedGuess = guess.trim().toLowerCase();
 
-    // Validate word exists in wordlist
-    const wordlistSet = getWordlistSet();
-    if (!wordlistSet.has(normalizedGuess)) {
+    // Validate word exists in the validation bank
+    if (!getValidationSet().has(normalizedGuess)) {
       return { error: 'Palavra não encontrada na lista de palavras válidas.' };
     }
 
@@ -300,7 +326,12 @@ export class WordleService {
 
   forceNewWord(guildId: string): ForceNewWordResult {
     const today = getRecifeDate();
-    return this.pickNewWord(guildId, today);
+    const result = this.pickNewWord(guildId, today);
+    // Clear all player sessions for today so everyone can play the new word
+    db.query(
+      'DELETE FROM wordle_sessions WHERE guild_id = $guild_id AND word_date = $word_date',
+    ).run({ $guild_id: guildId, $word_date: today });
+    return result;
   }
 
   setConfig(guildId: string, channelId: string): void {

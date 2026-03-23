@@ -13,6 +13,7 @@ import * as privacyPolicy from './routes/privacyPolicy.route';
 import * as scrobble from './routes/scrobble.route';
 import * as user from './routes/user.route';
 import { GamificationService } from './services/gamification';
+import { getValidationSet } from './services/wordle';
 
 const app: Express = express();
 
@@ -60,6 +61,9 @@ app.use('/api/gamification', gamificationRouter);
 app.use('/api/evolutive-achievements', evolutiveAchievementsRouter);
 app.use('/api/games/maze', mazeRouter);
 app.use('/api/wordle', wordleRouter);
+
+// Pre-warm the validation word set to avoid latency on first guess
+getValidationSet();
 
 const httpServer = http.createServer(app);
 httpServer.listen(process.env.HTTP_PORT || 3000);

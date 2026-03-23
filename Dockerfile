@@ -8,6 +8,11 @@ COPY package.json bun.lock* ./
 
 RUN bun install --frozen-lockfile
 
+# Generate the merged validation word list from ICF + wordlist
+COPY icf wordlist.txt ./
+COPY scripts/ ./scripts/
+RUN bun run scripts/build-valid-guesses.ts
+
 # ── Stage 2: runtime ─────────────────────────────────────────────
 FROM oven/bun:1-alpine AS runtime
 
@@ -23,6 +28,7 @@ COPY --from=builder /app/node_modules ./node_modules
 # Copy source (Bun runs TypeScript natively)
 COPY src/ ./src/
 COPY wordlist.txt ./
+COPY --from=builder /app/valid-guesses.txt ./
 
 RUN mkdir -p /app/data && chown marquinhos:marquinhos /app/data
 

@@ -1,6 +1,6 @@
+import { randomUUID } from 'crypto';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { randomUUID } from 'crypto';
 import { db } from '../database/sqlite';
 
 interface WordleDaily {
@@ -125,7 +125,8 @@ export class WordleService {
     const MIN_LENGTH = 5;
     const MAX_LENGTH = 12;
     const available = wordlist.filter(
-      (w) => !usedSet.has(w) && w.length >= MIN_LENGTH && w.length <= MAX_LENGTH,
+      (w) =>
+        !usedSet.has(w) && w.length >= MIN_LENGTH && w.length <= MAX_LENGTH,
     );
 
     if (available.length === 0) {
@@ -164,18 +165,20 @@ export class WordleService {
   getDailyWord(guildId: string): WordleDaily {
     const today = getRecifeDate();
     const row = db
-      .query<WordleDaily, { $guild_id: string }>(
-        'SELECT * FROM wordle_daily WHERE guild_id = $guild_id',
-      )
+      .query<
+        WordleDaily,
+        { $guild_id: string }
+      >('SELECT * FROM wordle_daily WHERE guild_id = $guild_id')
       .get({ $guild_id: guildId });
 
     if (!row || row.word_date !== today) {
       // Lazy init: pick a new word for today
       this.pickNewWord(guildId, today);
       return db
-        .query<WordleDaily, { $guild_id: string }>(
-          'SELECT * FROM wordle_daily WHERE guild_id = $guild_id',
-        )
+        .query<
+          WordleDaily,
+          { $guild_id: string }
+        >('SELECT * FROM wordle_daily WHERE guild_id = $guild_id')
         .get({ $guild_id: guildId })!;
     }
 
@@ -211,9 +214,7 @@ export class WordleService {
       .query<
         { id: string; guesses: string; solved: number; attempts: number },
         { $user_id: string; $guild_id: string; $word_date: string }
-      >(
-        'SELECT id, guesses, solved, attempts FROM wordle_sessions WHERE user_id = $user_id AND guild_id = $guild_id AND word_date = $word_date',
-      )
+      >('SELECT id, guesses, solved, attempts FROM wordle_sessions WHERE user_id = $user_id AND guild_id = $guild_id AND word_date = $word_date')
       .get({ $user_id: userId, $guild_id: guildId, $word_date: today });
 
     if (!sessionRow) {
@@ -239,7 +240,10 @@ export class WordleService {
       JSON.parse(sessionRow.guesses);
     const feedback = computeFeedback(normalizedGuess, daily.word);
     const solved = normalizedGuess === daily.word;
-    const newGuesses = [...previousGuesses, { guess: normalizedGuess, feedback }];
+    const newGuesses = [
+      ...previousGuesses,
+      { guess: normalizedGuess, feedback },
+    ];
     const newAttempts = sessionRow.attempts + 1;
 
     // Update session
@@ -303,7 +307,13 @@ export class WordleService {
     const today = getRecifeDate();
     const row = db
       .query<
-        { id: string; guesses: string; solved: number; attempts: number; created_at: number },
+        {
+          id: string;
+          guesses: string;
+          solved: number;
+          attempts: number;
+          created_at: number;
+        },
         { $user_id: string; $guild_id: string; $word_date: string }
       >(
         'SELECT id, guesses, solved, attempts, created_at FROM wordle_sessions WHERE user_id = $user_id AND guild_id = $guild_id AND word_date = $word_date',
@@ -360,9 +370,10 @@ export class WordleService {
 
   getConfig(guildId: string): { channelId: string } | null {
     const row = db
-      .query<{ channel_id: string }, { $guild_id: string }>(
-        'SELECT channel_id FROM wordle_config WHERE guild_id = $guild_id',
-      )
+      .query<
+        { channel_id: string },
+        { $guild_id: string }
+      >('SELECT channel_id FROM wordle_config WHERE guild_id = $guild_id')
       .get({ $guild_id: guildId });
 
     return row ? { channelId: row.channel_id } : null;

@@ -12,7 +12,9 @@ export default class WordleController {
     };
 
     if (!userId || !guildId || !guess) {
-      res.status(400).json({ message: 'userId, guildId e guess são obrigatórios.' });
+      res
+        .status(400)
+        .json({ message: 'userId, guildId e guess são obrigatórios.' });
       return;
     }
 
@@ -79,9 +81,14 @@ export default class WordleController {
   }
 
   setConfig(req: Request, res: Response): void {
-    const { guildId, channelId } = req.body as { guildId?: string; channelId?: string };
+    const { guildId, channelId } = req.body as {
+      guildId?: string;
+      channelId?: string;
+    };
     if (!guildId || !channelId) {
-      res.status(400).json({ message: 'guildId e channelId são obrigatórios.' });
+      res
+        .status(400)
+        .json({ message: 'guildId e channelId são obrigatórios.' });
       return;
     }
 

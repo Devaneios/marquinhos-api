@@ -351,10 +351,7 @@ export class GamificationService {
     // Single LEFT JOIN query instead of N+1 (one SELECT per achievement).
     // Only returns achievements the user has NOT already unlocked.
     const candidates = db
-      .query<
-        Achievement,
-        { $userId: string; $guildId: string }
-      >(
+      .query<Achievement, { $userId: string; $guildId: string }>(
         `SELECT a.*
          FROM achievements a
          LEFT JOIN user_achievements ua
@@ -563,15 +560,17 @@ export class GamificationService {
 
         // .changes is 0 when INSERT OR IGNORE silently skips a duplicate row.
         // Only apply XP/stats on the first (non-duplicate) submission.
-        const insertResult = db.query(
-          'INSERT OR IGNORE INTO user_game_results (game_result_id, user_id, guild_id, position, xp_awarded) VALUES ($gameId, $userId, $guildId, $position, $xpAwarded)',
-        ).run({
-          $gameId: input.sessionId,
-          $userId: player.userId,
-          $guildId: input.guildId,
-          $position: player.position,
-          $xpAwarded: xpAwarded,
-        });
+        const insertResult = db
+          .query(
+            'INSERT OR IGNORE INTO user_game_results (game_result_id, user_id, guild_id, position, xp_awarded) VALUES ($gameId, $userId, $guildId, $position, $xpAwarded)',
+          )
+          .run({
+            $gameId: input.sessionId,
+            $userId: player.userId,
+            $guildId: input.guildId,
+            $position: player.position,
+            $xpAwarded: xpAwarded,
+          });
 
         if (insertResult.changes > 0) {
           db.query(

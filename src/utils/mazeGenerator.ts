@@ -31,7 +31,11 @@ function find(uf: { parent: number[] }, x: number): number {
   return x;
 }
 
-function union(uf: { parent: number[]; rank: number[] }, a: number, b: number): boolean {
+function union(
+  uf: { parent: number[]; rank: number[] },
+  a: number,
+  b: number,
+): boolean {
   const ra = find(uf, a);
   const rb = find(uf, b);
   if (ra === rb) return false; // already connected
@@ -64,11 +68,13 @@ export function generateMaze(width: number, height: number): number[][] {
   if (height % 2 === 0) height++;
 
   // Number of navigable cells along each axis
-  const cols = Math.floor(width / 2);   // navigable columns: 1, 3, 5, ...
-  const rows = Math.floor(height / 2);  // navigable rows:    1, 3, 5, ...
+  const cols = Math.floor(width / 2); // navigable columns: 1, 3, 5, ...
+  const rows = Math.floor(height / 2); // navigable rows:    1, 3, 5, ...
 
   // Fill grid with walls
-  const maze: number[][] = Array.from({ length: height }, () => Array(width).fill(1));
+  const maze: number[][] = Array.from({ length: height }, () =>
+    Array(width).fill(1),
+  );
 
   // Map navigable cell (r, c) → unique id for Union-Find
   // r and c are in navigable-cell space (0-based), NOT grid space

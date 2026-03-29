@@ -1,4 +1,9 @@
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  randomBytes,
+  scryptSync,
+} from 'crypto';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -18,7 +23,10 @@ export function encryptToken(token: string): string | null {
     const key = getKey();
     const iv = randomBytes(12);
     const cipher = createCipheriv(ALGORITHM, key, iv);
-    const encrypted = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
+    const encrypted = Buffer.concat([
+      cipher.update(token, 'utf8'),
+      cipher.final(),
+    ]);
     const tag = cipher.getAuthTag();
     // Format: base64(iv):base64(gcmTag):base64(ciphertext)
     return `${iv.toString('base64')}:${tag.toString('base64')}:${encrypted.toString('base64')}`;
@@ -38,7 +46,10 @@ export function decryptToken(encryptedToken: string): string | null {
     const ciphertext = Buffer.from(ciphertextB64, 'base64');
     const decipher = createDecipheriv(ALGORITHM, key, iv);
     decipher.setAuthTag(tag);
-    return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
+    return Buffer.concat([
+      decipher.update(ciphertext),
+      decipher.final(),
+    ]).toString('utf8');
   } catch {
     // Covers: auth-tag mismatch (tampered), wrong format, missing env key
     return null;

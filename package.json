@@ -16,6 +16,8 @@
     "tslib": "^2.6.1"
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
     "@types/bun": "latest",
     "@types/cookie-parser": "^1.4.3",
     "@types/cors": "^2.8.13",
@@ -30,6 +32,8 @@
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-prettier": "^5.4.1",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0",
     "prettier": "3.8.1",
     "prettier-plugin-organize-imports": "^4.3.0",
     "typescript": "5.1.6"
@@ -44,8 +48,12 @@
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "clean": "rm -rf dist/ .logs/",
-    "start": "bun run src/index.ts"
+    "start": "bun run src/index.ts",
+    "prepare": "husky"
   },
   "author": "Devaneios",
-  "license": "ISC"
+  "license": "ISC",
+  "lint-staged": {
+    "*.ts": ["prettier --write", "eslint --fix"]
+  }
 }

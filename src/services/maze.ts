@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { db } from '../database/sqlite';
 import { generateMaze } from '../utils/mazeGenerator';
 
@@ -84,7 +85,8 @@ function computeViewport(
   const viewTopRow = py - PLAYER_VIEWPORT_OFFSET;
   const viewTopCol = px - PLAYER_VIEWPORT_OFFSET;
 
-  const visible = mode === 'foggy' ? computeFoggyVisibility(maze, px, py) : null;
+  const visible =
+    mode === 'foggy' ? computeFoggyVisibility(maze, px, py) : null;
 
   const viewport: number[][] = [];
   for (let vr = 0; vr < VIEWPORT_SIZE; vr++) {
@@ -148,12 +150,14 @@ export class MazeService {
     const startX = 1;
     const startY = 0;
 
-    db.query(`
+    db.query(
+      `
       INSERT INTO maze_sessions
         (id, user_id, guild_id, game_mode, maze_width, maze_height, maze_grid, player_x, player_y, started_at)
       VALUES
         ($id, $userId, $guildId, $mode, $width, $height, $grid, $px, $py, $startedAt)
-    `).run({
+    `,
+    ).run({
       $id: sessionId,
       $userId: userId,
       $guildId: guildId,
@@ -181,9 +185,10 @@ export class MazeService {
     direction: string,
   ): MazeViewportState | null {
     const session = db
-      .query<MazeSessionRow, { $id: string }>(
-        'SELECT * FROM maze_sessions WHERE id = $id',
-      )
+      .query<
+        MazeSessionRow,
+        { $id: string }
+      >('SELECT * FROM maze_sessions WHERE id = $id')
       .get({ $id: sessionId });
 
     if (!session || session.user_id !== userId || session.status !== 'active') {
@@ -228,12 +233,14 @@ export class MazeService {
     const isCompleted = newX === exitX && newY === exitY;
     const newMoves = session.moves_count + 1;
 
-    db.query(`
+    db.query(
+      `
       UPDATE maze_sessions
       SET player_x = $px, player_y = $py, moves_count = $moves,
           status = $status, completed_at = $completedAt
       WHERE id = $id
-    `).run({
+    `,
+    ).run({
       $px: newX,
       $py: newY,
       $moves: newMoves,
@@ -245,7 +252,14 @@ export class MazeService {
     return {
       sessionId,
       playerPosition: { x: newX, y: newY },
-      viewport: computeViewport(maze, newX, newY, session.game_mode, exitX, exitY),
+      viewport: computeViewport(
+        maze,
+        newX,
+        newY,
+        session.game_mode,
+        exitX,
+        exitY,
+      ),
       moves: newMoves,
       isCompleted,
     };
@@ -253,9 +267,10 @@ export class MazeService {
 
   getMazeSession(sessionId: string): MazeViewportState | null {
     const session = db
-      .query<MazeSessionRow, { $id: string }>(
-        'SELECT * FROM maze_sessions WHERE id = $id',
-      )
+      .query<
+        MazeSessionRow,
+        { $id: string }
+      >('SELECT * FROM maze_sessions WHERE id = $id')
       .get({ $id: sessionId });
 
     if (!session) return null;

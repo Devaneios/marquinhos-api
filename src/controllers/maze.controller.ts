@@ -18,13 +18,19 @@ export class MazeController {
       };
 
       if (!userId || !guildId) {
-        return res.status(400).json({ message: 'userId and guildId are required' });
+        return res
+          .status(400)
+          .json({ message: 'userId and guildId are required' });
       }
       if (!VALID_MODES.includes(mode)) {
-        return res.status(400).json({ message: `mode must be one of: ${VALID_MODES.join(', ')}` });
+        return res
+          .status(400)
+          .json({ message: `mode must be one of: ${VALID_MODES.join(', ')}` });
       }
       if (!VALID_SIZES.includes(Number(size))) {
-        return res.status(400).json({ message: `size must be one of: ${VALID_SIZES.join(', ')}` });
+        return res
+          .status(400)
+          .json({ message: `size must be one of: ${VALID_SIZES.join(', ')}` });
       }
 
       const data = this.service.createMazeSession(
@@ -52,12 +58,16 @@ export class MazeController {
         return res.status(400).json({ message: 'userId is required' });
       }
       if (!VALID_DIRECTIONS.includes(direction)) {
-        return res.status(400).json({ message: `direction must be one of: ${VALID_DIRECTIONS.join(', ')}` });
+        return res.status(400).json({
+          message: `direction must be one of: ${VALID_DIRECTIONS.join(', ')}`,
+        });
       }
 
       const data = this.service.processMazeMove(sessionId, userId, direction);
       if (data === null) {
-        return res.status(404).json({ message: 'Maze session not found or not active' });
+        return res
+          .status(404)
+          .json({ message: 'Maze session not found or not active' });
       }
       return res.status(200).json({ data });
     } catch (error) {

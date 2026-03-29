@@ -24,7 +24,6 @@ SOFTWARE.
 
 import axios from 'axios';
 import crypto from 'crypto';
-import md5 from 'crypto-js/md5';
 import { getUnixTime, parseISO } from 'date-fns';
 import {
   LastfmSessionResponse,
@@ -392,7 +391,7 @@ export class LastfmService {
     }
 
     signatureString += process.env.LASTFM_SHARED_SECRET;
-    return md5(signatureString).toString();
+    return crypto.createHash('md5').update(signatureString).digest('hex');
   }
 
   getAuthorizationUrl = () => {

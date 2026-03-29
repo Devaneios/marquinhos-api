@@ -253,24 +253,40 @@ export class WordleService {
       $id: sessionRow.id,
     });
 
-    // Update daily stats
-    if (solved) {
+    // Update daily stats.
+    // players_count is incremented exactly once per user per day: on their first guess,
+    // regardless of whether that guess solves the puzzle. The previous CASE WHEN expression
+    // caused a bug where a user who solved on a later guess never incremented players_count
+    // (previousGuesses.length > 0 → $is_new_player = 0).
+    if (previousGuesses.length === 0) {
+      // First guess of the day for this user
+      if (solved) {
+        db.query(
+          `UPDATE wordle_daily SET
+            players_count = players_count + 1,
+            winners_count = winners_count + 1,
+            total_attempts = total_attempts + $attempts
+           WHERE guild_id = $guild_id`,
+        ).run({
+          $attempts: newAttempts,
+          $guild_id: guildId,
+        });
+      } else {
+        db.query(
+          'UPDATE wordle_daily SET players_count = players_count + 1 WHERE guild_id = $guild_id',
+        ).run({ $guild_id: guildId });
+      }
+    } else if (solved) {
+      // Returning player (already counted) who now solved
       db.query(
         `UPDATE wordle_daily SET
-          players_count = players_count + CASE WHEN $is_new_player THEN 1 ELSE 0 END,
           winners_count = winners_count + 1,
           total_attempts = total_attempts + $attempts
          WHERE guild_id = $guild_id`,
       ).run({
-        $is_new_player: previousGuesses.length === 0 ? 1 : 0,
         $attempts: newAttempts,
         $guild_id: guildId,
       });
-    } else if (previousGuesses.length === 0) {
-      // First guess of the day for this user — increment player count
-      db.query(
-        'UPDATE wordle_daily SET players_count = players_count + 1 WHERE guild_id = $guild_id',
-      ).run({ $guild_id: guildId });
     }
 
     return {

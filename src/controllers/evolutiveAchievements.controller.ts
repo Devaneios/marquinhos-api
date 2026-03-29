@@ -10,9 +10,8 @@ export const evolutiveAchievements = {
       const evolutions = service.checkAndEvolveAll(userId, guildId);
       res.json({ data: evolutions });
     } catch (error) {
-      res
-        .status(500)
-        .json({ message: 'Failed to check evolution', error: String(error) });
+      console.error('[evolutiveAchievements] checkAndEvolve error:', error);
+      res.status(500).json({ message: 'Failed to check evolution' });
     }
   },
 
@@ -25,10 +24,8 @@ export const evolutiveAchievements = {
       );
       res.json({ data: achievements });
     } catch (error) {
-      res.status(500).json({
-        message: 'Failed to get evolutive achievements',
-        error: String(error),
-      });
+      console.error('[evolutiveAchievements] getUserEvolutiveAchievements error:', error);
+      res.status(500).json({ message: 'Failed to get evolutive achievements' });
     }
   },
 
@@ -38,10 +35,8 @@ export const evolutiveAchievements = {
       const timeline = service.getEvolutionTimeline(userId, guildId);
       res.json({ data: timeline });
     } catch (error) {
-      res.status(500).json({
-        message: 'Failed to get evolution timeline',
-        error: String(error),
-      });
+      console.error('[evolutiveAchievements] getEvolutionTimeline error:', error);
+      res.status(500).json({ message: 'Failed to get evolution timeline' });
     }
   },
 };

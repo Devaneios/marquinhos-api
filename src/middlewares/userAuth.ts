@@ -21,20 +21,23 @@ export async function verifyDiscordToken(
   const decryptedToken = decryptToken(access_token);
 
   if (!decryptedToken) {
-    return res.status(500).json({ message: 'Internal Server Error' });
+    // Was 500 — decryption failure means invalid/expired/tampered token, not a server error
+    return res.status(401).json({ message: 'Invalid or expired token' });
   }
 
   try {
     const discordUser = await discordService.getDiscordUser(decryptedToken);
 
+    // Null check BEFORE property assignment (previous code assigned .highestRole first,
+    // making this guard unreachable dead code that always produced a 500 TypeError)
+    if (!discordUser) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
     const highestRole =
       await discordService.getDiscordGuildUserHighestRole(decryptedToken);
 
     discordUser.highestRole = highestRole;
-
-    if (!discordUser) {
-      return res.status(403).json({ message: 'Unauthorized' });
-    }
 
     const user = await userService.exists(discordUser.id);
 
@@ -48,6 +51,6 @@ export async function verifyDiscordToken(
     next();
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ error: 'Internal Server Error' });
+    return res.status(500).json({ message: 'Internal Server Error' });
   }
 }

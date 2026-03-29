@@ -219,28 +219,34 @@ export class GamificationService {
   }
 
   private applyLevelUps(userId: string, guildId: string): boolean {
-    let leveled = false;
-    let row = db
-      .query<
-        UserLevel,
-        { $userId: string; $guildId: string }
-      >('SELECT * FROM user_levels WHERE user_id = $userId AND guild_id = $guildId')
-      .get({ $userId: userId, $guildId: guildId })!;
-
-    while (row.xp >= this.getRequiredXP(row.level)) {
-      const required = this.getRequiredXP(row.level);
-      db.query(
-        'UPDATE user_levels SET level = level + 1, xp = xp - $required WHERE user_id = $userId AND guild_id = $guildId',
-      ).run({ $required: required, $userId: userId, $guildId: guildId });
-      row = db
+    // Wrapped in a transaction so a crash mid-loop cannot leave XP subtracted
+    // but level not incremented (or vice versa). bun:sqlite transactions are
+    // reentrant-safe — nested calls use savepoints.
+    const fn = db.transaction(() => {
+      let leveled = false;
+      let row = db
         .query<
           UserLevel,
           { $userId: string; $guildId: string }
         >('SELECT * FROM user_levels WHERE user_id = $userId AND guild_id = $guildId')
         .get({ $userId: userId, $guildId: guildId })!;
-      leveled = true;
-    }
-    return leveled;
+
+      while (row.xp >= this.getRequiredXP(row.level)) {
+        const required = this.getRequiredXP(row.level);
+        db.query(
+          'UPDATE user_levels SET level = level + 1, xp = xp - $required WHERE user_id = $userId AND guild_id = $guildId',
+        ).run({ $required: required, $userId: userId, $guildId: guildId });
+        row = db
+          .query<
+            UserLevel,
+            { $userId: string; $guildId: string }
+          >('SELECT * FROM user_levels WHERE user_id = $userId AND guild_id = $guildId')
+          .get({ $userId: userId, $guildId: guildId })!;
+        leveled = true;
+      }
+      return leveled;
+    });
+    return fn();
   }
 
   addXP(userId: string, guildId: string, eventType: string): AddXpResult {
@@ -342,25 +348,41 @@ export class GamificationService {
 
     if (!stats || !userLevel) return [];
 
-    const achievements = db
-      .query<Achievement, []>('SELECT * FROM achievements')
-      .all();
+    // Single LEFT JOIN query instead of N+1 (one SELECT per achievement).
+    // Only returns achievements the user has NOT already unlocked.
+    const candidates = db
+      .query<
+        Achievement,
+        { $userId: string; $guildId: string }
+      >(
+        `SELECT a.*
+         FROM achievements a
+         LEFT JOIN user_achievements ua
+           ON ua.achievement_id = a.id
+           AND ua.user_id = $userId
+           AND ua.guild_id = $guildId
+         WHERE ua.achievement_id IS NULL`,
+      )
+      .all({ $userId: userId, $guildId: guildId });
+
     const unlocked: string[] = [];
 
-    for (const achievement of achievements) {
-      const existing = db
-        .query<
-          { n: number },
-          { $userId: string; $guildId: string; $id: string }
-        >('SELECT 1 as n FROM user_achievements WHERE user_id = $userId AND guild_id = $guildId AND achievement_id = $id')
-        .get({ $userId: userId, $guildId: guildId, $id: achievement.id });
+    for (const achievement of candidates) {
+      // Defensive parse — a malformed condition row must not break XP for all users
+      let condition: { type: string; threshold: number };
+      try {
+        condition = JSON.parse(achievement.condition) as {
+          type: string;
+          threshold: number;
+        };
+      } catch (e) {
+        console.error(
+          `[gamification] Malformed condition on achievement '${achievement.id}':`,
+          e,
+        );
+        continue;
+      }
 
-      if (existing) continue;
-
-      const condition = JSON.parse(achievement.condition) as {
-        type: string;
-        threshold: number;
-      };
       let met = false;
 
       switch (condition.type) {
@@ -501,70 +523,80 @@ export class GamificationService {
   }
 
   recordGameResult(input: GameResultInput): void {
-    const now = Date.now();
+    // Entire function wrapped in a transaction so a concurrent double-submit
+    // (two button clicks arriving before the session is removed) cannot
+    // double-award XP. INSERT OR IGNORE + changes > 0 guard makes this idempotent.
+    const fn = db.transaction(() => {
+      const now = Date.now();
 
-    const winXp = (
-      db
-        .query<
-          { xp_amount: number },
-          { $event: string }
-        >('SELECT xp_amount FROM xp_config WHERE event_type = $event')
-        .get({ $event: 'game_win' }) ?? { xp_amount: 20 }
-    ).xp_amount;
+      const winXp = (
+        db
+          .query<
+            { xp_amount: number },
+            { $event: string }
+          >('SELECT xp_amount FROM xp_config WHERE event_type = $event')
+          .get({ $event: 'game_win' }) ?? { xp_amount: 20 }
+      ).xp_amount;
 
-    const participateXp = (
-      db
-        .query<
-          { xp_amount: number },
-          { $event: string }
-        >('SELECT xp_amount FROM xp_config WHERE event_type = $event')
-        .get({ $event: 'game_participate' }) ?? { xp_amount: 5 }
-    ).xp_amount;
+      const participateXp = (
+        db
+          .query<
+            { xp_amount: number },
+            { $event: string }
+          >('SELECT xp_amount FROM xp_config WHERE event_type = $event')
+          .get({ $event: 'game_participate' }) ?? { xp_amount: 5 }
+      ).xp_amount;
 
-    db.query(
-      'INSERT OR IGNORE INTO game_results (id, guild_id, game_type, played_at, duration_ms) VALUES ($id, $guildId, $gameType, $playedAt, $durationMs)',
-    ).run({
-      $id: input.sessionId,
-      $guildId: input.guildId,
-      $gameType: input.gameType,
-      $playedAt: now,
-      $durationMs: input.durationMs ?? null,
+      db.query(
+        'INSERT OR IGNORE INTO game_results (id, guild_id, game_type, played_at, duration_ms) VALUES ($id, $guildId, $gameType, $playedAt, $durationMs)',
+      ).run({
+        $id: input.sessionId,
+        $guildId: input.guildId,
+        $gameType: input.gameType,
+        $playedAt: now,
+        $durationMs: input.durationMs ?? null,
+      });
+
+      for (const player of input.results) {
+        this.ensureUser(player.userId, input.guildId);
+        const xpAwarded = player.position === 1 ? winXp : participateXp;
+
+        // .changes is 0 when INSERT OR IGNORE silently skips a duplicate row.
+        // Only apply XP/stats on the first (non-duplicate) submission.
+        const insertResult = db.query(
+          'INSERT OR IGNORE INTO user_game_results (game_result_id, user_id, guild_id, position, xp_awarded) VALUES ($gameId, $userId, $guildId, $position, $xpAwarded)',
+        ).run({
+          $gameId: input.sessionId,
+          $userId: player.userId,
+          $guildId: input.guildId,
+          $position: player.position,
+          $xpAwarded: xpAwarded,
+        });
+
+        if (insertResult.changes > 0) {
+          db.query(
+            'UPDATE user_levels SET xp = xp + $amount, total_xp = total_xp + $amount, last_xp_gain = $now WHERE user_id = $userId AND guild_id = $guildId',
+          ).run({
+            $amount: xpAwarded,
+            $now: now,
+            $userId: player.userId,
+            $guildId: input.guildId,
+          });
+
+          db.query(
+            'UPDATE user_stats SET total_games = total_games + 1, games_won = games_won + $wonIncrement WHERE user_id = $userId AND guild_id = $guildId',
+          ).run({
+            $wonIncrement: player.position === 1 ? 1 : 0,
+            $userId: player.userId,
+            $guildId: input.guildId,
+          });
+
+          this.applyLevelUps(player.userId, input.guildId);
+          this.checkAndAwardAchievements(player.userId, input.guildId);
+        }
+      }
     });
-
-    for (const player of input.results) {
-      this.ensureUser(player.userId, input.guildId);
-      const xpAwarded = player.position === 1 ? winXp : participateXp;
-
-      db.query(
-        'INSERT OR IGNORE INTO user_game_results (game_result_id, user_id, guild_id, position, xp_awarded) VALUES ($gameId, $userId, $guildId, $position, $xpAwarded)',
-      ).run({
-        $gameId: input.sessionId,
-        $userId: player.userId,
-        $guildId: input.guildId,
-        $position: player.position,
-        $xpAwarded: xpAwarded,
-      });
-
-      db.query(
-        'UPDATE user_levels SET xp = xp + $amount, total_xp = total_xp + $amount, last_xp_gain = $now WHERE user_id = $userId AND guild_id = $guildId',
-      ).run({
-        $amount: xpAwarded,
-        $now: now,
-        $userId: player.userId,
-        $guildId: input.guildId,
-      });
-
-      db.query(
-        'UPDATE user_stats SET total_games = total_games + 1, games_won = games_won + $wonIncrement WHERE user_id = $userId AND guild_id = $guildId',
-      ).run({
-        $wonIncrement: player.position === 1 ? 1 : 0,
-        $userId: player.userId,
-        $guildId: input.guildId,
-      });
-
-      this.applyLevelUps(player.userId, input.guildId);
-      this.checkAndAwardAchievements(player.userId, input.guildId);
-    }
+    fn();
   }
 
   getUserGameStats(

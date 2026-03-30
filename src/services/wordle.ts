@@ -123,7 +123,7 @@ export class WordleService {
     const wordlist = getWordlist();
     // Only pick words of reasonable length for playability
     const MIN_LENGTH = 5;
-    const MAX_LENGTH = 12;
+    const MAX_LENGTH = 6;
     const available = wordlist.filter(
       (w) =>
         !usedSet.has(w) && w.length >= MIN_LENGTH && w.length <= MAX_LENGTH,

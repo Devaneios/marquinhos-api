@@ -246,6 +246,11 @@ export class WordleService {
 
     const previousGuesses: { guess: string; feedback: LetterFeedback[] }[] =
       JSON.parse(sessionRow.guesses);
+
+    if (previousGuesses.some((g) => g.guess === normalizedGuess)) {
+      return { error: 'Você já tentou essa palavra.' };
+    }
+
     const feedback = computeFeedback(normalizedGuess, daily.word);
     const solved = normalizedGuess === daily.word;
     const newGuesses = [

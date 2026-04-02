@@ -18,6 +18,7 @@ export interface MazeViewportState {
   viewport: number[][];
   moves: number;
   isCompleted: boolean;
+  isAbandoned?: boolean;
 }
 
 interface MazeSessionRow {
@@ -233,6 +234,29 @@ export class MazeService {
     const isCompleted = newX === exitX && newY === exitY;
     const newMoves = session.moves_count + 1;
 
+    const maxMoves = session.maze_width * session.maze_height * 2;
+    if (!isCompleted && newMoves >= maxMoves) {
+      db.query(
+        "UPDATE maze_sessions SET player_x = $px, player_y = $py, moves_count = $moves, status = 'abandoned' WHERE id = $id",
+      ).run({ $px: newX, $py: newY, $moves: newMoves, $id: sessionId });
+
+      return {
+        sessionId,
+        playerPosition: { x: newX, y: newY },
+        viewport: computeViewport(
+          maze,
+          newX,
+          newY,
+          session.game_mode,
+          exitX,
+          exitY,
+        ),
+        moves: newMoves,
+        isCompleted: false,
+        isAbandoned: true,
+      };
+    }
+
     db.query(
       `
       UPDATE maze_sessions
@@ -307,6 +331,7 @@ export class MazeService {
       ),
       moves: session.moves_count,
       isCompleted: session.status === 'completed',
+      isAbandoned: session.status === 'abandoned',
     };
   }
 }

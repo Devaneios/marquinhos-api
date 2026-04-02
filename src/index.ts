@@ -1,6 +1,6 @@
 import cors from 'cors';
 import dotenv from 'dotenv';
-import express, { Express, Request } from 'express';
+import express, { Express, NextFunction, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import http from 'http';
 import morgan from 'morgan';
@@ -20,7 +20,12 @@ dotenv.config();
 
 const app: Express = express();
 
-const allowlist = ['http://localhost:4200', 'https://marquinhos-74154.web.app'];
+const allowlist = (
+  process.env.CORS_ORIGINS ??
+  'http://localhost:4200,https://marquinhos-74154.web.app'
+)
+  .split(',')
+  .map((s) => s.trim());
 
 const corsOptionsDelegate = function (req: Request, callback: Function) {
   let corsOptions;
@@ -91,9 +96,28 @@ app.use('/api/evolutive-achievements', evolutiveAchievementsRouter);
 app.use('/api/games/maze', mazeRouter);
 app.use('/api/wordle', wordleRouter);
 
+// --- 404 catch-all for unmatched routes ---
+app.use((_req: Request, res: Response) => {
+  res.status(404).json({ message: 'Route not found' });
+});
+
+// --- Global error handler (must be 4-arg for Express to treat it as error middleware) ---
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    message:
+      process.env.NODE_ENV === 'production'
+        ? 'Internal Server Error'
+        : err.message,
+  });
+});
+
 // Startup initialisation — failures crash the process instead of silently
 // serving with empty XP config or missing wordle word list.
+import { runMigrations } from './database/migrate';
+
 try {
+  runMigrations();
   new GamificationService().initializeDefaults();
 } catch (err) {
   console.error('Fatal: gamification initialization failed', err);

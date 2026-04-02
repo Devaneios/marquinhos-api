@@ -135,6 +135,9 @@ db.run(
 db.run(
   'CREATE INDEX IF NOT EXISTS idx_user_levels_leaderboard ON user_levels(guild_id, level DESC, total_xp DESC)',
 );
+db.run(
+  'CREATE INDEX IF NOT EXISTS idx_scrobbles_queue_ttl ON scrobbles_queue(created_at)',
+);
 
 db.run(`
   CREATE TABLE IF NOT EXISTS maze_sessions (

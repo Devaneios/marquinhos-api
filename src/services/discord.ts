@@ -111,7 +111,11 @@ export class DiscordService {
     return response.data;
   };
 
-  getAuthorizationUrl = () => {
-    return `https://discord.com/oauth2/authorize?response_type=code&client_id=${process.env.DISCORD_CLIENT_ID}&scope=identify+guilds.members.read&redirect_uri=${process.env.DISCORD_REDIRECT_URI}&prompt=none`;
+  getAuthorizationUrl = (state?: string) => {
+    let url = `https://discord.com/oauth2/authorize?response_type=code&client_id=${process.env.DISCORD_CLIENT_ID}&scope=identify+guilds.members.read&redirect_uri=${encodeURIComponent(process.env.DISCORD_REDIRECT_URI ?? '')}&prompt=none`;
+    if (state) {
+      url += `&state=${encodeURIComponent(state)}`;
+    }
+    return url;
   };
 }

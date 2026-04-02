@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import { LastfmTopListenedPeriod, Track } from 'types';
 import { db } from '../database/sqlite';
+import { decryptToken, encryptToken } from '../utils/crypto';
 import { DiscordService } from './discord';
 import { LastfmService } from './lastfm';
 import { SpotifyService } from './spotify';
@@ -26,14 +27,8 @@ export class UserService {
   }
 
   async create(id: string) {
-    const existing = db.prepare('SELECT id FROM users WHERE id = ?').get(id);
-
-    if (existing) {
-      throw new Error('User already exists');
-    }
-
-    db.prepare('INSERT INTO users (id) VALUES (?)').run(id);
-
+    // Atomic upsert — avoids SELECT-then-INSERT race condition (14.4)
+    db.prepare('INSERT OR IGNORE INTO users (id) VALUES (?)').run(id);
     return { id };
   }
 
@@ -50,9 +45,14 @@ export class UserService {
       throw new Error('Invalid token');
     }
 
+    // Encrypt the session token before persisting (P0 security fix)
+    const encrypted = encryptToken(sessionToken.sessionKey);
+    if (!encrypted) {
+      throw new Error('Failed to encrypt session token');
+    }
     db.prepare(
       'UPDATE users SET lastfm_session_token = ?, lastfm_username = ?, scrobbles_on = 1 WHERE id = ?',
-    ).run(sessionToken.sessionKey, sessionToken.userName, id);
+    ).run(encrypted, sessionToken.userName, id);
 
     return { id };
   }
@@ -119,9 +119,12 @@ export class UserService {
       return null;
     }
 
-    const lastfmUser = await this.lastfmService.getUserInfo(
-      row.lastfm_session_token,
-    );
+    const sessionKey = decryptToken(row.lastfm_session_token);
+    if (!sessionKey) {
+      return null;
+    }
+
+    const lastfmUser = await this.lastfmService.getUserInfo(sessionKey);
 
     if (!lastfmUser) {
       return null;
@@ -157,7 +160,9 @@ export class UserService {
     }
 
     const username = row.lastfm_username ?? '';
-    const sessionKey = row.lastfm_session_token ?? undefined;
+    const sessionKey = row.lastfm_session_token
+      ? (decryptToken(row.lastfm_session_token) ?? undefined)
+      : undefined;
 
     const profileName = (
       await this.lastfmService.getUserInfo(sessionKey)
@@ -214,7 +219,9 @@ export class UserService {
     }
 
     const username = row.lastfm_username ?? '';
-    const sessionKey = row.lastfm_session_token ?? undefined;
+    const sessionKey = row.lastfm_session_token
+      ? (decryptToken(row.lastfm_session_token) ?? undefined)
+      : undefined;
 
     const profileName = (
       await this.lastfmService.getUserInfo(sessionKey)
@@ -271,7 +278,9 @@ export class UserService {
     }
 
     const username = row.lastfm_username ?? '';
-    const sessionKey = row.lastfm_session_token ?? undefined;
+    const sessionKey = row.lastfm_session_token
+      ? (decryptToken(row.lastfm_session_token) ?? undefined)
+      : undefined;
 
     const profileName = (
       await this.lastfmService.getUserInfo(sessionKey)

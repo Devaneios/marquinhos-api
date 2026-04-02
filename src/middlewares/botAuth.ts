@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'crypto';
 import { NextFunction, Request, Response } from 'express';
 import { verifyDiscordToken } from './userAuth';
 
@@ -11,7 +12,14 @@ export function checkToken(req: Request, res: Response, next: NextFunction) {
   if (!token) {
     return res.status(401).json({ message: 'Token not provided' });
   }
-  if (token !== process.env.MARQUINHOS_API_KEY) {
+  const expectedKey = process.env.MARQUINHOS_API_KEY;
+  if (!expectedKey) {
+    return res.status(500).json({ message: 'Server misconfiguration' });
+  }
+  // Timing-safe comparison to prevent timing-based API key extraction
+  const tokenBuf = Buffer.from(token);
+  const keyBuf = Buffer.from(expectedKey);
+  if (tokenBuf.length !== keyBuf.length || !timingSafeEqual(tokenBuf, keyBuf)) {
     return res.status(401).json({ message: 'Token not authorized' });
   }
   next();

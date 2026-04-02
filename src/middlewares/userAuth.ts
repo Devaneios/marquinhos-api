@@ -1,7 +1,11 @@
 import { NextFunction, Request, Response } from 'express';
 import { DiscordService } from '../services/discord';
 import { UserService } from '../services/user';
-import { decryptToken } from '../utils/crypto';
+import { decryptTokenFull } from '../utils/crypto';
+
+const logger = {
+  error: (...args: unknown[]) => console.error('[userAuth]', ...args),
+};
 
 const discordService = new DiscordService();
 const userService = new UserService();
@@ -18,15 +22,19 @@ export async function verifyDiscordToken(
     return res.status(401).json({ message: 'Token not provided' });
   }
 
-  const decryptedToken = decryptToken(access_token);
+  const payload = decryptTokenFull(access_token);
 
-  if (!decryptedToken) {
+  if (!payload) {
     // Was 500 — decryption failure means invalid/expired/tampered token, not a server error
     return res.status(401).json({ message: 'Invalid or expired token' });
   }
 
+  if (payload.expiresAt !== undefined && Date.now() > payload.expiresAt) {
+    return res.status(401).json({ message: 'Token expired' });
+  }
+
   try {
-    const discordUser = await discordService.getDiscordUser(decryptedToken);
+    const discordUser = await discordService.getDiscordUser(payload.token);
 
     // Null check BEFORE property assignment (previous code assigned .highestRole first,
     // making this guard unreachable dead code that always produced a 500 TypeError)
@@ -34,8 +42,9 @@ export async function verifyDiscordToken(
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const highestRole =
-      await discordService.getDiscordGuildUserHighestRole(decryptedToken);
+    const highestRole = await discordService.getDiscordGuildUserHighestRole(
+      payload.token,
+    );
 
     discordUser.highestRole = highestRole;
 
@@ -50,7 +59,7 @@ export async function verifyDiscordToken(
     });
     next();
   } catch (error) {
-    console.error(error);
+    logger.error('Discord token verification failed:', error);
     return res.status(500).json({ message: 'Internal Server Error' });
   }
 }

@@ -3,6 +3,10 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { db } from '../database/sqlite';
 
+const logger = {
+  warn: (...args: unknown[]) => console.warn('[wordle]', ...args),
+};
+
 interface WordleDaily {
   guild_id: string;
   word: string;
@@ -79,13 +83,13 @@ export function getValidationSet(): Set<string> {
 }
 
 function getRecifeDate(): string {
-  // UTC-3 (Recife does not observe DST)
-  const now = new Date();
-  const recife = new Date(now.getTime() - 3 * 60 * 60 * 1000);
-  return recife.toISOString().slice(0, 10);
+  // Use Intl to get the correct date in Recife timezone
+  const tz = process.env.WORDLE_TIMEZONE ?? 'America/Recife';
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: tz }).format(new Date());
+  // 'sv-SE' locale gives YYYY-MM-DD format
 }
 
-function computeFeedback(guess: string, word: string): LetterFeedback[] {
+export function computeFeedback(guess: string, word: string): LetterFeedback[] {
   const result: LetterFeedback[] = new Array(guess.length).fill('absent');
   const wordChars = word.split('');
   const guessChars = guess.split('');
@@ -131,6 +135,10 @@ export class WordleService {
 
     if (available.length === 0) {
       throw new Error('No available words left in the wordlist');
+    }
+
+    if (available.length < 50) {
+      logger.warn(`Low word pool: only ${available.length} words remaining`);
     }
 
     // Group by length and pick a length uniformly, then a word within that group.

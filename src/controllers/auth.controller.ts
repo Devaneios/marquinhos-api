@@ -24,18 +24,19 @@ class AuthController {
 
     if (!code) {
       return res.status(400).json({
-        error: 'Code not provided',
+        message: 'Code not provided',
       });
     }
 
     try {
       const response = await this.discordService.requestToken(code);
 
-      const encryptedToken = encryptToken(response.access_token);
+      const expiresAt = Date.now() + response.expires_in * 1000;
+      const encryptedToken = encryptToken(response.access_token, expiresAt);
       const encryptedRefreshToken = encryptToken(response.refresh_token);
 
       if (!encryptedToken || !encryptedRefreshToken) {
-        return res.status(500).json({ error: 'Internal Server Error' });
+        return res.status(500).json({ message: 'Internal Server Error' });
       }
 
       res.set('Created-At', new Date().toISOString());
@@ -62,7 +63,7 @@ class AuthController {
       return res.status(200).json({ message: 'Authenticated successfully' });
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Internal Server Error' });
+      return res.status(500).json({ message: 'Internal Server Error' });
     }
   }
 
@@ -73,12 +74,12 @@ class AuthController {
     const refresh_token = req.headers['Refresh-Token'] as string;
 
     if (!refresh_token) {
-      return res.status(400).json({ error: 'Refresh token not found' });
+      return res.status(400).json({ message: 'Refresh token not found' });
     }
     const decryptedRefreshToken = decryptToken(refresh_token);
 
     if (!decryptedRefreshToken) {
-      return res.status(500).json({ error: 'Internal Server Error' });
+      return res.status(500).json({ message: 'Internal Server Error' });
     }
 
     try {
@@ -86,7 +87,11 @@ class AuthController {
         decryptedRefreshToken,
       );
 
-      const encryptedToken = encryptToken(response.access_token);
+      const refreshExpiresAt = Date.now() + response.expires_in * 1000;
+      const encryptedToken = encryptToken(
+        response.access_token,
+        refreshExpiresAt,
+      );
 
       res.set('Authorization', `Bearer ${encryptedToken}`);
       res.set('Access-Control-Expose-Headers', 'Authorization');
@@ -95,7 +100,7 @@ class AuthController {
       return res.status(200).json({ message: 'Token refreshed' });
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Internal Server Error' });
+      return res.status(500).json({ message: 'Internal Server Error' });
     }
   }
 
@@ -103,8 +108,9 @@ class AuthController {
     req: Request,
     res: Response,
   ): Response<ApiResponse<string>> {
+    const state = req.query.state as string | undefined;
     return res.status(200).json({
-      data: this.discordService.getAuthorizationUrl(),
+      data: this.discordService.getAuthorizationUrl(state),
     });
   }
 

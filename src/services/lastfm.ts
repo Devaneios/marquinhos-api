@@ -35,6 +35,11 @@ import { URLSearchParams } from 'url';
 import { db } from '../database/sqlite';
 // URLSearchParams is available globally in Node.js >= 15 but we import for clarity
 
+const logger = {
+  error: (...args: unknown[]) => console.error('[lastfm]', ...args),
+  warn: (...args: unknown[]) => console.warn('[lastfm]', ...args),
+};
+
 interface LastfmErrorResponse {
   response?: {
     data?: {
@@ -81,7 +86,7 @@ export class LastfmService {
       ) {
         throw new Error('LastfmServiceUnavailable');
       } else {
-        console.error(error);
+        logger.error('LastfmRequestUnknownError:', error);
         throw new Error('LastfmRequestUnknownError');
       }
     }
@@ -124,7 +129,7 @@ export class LastfmService {
       if (err?.response?.data?.error === 9) {
         throw new Error('LastfmInvalidSessionKey');
       } else {
-        console.error(error);
+        logger.error('Scrobble error:', error);
         throw new Error('LastfmRequestUnknownError');
       }
     }
@@ -146,7 +151,7 @@ export class LastfmService {
       if (err?.response?.data?.error === 9) {
         throw new Error('LastfmInvalidSessionKey');
       } else {
-        console.error(error);
+        logger.error('getUserInfo error:', error);
         throw new Error('LastfmRequestUnknownError');
       }
     }
@@ -164,9 +169,18 @@ export class LastfmService {
     const track = JSON.parse(row.track) as Track;
     const playbackData = JSON.parse(row.playback_data) as PlaybackData;
 
-    await this.dispatchScrobble(track, playbackData);
+    const failedUserIds = await this.dispatchScrobble(track, playbackData);
 
-    db.prepare('DELETE FROM scrobbles_queue WHERE id = ?').run(scrobbleId);
+    // If completely successful (or non-transient failures), delete the queue item.
+    // If transient failures occurred, update the queue to only contain the users who need retries.
+    if (failedUserIds.length === 0) {
+      db.prepare('DELETE FROM scrobbles_queue WHERE id = ?').run(scrobbleId);
+    } else {
+      playbackData.listeningUsersId = failedUserIds;
+      db.prepare(
+        'UPDATE scrobbles_queue SET playback_data = ? WHERE id = ?',
+      ).run(JSON.stringify(playbackData), scrobbleId);
+    }
 
     return scrobbleId;
   }
@@ -213,8 +227,15 @@ export class LastfmService {
     };
   }
 
-  async dispatchScrobble(track: Track, playbackData: PlaybackData) {
-    const scrobblingRequestPromises: Promise<void>[] = [];
+  async dispatchScrobble(
+    track: Track,
+    playbackData: PlaybackData,
+  ): Promise<string[]> {
+    const scrobblingRequestPromises: Promise<{
+      userId: string;
+      success: boolean;
+      error?: Error;
+    }>[] = [];
 
     for (const userId of playbackData.listeningUsersId) {
       const registeredUser = db
@@ -231,12 +252,33 @@ export class LastfmService {
           [track],
           [playbackData],
           registeredUser.lastfm_session_token ?? undefined,
-        );
+        )
+          .then(() => ({ userId, success: true }))
+          .catch((error) => ({ userId, success: false, error }));
         scrobblingRequestPromises.push(scrobblingRequestPromise);
       }
     }
 
-    await Promise.all(scrobblingRequestPromises);
+    const results = await Promise.all(scrobblingRequestPromises);
+    const failedUserIds: string[] = [];
+
+    for (const res of results) {
+      if (!res.success) {
+        if (res.error?.message === 'LastfmInvalidSessionKey') {
+          logger.warn(`User ${res.userId} has invalid Last.fm session`);
+          db.prepare('UPDATE users SET scrobbles_on = 0 WHERE id = ?').run(
+            res.userId,
+          );
+        } else {
+          logger.warn(
+            `Transient scrobble error for ${res.userId}: ${res.error?.message || res.error}`,
+          );
+          failedUserIds.push(res.userId);
+        }
+      }
+    }
+
+    return failedUserIds;
   }
 
   async updateNowPlaying(
@@ -259,11 +301,11 @@ export class LastfmService {
     }
 
     try {
-      const _response = await this._performRequest(params, 'post', true);
+      await this._performRequest(params, 'post', true);
     } catch (error: unknown) {
       const err = error as LastfmErrorResponse;
       if (err?.response?.data?.error !== 9) {
-        console.error(error);
+        logger.warn('updateNowPlaying failed:', error);
       }
     }
   }
@@ -290,7 +332,7 @@ export class LastfmService {
         };
       });
     } catch (error: unknown) {
-      console.error(error);
+      logger.error('getTopArtists error:', error);
       throw new Error('LastfmRequestUnknownError');
     }
   }
@@ -317,7 +359,7 @@ export class LastfmService {
         },
       );
     } catch (error: unknown) {
-      console.error(error);
+      logger.error('getTopAlbums error:', error);
       throw new Error('LastfmRequestUnknownError');
     }
   }
@@ -344,7 +386,7 @@ export class LastfmService {
         },
       );
     } catch (error: unknown) {
-      console.error(error);
+      logger.error('getTopTracks error:', error);
       throw new Error('LastfmRequestUnknownError');
     }
   }

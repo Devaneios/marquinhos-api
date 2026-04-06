@@ -17,6 +17,12 @@ router.post(
   checkToken,
   wordle.forceNewWord.bind(wordle),
 );
+router.get(
+  '/leaderboard/:guildId',
+  checkToken,
+  wordle.getLeaderboard.bind(wordle),
+);
+router.get('/validate/:guildId', checkToken, wordle.validateGuess.bind(wordle));
 router.post('/config', checkToken, wordle.setConfig.bind(wordle));
 router.get('/config/:guildId', checkToken, wordle.getConfig.bind(wordle));
 

@@ -202,6 +202,14 @@ db.run(`
   )
 `);
 
+try {
+  db.run(
+    'ALTER TABLE wordle_sessions ADD COLUMN word_length INTEGER NOT NULL DEFAULT 0',
+  );
+} catch {
+  // Column already exists — safe to ignore
+}
+
 const cleanupStmt = db.prepare(
   `DELETE FROM scrobbles_queue WHERE created_at < (unixepoch() - ${TTL_SECONDS})`,
 );

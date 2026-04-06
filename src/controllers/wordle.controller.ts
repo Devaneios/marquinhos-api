@@ -80,6 +80,22 @@ export default class WordleController {
     }
   }
 
+  getLeaderboard(req: Request, res: Response): void {
+    const { guildId } = req.params;
+    if (!guildId) {
+      res.status(400).json({ message: 'guildId é obrigatório.' });
+      return;
+    }
+
+    try {
+      const entries = service.getLeaderboard(guildId);
+      res.json({ data: entries });
+    } catch (err) {
+      console.error('WordleController.getLeaderboard error:', err);
+      res.status(500).json({ message: 'Erro interno.' });
+    }
+  }
+
   setConfig(req: Request, res: Response): void {
     const { guildId, channelId } = req.body as {
       guildId?: string;
@@ -97,6 +113,24 @@ export default class WordleController {
       res.json({ message: 'Configuração salva.' });
     } catch (err) {
       console.error('WordleController.setConfig error:', err);
+      res.status(500).json({ message: 'Erro interno.' });
+    }
+  }
+
+  validateGuess(req: Request, res: Response): void {
+    const { guildId } = req.params;
+    const guess = req.query.guess as string | undefined;
+
+    if (!guildId || !guess) {
+      res.status(400).json({ message: 'guildId e guess são obrigatórios.' });
+      return;
+    }
+
+    try {
+      const result = service.validateGuess(guildId, guess);
+      res.json({ data: result });
+    } catch (err) {
+      console.error('WordleController.validateGuess error:', err);
       res.status(500).json({ message: 'Erro interno.' });
     }
   }

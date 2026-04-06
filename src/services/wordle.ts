@@ -228,13 +228,14 @@ export class WordleService {
     if (!sessionRow) {
       const id = randomUUID();
       db.query(
-        `INSERT INTO wordle_sessions (id, user_id, guild_id, word_date, guesses, solved, attempts, created_at)
-         VALUES ($id, $user_id, $guild_id, $word_date, '[]', 0, 0, $now)`,
+        `INSERT INTO wordle_sessions (id, user_id, guild_id, word_date, guesses, solved, attempts, word_length, created_at)
+         VALUES ($id, $user_id, $guild_id, $word_date, '[]', 0, 0, $word_length, $now)`,
       ).run({
         $id: id,
         $user_id: userId,
         $guild_id: guildId,
         $word_date: today,
+        $word_length: daily.word.length,
         $now: now,
       });
       sessionRow = { id, guesses: '[]', solved: 0, attempts: 0 };
@@ -347,6 +348,31 @@ export class WordleService {
     };
   }
 
+  validateGuess(
+    guildId: string,
+    guess: string,
+  ): { valid: boolean; wordLength: number; message: string } {
+    const normalized = guess.trim().toLowerCase();
+    const daily = this.getDailyWord(guildId);
+
+    if (normalized.length !== daily.word.length) {
+      return {
+        valid: false,
+        wordLength: daily.word.length,
+        message: `A palavra de hoje tem ${daily.word.length} letras (você digitou ${normalized.length})`,
+      };
+    }
+
+    const inWordBank = getValidationSet().has(normalized);
+    return {
+      valid: inWordBank,
+      wordLength: daily.word.length,
+      message: inWordBank
+        ? `"${normalized}" é uma palavra válida`
+        : `"${normalized}" não está na lista de palavras válidas`,
+    };
+  }
+
   getDailyStats(guildId: string): DailyStats {
     const daily = this.getDailyWord(guildId);
     const avgAttempts =
@@ -361,6 +387,46 @@ export class WordleService {
       winnersCount: daily.winners_count,
       avgAttempts,
     };
+  }
+
+  getLeaderboard(
+    guildId: string,
+    limit = 10,
+  ): { userId: string; totalDays: number; avgScore: number }[] {
+    return db
+      .query<
+        { user_id: string; total_days: number; avg_score: number },
+        { $guild_id: string; $limit: number }
+      >(
+        `SELECT
+           p.user_id,
+           COUNT(d.word_date) AS total_days,
+           ROUND(
+             CAST(SUM(COALESCE(s.attempts, d.word_length + 1)) AS REAL) / COUNT(d.word_date),
+             2
+           ) AS avg_score
+         FROM (
+           SELECT DISTINCT user_id FROM wordle_sessions WHERE guild_id = $guild_id
+         ) p
+         CROSS JOIN (
+           SELECT DISTINCT word_date, word_length
+           FROM wordle_sessions
+           WHERE guild_id = $guild_id AND word_length > 0
+         ) d
+         LEFT JOIN wordle_sessions s
+           ON s.user_id = p.user_id
+           AND s.guild_id = $guild_id
+           AND s.word_date = d.word_date
+         GROUP BY p.user_id
+         ORDER BY avg_score ASC
+         LIMIT $limit`,
+      )
+      .all({ $guild_id: guildId, $limit: limit })
+      .map((row) => ({
+        userId: row.user_id,
+        totalDays: row.total_days,
+        avgScore: row.avg_score,
+      }));
   }
 
   forceNewWord(guildId: string): ForceNewWordResult {

@@ -1,7 +1,6 @@
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express, { Express, NextFunction, Request, Response } from 'express';
-import rateLimit from 'express-rate-limit';
 import http from 'http';
 import morgan from 'morgan';
 import './database/sqlite';
@@ -54,34 +53,34 @@ app.use(cors(corsOptionsDelegate));
 app.use(express.urlencoded({ extended: true }));
 
 // Rate limiting — global 100 req/15min, tighter limits on sensitive endpoints
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { message: 'Too many requests, please try again later.' },
-});
+// const globalLimiter = rateLimit({
+//   windowMs: 15 * 60 * 1000,
+//   max: 100,
+//   standardHeaders: true,
+//   legacyHeaders: false,
+//   message: { message: 'Too many requests, please try again later.' },
+// });
 
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { message: 'Too many login attempts, please try again later.' },
-});
+// const authLimiter = rateLimit({
+//   windowMs: 15 * 60 * 1000,
+//   max: 10,
+//   standardHeaders: true,
+//   legacyHeaders: false,
+//   message: { message: 'Too many login attempts, please try again later.' },
+// });
 
-const wordleLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { message: 'Too many guesses, slow down.' },
-});
+// const wordleLimiter = rateLimit({
+//   windowMs: 60 * 1000,
+//   max: 20,
+//   standardHeaders: true,
+//   legacyHeaders: false,
+//   message: { message: 'Too many guesses, slow down.' },
+// });
 
-app.use(globalLimiter);
-// Specific limiters registered before the catch-all route mounts
-app.use('/api/auth/login', authLimiter);
-app.use('/api/wordle/guess', wordleLimiter);
+// app.use(globalLimiter);
+// // Specific limiters registered before the catch-all route mounts
+// app.use('/api/auth/login', authLimiter);
+// app.use('/api/wordle/guess', wordleLimiter);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });

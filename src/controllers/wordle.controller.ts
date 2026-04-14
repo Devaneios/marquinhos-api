@@ -150,4 +150,20 @@ export default class WordleController {
       res.status(500).json({ message: 'Erro interno.' });
     }
   }
+
+  getStreak(req: Request, res: Response): void {
+    const { userId, guildId } = req.params;
+    if (!userId || !guildId) {
+      res.status(400).json({ message: 'userId e guildId são obrigatórios.' });
+      return;
+    }
+
+    try {
+      const streak = service.getStreak(userId, guildId);
+      res.json({ data: streak });
+    } catch (err) {
+      console.error('WordleController.getStreak error:', err);
+      res.status(500).json({ message: 'Erro interno.' });
+    }
+  }
 }

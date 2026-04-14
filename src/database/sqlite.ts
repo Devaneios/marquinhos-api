@@ -210,6 +210,17 @@ try {
   // Column already exists — safe to ignore
 }
 
+db.run(`
+  CREATE TABLE IF NOT EXISTS wordle_streaks (
+    user_id          TEXT NOT NULL,
+    guild_id         TEXT NOT NULL,
+    current_streak   INTEGER NOT NULL DEFAULT 0,
+    max_streak       INTEGER NOT NULL DEFAULT 0,
+    last_solved_date TEXT,
+    PRIMARY KEY (user_id, guild_id)
+  )
+`);
+
 const cleanupStmt = db.prepare(
   `DELETE FROM scrobbles_queue WHERE created_at < (unixepoch() - ${TTL_SECONDS})`,
 );

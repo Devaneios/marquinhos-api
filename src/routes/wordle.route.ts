@@ -25,5 +25,10 @@ router.get(
 router.get('/validate/:guildId', checkToken, wordle.validateGuess.bind(wordle));
 router.post('/config', checkToken, wordle.setConfig.bind(wordle));
 router.get('/config/:guildId', checkToken, wordle.getConfig.bind(wordle));
+router.get(
+  '/streak/:userId/:guildId',
+  checkToken,
+  wordle.getStreak.bind(wordle),
+);
 
 export default router;

@@ -37,6 +37,7 @@ export interface GuessResult {
   solved: boolean;
   attempts: number;
   wordLength: number;
+  streak?: number;
 }
 
 export interface DailyStats {
@@ -70,16 +71,52 @@ function getWordlist(): string[] {
 // Validation bank: valid-guesses.txt (pre-built union of wordlist + ICF, 5–12 chars)
 const VALID_GUESSES_PATH = join(__dirname, '../../valid-guesses.txt');
 let validationSetCache: Set<string> | null = null;
+let validationByStrippedCache: Map<string, string> | null = null;
 
-export function getValidationSet(): Set<string> {
-  if (validationSetCache) return validationSetCache;
+export function stripDiacritics(s: string): string {
+  return s.normalize('NFD').replace(/\p{Diacritic}/gu, '');
+}
+
+function hasDiacritics(s: string): boolean {
+  return stripDiacritics(s) !== s;
+}
+
+function loadValidationBank(): void {
+  if (validationSetCache && validationByStrippedCache) return;
   const raw = readFileSync(VALID_GUESSES_PATH, 'utf-8');
   const words = raw
     .split('\n')
     .map((w) => w.trim())
     .filter((w) => w.length > 0);
-  validationSetCache = new Set(words);
-  return validationSetCache;
+
+  const set = new Set(words);
+  const byStripped = new Map<string, string>();
+  for (const w of words) {
+    const key = stripDiacritics(w);
+    const existing = byStripped.get(key);
+    // Prefer entries with diacritics when a collision occurs so that
+    // unaccented inputs resolve to the canonical accented spelling.
+    if (!existing || (!hasDiacritics(existing) && hasDiacritics(w))) {
+      byStripped.set(key, w);
+    }
+  }
+
+  validationSetCache = set;
+  validationByStrippedCache = byStripped;
+}
+
+export function getValidationSet(): Set<string> {
+  loadValidationBank();
+  return validationSetCache!;
+}
+
+export function resolveCanonical(guess: string): string | null {
+  loadValidationBank();
+  const normalized = guess.trim().toLowerCase();
+  if (!normalized) return null;
+  if (validationSetCache!.has(normalized)) return normalized;
+  const canonical = validationByStrippedCache!.get(stripDiacritics(normalized));
+  return canonical ?? null;
 }
 
 function getRecifeDate(): string {
@@ -198,21 +235,22 @@ export class WordleService {
     guildId: string,
     guess: string,
   ): GuessResult | { error: string } {
-    const normalizedGuess = guess.trim().toLowerCase();
-
-    // Validate word exists in the validation bank
-    if (!getValidationSet().has(normalizedGuess)) {
+    const canonicalGuess = resolveCanonical(guess);
+    if (!canonicalGuess) {
       return { error: 'Palavra não encontrada na lista de palavras válidas.' };
     }
 
     const daily = this.getDailyWord(guildId);
 
     // Validate length matches today's word
-    if (normalizedGuess.length !== daily.word.length) {
+    if (canonicalGuess.length !== daily.word.length) {
       return {
-        error: `A palavra de hoje tem ${daily.word.length} letras. Sua tentativa tem ${normalizedGuess.length}.`,
+        error: `A palavra de hoje tem ${daily.word.length} letras. Sua tentativa tem ${canonicalGuess.length}.`,
       };
     }
+
+    const strippedGuess = stripDiacritics(canonicalGuess);
+    const strippedWord = stripDiacritics(daily.word);
 
     const today = getRecifeDate();
     const now = Math.floor(Date.now() / 1000);
@@ -248,15 +286,17 @@ export class WordleService {
     const previousGuesses: { guess: string; feedback: LetterFeedback[] }[] =
       JSON.parse(sessionRow.guesses);
 
-    if (previousGuesses.some((g) => g.guess === normalizedGuess)) {
+    if (
+      previousGuesses.some((g) => stripDiacritics(g.guess) === strippedGuess)
+    ) {
       return { error: 'Você já tentou essa palavra.' };
     }
 
-    const feedback = computeFeedback(normalizedGuess, daily.word);
-    const solved = normalizedGuess === daily.word;
+    const feedback = computeFeedback(strippedGuess, strippedWord);
+    const solved = strippedGuess === strippedWord;
     const newGuesses = [
       ...previousGuesses,
-      { guess: normalizedGuess, feedback },
+      { guess: canonicalGuess, feedback },
     ];
     const newAttempts = sessionRow.attempts + 1;
 
@@ -307,14 +347,20 @@ export class WordleService {
       });
     }
 
-    return {
-      guess: normalizedGuess,
+    const result: GuessResult = {
+      guess: canonicalGuess,
       feedback,
       guesses: newGuesses,
       solved,
       attempts: newAttempts,
       wordLength: daily.word.length,
     };
+
+    if (solved) {
+      result.streak = this.updateStreak(userId, guildId);
+    }
+
+    return result;
   }
 
   getUserSession(userId: string, guildId: string): WordleSession | null {
@@ -363,12 +409,12 @@ export class WordleService {
       };
     }
 
-    const inWordBank = getValidationSet().has(normalized);
+    const canonical = resolveCanonical(normalized);
     return {
-      valid: inWordBank,
+      valid: canonical !== null,
       wordLength: daily.word.length,
-      message: inWordBank
-        ? `"${normalized}" é uma palavra válida`
+      message: canonical
+        ? `"${canonical}" é uma palavra válida`
         : `"${normalized}" não está na lista de palavras válidas`,
     };
   }
@@ -386,6 +432,139 @@ export class WordleService {
       playersCount: daily.players_count,
       winnersCount: daily.winners_count,
       avgAttempts,
+    };
+  }
+
+  private getYesterday(today: string): string {
+    const d = new Date(`${today}T12:00:00`);
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().split('T')[0];
+  }
+
+  private computeStreakFromHistory(
+    userId: string,
+    guildId: string,
+    today: string,
+  ): number {
+    const rows = db
+      .query<{ word_date: string }, { $user_id: string; $guild_id: string }>(
+        `SELECT word_date FROM wordle_sessions
+         WHERE user_id = $user_id AND guild_id = $guild_id AND solved = 1
+         ORDER BY word_date DESC`,
+      )
+      .all({ $user_id: userId, $guild_id: guildId });
+
+    if (rows.length === 0) return 0;
+
+    let streak = 0;
+    let expectedDate = today;
+
+    for (const row of rows) {
+      if (row.word_date === expectedDate) {
+        streak++;
+        expectedDate = this.getYesterday(expectedDate);
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  }
+
+  updateStreak(userId: string, guildId: string): number {
+    const today = getRecifeDate();
+
+    const row = db
+      .query<
+        {
+          current_streak: number;
+          max_streak: number;
+          last_solved_date: string | null;
+        },
+        { $user_id: string; $guild_id: string }
+      >(
+        `SELECT current_streak, max_streak, last_solved_date FROM wordle_streaks
+         WHERE user_id = $user_id AND guild_id = $guild_id`,
+      )
+      .get({ $user_id: userId, $guild_id: guildId });
+
+    if (!row) {
+      const streak = this.computeStreakFromHistory(userId, guildId, today);
+      db.query(
+        `INSERT INTO wordle_streaks (user_id, guild_id, current_streak, max_streak, last_solved_date)
+         VALUES ($user_id, $guild_id, $streak, $streak, $today)`,
+      ).run({
+        $user_id: userId,
+        $guild_id: guildId,
+        $streak: streak,
+        $today: today,
+      });
+      return streak;
+    }
+
+    if (row.last_solved_date === today) {
+      return row.current_streak;
+    }
+
+    const yesterday = this.getYesterday(today);
+    let newStreak: number;
+
+    if (row.last_solved_date === yesterday) {
+      newStreak = row.current_streak + 1;
+    } else {
+      newStreak = 1;
+    }
+
+    const newMax = Math.max(newStreak, row.max_streak);
+
+    db.query(
+      `UPDATE wordle_streaks SET current_streak = $streak, max_streak = $max, last_solved_date = $today
+       WHERE user_id = $user_id AND guild_id = $guild_id`,
+    ).run({
+      $user_id: userId,
+      $guild_id: guildId,
+      $streak: newStreak,
+      $max: newMax,
+      $today: today,
+    });
+
+    return newStreak;
+  }
+
+  getStreak(
+    userId: string,
+    guildId: string,
+  ): { currentStreak: number; maxStreak: number } {
+    const row = db
+      .query<
+        {
+          current_streak: number;
+          max_streak: number;
+          last_solved_date: string | null;
+        },
+        { $user_id: string; $guild_id: string }
+      >(
+        `SELECT current_streak, max_streak, last_solved_date FROM wordle_streaks
+         WHERE user_id = $user_id AND guild_id = $guild_id`,
+      )
+      .get({ $user_id: userId, $guild_id: guildId });
+
+    if (!row) {
+      const today = getRecifeDate();
+      const streak = this.computeStreakFromHistory(userId, guildId, today);
+      return { currentStreak: streak, maxStreak: streak };
+    }
+
+    const today = getRecifeDate();
+    const yesterday = this.getYesterday(today);
+
+    if (row.last_solved_date !== today && row.last_solved_date !== yesterday) {
+      return { currentStreak: 0, maxStreak: row.max_streak };
+    }
+
+    return {
+      currentStreak: row.current_streak,
+      maxStreak: row.max_streak,
     };
   }
 

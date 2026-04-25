@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  buildUniqueDayGuesses,
   computeFeedback,
   resolveCanonical,
   stripDiacritics,
@@ -93,5 +94,99 @@ describe('resolveCanonical', () => {
 
   it('accepts an accented input that matches an entry verbatim', () => {
     expect(resolveCanonical('bastião')).toBe('bastião');
+  });
+});
+
+describe('buildUniqueDayGuesses', () => {
+  it('removes guesses that match the answer without accents', () => {
+    const result = buildUniqueDayGuesses('rádio', [
+      {
+        guesses: JSON.stringify([
+          {
+            guess: 'radio',
+            feedback: ['correct', 'correct', 'correct', 'correct', 'correct'],
+          },
+          {
+            guess: 'termo',
+            feedback: ['absent', 'absent', 'absent', 'absent', 'absent'],
+          },
+        ]),
+      },
+    ]);
+
+    expect(result.map((g) => g.guess)).toEqual(['termo']);
+  });
+
+  it('deduplicates guesses by accent-insensitive normalized spelling', () => {
+    const result = buildUniqueDayGuesses('termo', [
+      {
+        guesses: JSON.stringify([
+          {
+            guess: 'radio',
+            feedback: ['absent', 'present', 'absent', 'absent', 'correct'],
+          },
+        ]),
+      },
+      {
+        guesses: JSON.stringify([
+          {
+            guess: 'rádio',
+            feedback: ['absent', 'present', 'absent', 'absent', 'correct'],
+          },
+          {
+            guess: 'prato',
+            feedback: ['absent', 'present', 'absent', 'absent', 'correct'],
+          },
+        ]),
+      },
+    ]);
+
+    expect(result.map((g) => g.guess)).toEqual(['radio', 'prato']);
+  });
+
+  it('preserves first-seen row and guess order', () => {
+    const result = buildUniqueDayGuesses('termo', [
+      {
+        guesses: JSON.stringify([
+          {
+            guess: 'prato',
+            feedback: ['absent', 'present', 'absent', 'absent', 'correct'],
+          },
+          {
+            guess: 'certo',
+            feedback: ['absent', 'correct', 'correct', 'correct', 'correct'],
+          },
+        ]),
+      },
+      {
+        guesses: JSON.stringify([
+          {
+            guess: 'mundo',
+            feedback: ['absent', 'absent', 'absent', 'absent', 'correct'],
+          },
+        ]),
+      },
+    ]);
+
+    expect(result.map((g) => g.guess)).toEqual(['prato', 'certo', 'mundo']);
+  });
+
+  it('skips guesses with malformed feedback length', () => {
+    const result = buildUniqueDayGuesses('termo', [
+      {
+        guesses: JSON.stringify([
+          {
+            guess: 'prato',
+            feedback: ['absent', 'present', 'absent', 'absent'],
+          },
+          {
+            guess: 'certo',
+            feedback: ['absent', 'correct', 'correct', 'correct', 'correct'],
+          },
+        ]),
+      },
+    ]);
+
+    expect(result.map((g) => g.guess)).toEqual(['certo']);
   });
 });

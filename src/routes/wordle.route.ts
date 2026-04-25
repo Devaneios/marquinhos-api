@@ -12,6 +12,11 @@ router.get(
   checkToken,
   wordle.getUserSession.bind(wordle),
 );
+router.get(
+  '/day-guesses/:guildId',
+  checkToken,
+  wordle.getDayGuesses.bind(wordle),
+);
 router.post(
   '/admin/force-new-word',
   checkToken,

@@ -54,6 +54,17 @@ export interface ForceNewWordResult {
   wordLength: number;
 }
 
+export interface DayGuesses {
+  word: string;
+  wordDate: string;
+  wordLength: number;
+  guesses: { guess: string; feedback: LetterFeedback[] }[];
+}
+
+interface WordleSessionGuessesRow {
+  guesses: string;
+}
+
 // Answer bank: wordlist.txt (used for picking daily words)
 const WORDLIST_PATH = join(__dirname, '../../wordlist.txt');
 let wordlistCache: string[] | null = null;
@@ -75,6 +86,10 @@ let validationByStrippedCache: Map<string, string> | null = null;
 
 export function stripDiacritics(s: string): string {
   return s.normalize('NFD').replace(/\p{Diacritic}/gu, '');
+}
+
+function normalizeGuess(s: string): string {
+  return stripDiacritics(s.trim().toLowerCase());
 }
 
 function hasDiacritics(s: string): boolean {
@@ -117,6 +132,52 @@ export function resolveCanonical(guess: string): string | null {
   if (validationSetCache!.has(normalized)) return normalized;
   const canonical = validationByStrippedCache!.get(stripDiacritics(normalized));
   return canonical ?? null;
+}
+
+export function buildUniqueDayGuesses(
+  answerWord: string,
+  rows: WordleSessionGuessesRow[],
+): { guess: string; feedback: LetterFeedback[] }[] {
+  const answerKey = normalizeGuess(answerWord);
+  const wordLength = answerWord.length;
+  const seen = new Set<string>();
+  const result: { guess: string; feedback: LetterFeedback[] }[] = [];
+
+  for (const row of rows) {
+    let guesses: unknown;
+    try {
+      guesses = JSON.parse(row.guesses);
+    } catch {
+      continue;
+    }
+
+    if (!Array.isArray(guesses)) continue;
+
+    for (const guess of guesses) {
+      if (
+        typeof guess !== 'object' ||
+        guess === null ||
+        !('guess' in guess) ||
+        !('feedback' in guess) ||
+        typeof guess.guess !== 'string' ||
+        !Array.isArray(guess.feedback) ||
+        guess.feedback.length !== wordLength
+      ) {
+        continue;
+      }
+
+      const key = normalizeGuess(guess.guess);
+      if (!key || key === answerKey || seen.has(key)) continue;
+
+      seen.add(key);
+      result.push({
+        guess: guess.guess,
+        feedback: guess.feedback as LetterFeedback[],
+      });
+    }
+  }
+
+  return result;
 }
 
 function getRecifeDate(): string {
@@ -432,6 +493,36 @@ export class WordleService {
       playersCount: daily.players_count,
       winnersCount: daily.winners_count,
       avgAttempts,
+    };
+  }
+
+  getDayGuesses(guildId: string): DayGuesses | null {
+    const daily = db
+      .query<
+        WordleDaily,
+        { $guild_id: string }
+      >('SELECT * FROM wordle_daily WHERE guild_id = $guild_id')
+      .get({ $guild_id: guildId });
+
+    if (!daily) return null;
+
+    const rows = db
+      .query<
+        WordleSessionGuessesRow,
+        { $guild_id: string; $word_date: string }
+      >(
+        `SELECT guesses
+         FROM wordle_sessions
+         WHERE guild_id = $guild_id AND word_date = $word_date
+         ORDER BY created_at ASC`,
+      )
+      .all({ $guild_id: guildId, $word_date: daily.word_date });
+
+    return {
+      word: daily.word,
+      wordDate: daily.word_date,
+      wordLength: daily.word.length,
+      guesses: buildUniqueDayGuesses(daily.word, rows),
     };
   }
 

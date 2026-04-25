@@ -63,6 +63,22 @@ export default class WordleController {
     }
   }
 
+  getDayGuesses(req: Request, res: Response): void {
+    const { guildId } = req.params;
+    if (!guildId) {
+      res.status(400).json({ message: 'guildId é obrigatório.' });
+      return;
+    }
+
+    try {
+      const data = service.getDayGuesses(guildId);
+      res.json({ data });
+    } catch (err) {
+      console.error('WordleController.getDayGuesses error:', err);
+      res.status(500).json({ message: 'Erro interno.' });
+    }
+  }
+
   forceNewWord(req: Request, res: Response): void {
     const { guildId } = req.body as { guildId?: string };
     if (!guildId) {

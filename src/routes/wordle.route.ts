@@ -35,5 +35,10 @@ router.get(
   checkToken,
   wordle.getStreak.bind(wordle),
 );
+router.get(
+  '/wordlist-pool-stats',
+  checkToken,
+  wordle.getWordlistPoolStats.bind(wordle),
+);
 
 export default router;

@@ -182,4 +182,14 @@ export default class WordleController {
       res.status(500).json({ message: 'Erro interno.' });
     }
   }
+
+  getWordlistPoolStats(_req: Request, res: Response): void {
+    try {
+      const stats = service.getWordlistPoolStats();
+      res.json({ data: stats });
+    } catch (err) {
+      console.error('WordleController.getWordlistPoolStats error:', err);
+      res.status(500).json({ message: 'Erro interno.' });
+    }
+  }
 }

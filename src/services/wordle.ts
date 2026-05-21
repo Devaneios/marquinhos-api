@@ -736,4 +736,17 @@ export class WordleService {
       .all()
       .map((r) => ({ guildId: r.guild_id, channelId: r.channel_id }));
   }
+
+  getWordlistPoolStats(): { total: number; used: number; remaining: number } {
+    const wordlist = getWordlist();
+    const total = wordlist.filter((w) => w.length >= 5 && w.length <= 6).length;
+    const used =
+      db
+        .query<
+          { count: number },
+          []
+        >('SELECT COUNT(*) as count FROM wordle_used_words')
+        .get()?.count ?? 0;
+    return { total, used, remaining: total - used };
+  }
 }

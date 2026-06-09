@@ -103,9 +103,19 @@ export default class WordleController {
       return;
     }
 
+    const rawPeriod = req.query.period as string | undefined;
+    const period =
+      rawPeriod === 'daily' ||
+      rawPeriod === 'weekly' ||
+      rawPeriod === 'monthly' ||
+      rawPeriod === 'all-time'
+        ? rawPeriod
+        : 'all-time';
+
     try {
-      const entries = service.getLeaderboard(guildId);
-      res.json({ data: entries });
+      const data = service.getLeaderboard(guildId, 10, period);
+      const groupStreak = service.getGroupStreak(guildId);
+      res.json({ data, groupStreak });
     } catch (err) {
       console.error('WordleController.getLeaderboard error:', err);
       res.status(500).json({ message: 'Erro interno.' });

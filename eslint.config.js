@@ -18,6 +18,7 @@ export default [
       'tmp/**',
       'temp/**',
       'src/resources/**',
+      'tests/**/*.spec.ts',
     ],
   },
   // Configuration for TypeScript files

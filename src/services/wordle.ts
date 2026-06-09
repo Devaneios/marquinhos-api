@@ -662,11 +662,47 @@ export class WordleService {
   getLeaderboard(
     guildId: string,
     limit = 10,
-  ): { userId: string; totalDays: number; avgScore: number }[] {
+    period: 'all-time' | 'weekly' | 'monthly' | 'daily' = 'all-time',
+  ):
+    | { userId: string; totalDays: number; avgScore: number }[]
+    | { userId: string; attempts: number; solved: boolean }[] {
+    if (period === 'daily') {
+      const today = getRecifeDate();
+      return db
+        .query<
+          { user_id: string; attempts: number; solved: number },
+          { $guild_id: string; $today: string; $limit: number }
+        >(
+          `SELECT user_id, attempts, solved
+           FROM wordle_sessions
+           WHERE guild_id = $guild_id AND word_date = $today
+           ORDER BY solved DESC, attempts ASC
+           LIMIT $limit`,
+        )
+        .all({ $guild_id: guildId, $today: today, $limit: limit })
+        .map((row) => ({
+          userId: row.user_id,
+          attempts: row.attempts,
+          solved: row.solved === 1,
+        }));
+    }
+
+    let dateFrom: string | null = null;
+    if (period === 'weekly') {
+      const today = getRecifeDate();
+      const d = new Date(`${today}T12:00:00`);
+      d.setDate(d.getDate() - 6);
+      dateFrom = d.toISOString().split('T')[0];
+    } else if (period === 'monthly') {
+      dateFrom = `${getRecifeDate().substring(0, 8)}01`;
+    }
+
+    const dateFilter = dateFrom ? 'AND word_date >= $date_from' : '';
+
     return db
       .query<
         { user_id: string; total_days: number; avg_score: number },
-        { $guild_id: string; $limit: number }
+        { $guild_id: string; $limit: number; $date_from?: string }
       >(
         `SELECT
            p.user_id,
@@ -676,12 +712,13 @@ export class WordleService {
              2
            ) AS avg_score
          FROM (
-           SELECT DISTINCT user_id FROM wordle_sessions WHERE guild_id = $guild_id
+           SELECT DISTINCT user_id FROM wordle_sessions
+           WHERE guild_id = $guild_id ${dateFilter}
          ) p
          CROSS JOIN (
            SELECT DISTINCT word_date, word_length
            FROM wordle_sessions
-           WHERE guild_id = $guild_id AND word_length > 0
+           WHERE guild_id = $guild_id AND word_length > 0 ${dateFilter}
          ) d
          LEFT JOIN wordle_sessions s
            ON s.user_id = p.user_id
@@ -691,12 +728,45 @@ export class WordleService {
          ORDER BY avg_score ASC
          LIMIT $limit`,
       )
-      .all({ $guild_id: guildId, $limit: limit })
+      .all(
+        dateFrom
+          ? { $guild_id: guildId, $limit: limit, $date_from: dateFrom }
+          : { $guild_id: guildId, $limit: limit },
+      )
       .map((row) => ({
         userId: row.user_id,
         totalDays: row.total_days,
         avgScore: row.avg_score,
       }));
+  }
+
+  getGroupStreak(guildId: string): number {
+    const today = getRecifeDate();
+    const yesterday = this.getYesterday(today);
+
+    const rows = db
+      .query<{ word_date: string }, { $guild_id: string }>(
+        `SELECT word_date FROM wordle_daily
+         WHERE guild_id = $guild_id AND players_count > 0
+         ORDER BY word_date DESC`,
+      )
+      .all({ $guild_id: guildId });
+
+    if (rows.length === 0) return 0;
+
+    let streak = 0;
+    let expectedDate = yesterday;
+
+    for (const row of rows) {
+      if (row.word_date === expectedDate) {
+        streak++;
+        expectedDate = this.getYesterday(expectedDate);
+      } else {
+        break;
+      }
+    }
+
+    return streak;
   }
 
   forceNewWord(guildId: string): ForceNewWordResult {

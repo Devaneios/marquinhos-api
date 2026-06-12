@@ -746,8 +746,8 @@ export class WordleService {
 
     const rows = db
       .query<{ word_date: string }, { $guild_id: string }>(
-        `SELECT word_date FROM wordle_daily
-         WHERE guild_id = $guild_id AND players_count > 0
+        `SELECT DISTINCT word_date FROM wordle_sessions
+         WHERE guild_id = $guild_id
          ORDER BY word_date DESC`,
       )
       .all({ $guild_id: guildId });
@@ -758,6 +758,7 @@ export class WordleService {
     let expectedDate = yesterday;
 
     for (const row of rows) {
+      if (row.word_date === today) continue;
       if (row.word_date === expectedDate) {
         streak++;
         expectedDate = this.getYesterday(expectedDate);

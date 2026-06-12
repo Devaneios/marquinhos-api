@@ -6,46 +6,16 @@ process.env.SQLITE_PATH = ':memory:';
 const { db } = await import('../src/database/sqlite');
 const { WordleService } = await import('../src/services/wordle');
 
-function seedDailyRow(guildId: string, wordDate: string, playersCount: number) {
-  db.run(
-    `INSERT OR REPLACE INTO wordle_daily
-       (guild_id, word, word_date, players_count, winners_count, total_attempts, created_at)
-     VALUES (?, ?, ?, ?, 0, 0, 0)`,
-    [guildId, 'teste', wordDate, playersCount],
-  );
+function getRecifeDate(): string {
+  const tz = process.env.WORDLE_TIMEZONE ?? 'America/Recife';
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: tz }).format(new Date());
 }
 
-describe('WordleService.getGroupStreak', () => {
-  let service: WordleService;
-
-  beforeEach(() => {
-    db.run('DELETE FROM wordle_daily');
-    db.run('DELETE FROM wordle_sessions');
-    service = new WordleService();
-  });
-
-  it('returns 0 when no days have been played', () => {
-    expect(service.getGroupStreak('guild1')).toBe(0);
-  });
-
-  it('returns 0 when the most recent day is not yesterday', () => {
-    // Two days ago — gap before yesterday means streak is broken
-    seedDailyRow('guild1', '2026-01-01', 1);
-    expect(service.getGroupStreak('guild1')).toBe(0);
-  });
-
-  it('counts consecutive days up to yesterday', () => {
-    const streak = service.getGroupStreak('guild1');
-    expect(typeof streak).toBe('number');
-    expect(streak).toBeGreaterThanOrEqual(0);
-  });
-
-  it('stops counting at a gap', () => {
-    const streak = service.getGroupStreak('guild1');
-    expect(streak).toBeGreaterThanOrEqual(0);
-    expect(streak).toBeLessThanOrEqual(3);
-  });
-});
+function daysAgo(n: number): string {
+  const d = new Date(`${getRecifeDate()}T12:00:00`);
+  d.setDate(d.getDate() - n);
+  return d.toISOString().split('T')[0];
+}
 
 function seedSession(
   guildId: string,
@@ -72,6 +42,48 @@ function seedSession(
   );
 }
 
+describe('WordleService.getGroupStreak', () => {
+  let service: WordleService;
+
+  beforeEach(() => {
+    db.run('DELETE FROM wordle_sessions');
+    service = new WordleService();
+  });
+
+  it('returns 0 when no days have been played', () => {
+    expect(service.getGroupStreak('guild1')).toBe(0);
+  });
+
+  it('returns 0 when the most recent day is not yesterday', () => {
+    // Two days ago — gap before yesterday means streak is broken
+    seedSession('guild1', 'user1', daysAgo(2), 3, true);
+    expect(service.getGroupStreak('guild1')).toBe(0);
+  });
+
+  it('counts consecutive days up to yesterday', () => {
+    seedSession('guild1', 'user1', daysAgo(1), 3, true);
+    seedSession('guild1', 'user2', daysAgo(2), 2, true);
+    seedSession('guild1', 'user1', daysAgo(3), 4, true);
+
+    expect(service.getGroupStreak('guild1')).toBe(3);
+  });
+
+  it('stops counting at a gap', () => {
+    seedSession('guild1', 'user1', daysAgo(1), 3, true);
+    seedSession('guild1', 'user1', daysAgo(3), 4, true);
+
+    expect(service.getGroupStreak('guild1')).toBe(1);
+  });
+
+  it('ignores todays session when computing the streak', () => {
+    seedSession('guild1', 'user1', daysAgo(0), 1, true);
+    seedSession('guild1', 'user1', daysAgo(1), 3, true);
+    seedSession('guild1', 'user1', daysAgo(2), 2, true);
+
+    expect(service.getGroupStreak('guild1')).toBe(2);
+  });
+});
+
 describe('WordleService.getLeaderboard with period', () => {
   let service: WordleService;
 
@@ -81,9 +93,7 @@ describe('WordleService.getLeaderboard with period', () => {
   });
 
   it('daily: returns only todays sessions sorted by solved DESC, attempts ASC', () => {
-    const today = new Intl.DateTimeFormat('sv-SE', {
-      timeZone: process.env.WORDLE_TIMEZONE ?? 'America/Recife',
-    }).format(new Date());
+    const today = getRecifeDate();
 
     seedSession('g1', 'user1', today, 3, true);
     seedSession('g1', 'user2', today, 2, true);

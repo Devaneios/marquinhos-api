@@ -87,6 +87,38 @@ describe('WordleService.pickNewWord', () => {
 
     expect(wordlistWords.has(result.word)).toBe(true);
   });
+
+  it('never picks a word marked banned in wordlist_review', () => {
+    Math.random = () => 0.9;
+
+    const { readFileSync } = require('fs');
+    const { join } = require('path');
+    const wordlistWords: string[] = readFileSync(
+      join(__dirname, '../wordlist.txt'),
+      'utf-8',
+    )
+      .split('\n')
+      .map((w: string) => w.trim().toLowerCase())
+      .filter((w: string) => w.length >= 5 && w.length <= 6);
+
+    db.run('DELETE FROM wordlist_review');
+    // Leave exactly one word unbanned so a pick is still possible
+    const survivor = wordlistWords[0];
+    const insertBanned = db.prepare(
+      'INSERT INTO wordlist_review (word, is_banned) VALUES ($word, 1)',
+    );
+    const insertAll = db.transaction((words: string[]) => {
+      for (const w of words) {
+        if (w !== survivor) insertBanned.run({ $word: w });
+      }
+    });
+    insertAll(wordlistWords);
+
+    const result = service.pickNewWord('guild-banned', '2026-01-03');
+    expect(result.word).toBe(survivor);
+
+    db.run('DELETE FROM wordlist_review');
+  });
 });
 
 describe('WordleService.getGroupStreak', () => {

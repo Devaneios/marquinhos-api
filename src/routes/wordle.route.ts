@@ -40,5 +40,11 @@ router.get(
   checkToken,
   wordle.getWordlistPoolStats.bind(wordle),
 );
+router.get('/review/next', checkToken, wordle.getNextReviewWord.bind(wordle));
+router.post(
+  '/review/decision',
+  checkToken,
+  wordle.submitReviewDecision.bind(wordle),
+);
 
 export default router;

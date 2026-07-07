@@ -61,6 +61,13 @@ export interface DayGuesses {
   guesses: { guess: string; feedback: LetterFeedback[] }[];
 }
 
+export interface ReviewWordResult {
+  word: string | null;
+  index: number;
+  total: number;
+  done: boolean;
+}
+
 interface WordleSessionGuessesRow {
   guesses: string;
 }
@@ -238,13 +245,24 @@ export class WordleService {
       .all();
     const usedSet = new Set(usedRows.map((r) => r.word));
 
+    const bannedRows = db
+      .query<
+        { word: string },
+        []
+      >('SELECT word FROM wordlist_review WHERE is_banned = 1')
+      .all();
+    const bannedSet = new Set(bannedRows.map((r: { word: string }) => r.word));
+
     // Only pick words of reasonable length for playability
     const MIN_LENGTH = 5;
     const MAX_LENGTH = 6;
     const filterAvailable = (list: string[]) =>
       list.filter(
         (w) =>
-          !usedSet.has(w) && w.length >= MIN_LENGTH && w.length <= MAX_LENGTH,
+          !usedSet.has(w) &&
+          !bannedSet.has(w) &&
+          w.length >= MIN_LENGTH &&
+          w.length <= MAX_LENGTH,
       );
 
     const useDevaneios = Math.random() < DEVANEIOS_WEIGHT;
@@ -831,6 +849,66 @@ export class WordleService {
       )
       .all()
       .map((r) => ({ guildId: r.guild_id, channelId: r.channel_id }));
+  }
+
+  private ensureReviewSeeded(): void {
+    const { count } = db
+      .query<
+        { count: number },
+        []
+      >('SELECT COUNT(*) as count FROM wordlist_review')
+      .get()!;
+    if (count > 0) return;
+
+    const insert = db.prepare(
+      'INSERT OR IGNORE INTO wordlist_review (word, is_banned) VALUES ($word, NULL)',
+    );
+    const insertAll = db.transaction((words: string[]) => {
+      for (const w of words) insert.run({ $word: w });
+    });
+    insertAll(getWordlist());
+  }
+
+  getNextReviewWord(): ReviewWordResult {
+    this.ensureReviewSeeded();
+
+    const total = db
+      .query<
+        { count: number },
+        []
+      >('SELECT COUNT(*) as count FROM wordlist_review')
+      .get()!.count;
+    const reviewed = db
+      .query<
+        { count: number },
+        []
+      >('SELECT COUNT(*) as count FROM wordlist_review WHERE is_banned IS NOT NULL')
+      .get()!.count;
+    const next = db
+      .query<
+        { word: string },
+        []
+      >('SELECT word FROM wordlist_review WHERE is_banned IS NULL ORDER BY rowid LIMIT 1')
+      .get();
+
+    if (!next) {
+      return { word: null, index: total, total, done: true };
+    }
+
+    return { word: next.word, index: reviewed, total, done: false };
+  }
+
+  submitReviewDecision(
+    word: string,
+    decision: 'keep' | 'remove',
+  ): ReviewWordResult {
+    this.ensureReviewSeeded();
+
+    db.query(
+      'UPDATE wordlist_review SET is_banned = $is_banned WHERE word = $word',
+    ).run({ $is_banned: decision === 'remove' ? 1 : 0, $word: word });
+
+    return this.getNextReviewWord();
   }
 
   getWordlistPoolStats(): { total: number; used: number; remaining: number } {

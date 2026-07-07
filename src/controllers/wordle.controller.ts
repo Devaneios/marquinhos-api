@@ -202,4 +202,36 @@ export default class WordleController {
       res.status(500).json({ message: 'Erro interno.' });
     }
   }
+
+  getNextReviewWord(_req: Request, res: Response): void {
+    try {
+      const data = service.getNextReviewWord();
+      res.json({ data });
+    } catch (err) {
+      console.error('WordleController.getNextReviewWord error:', err);
+      res.status(500).json({ message: 'Erro interno.' });
+    }
+  }
+
+  submitReviewDecision(req: Request, res: Response): void {
+    const { word, decision } = req.body as {
+      word?: string;
+      decision?: 'keep' | 'remove';
+    };
+
+    if (!word || (decision !== 'keep' && decision !== 'remove')) {
+      res.status(400).json({
+        message: 'word e decision ("keep" ou "remove") são obrigatórios.',
+      });
+      return;
+    }
+
+    try {
+      const data = service.submitReviewDecision(word, decision);
+      res.json({ data });
+    } catch (err) {
+      console.error('WordleController.submitReviewDecision error:', err);
+      res.status(500).json({ message: 'Erro interno.' });
+    }
+  }
 }

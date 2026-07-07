@@ -211,6 +211,13 @@ try {
 }
 
 db.run(`
+  CREATE TABLE IF NOT EXISTS wordlist_review (
+    word      TEXT    NOT NULL PRIMARY KEY,
+    is_banned INTEGER
+  )
+`);
+
+db.run(`
   CREATE TABLE IF NOT EXISTS wordle_streaks (
     user_id          TEXT NOT NULL,
     guild_id         TEXT NOT NULL,

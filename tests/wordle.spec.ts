@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 
 // Set in-memory db BEFORE any imports that load the db module
 process.env.SQLITE_PATH = ':memory:';
@@ -41,6 +41,53 @@ function seedSession(
     ],
   );
 }
+
+describe('WordleService.pickNewWord', () => {
+  let service: WordleService;
+  const originalRandom = Math.random;
+
+  beforeEach(() => {
+    db.run('DELETE FROM wordle_used_words');
+    db.run('DELETE FROM wordle_daily');
+    service = new WordleService();
+  });
+
+  afterEach(() => {
+    Math.random = originalRandom;
+  });
+
+  it('picks from devaneios-wordlist.txt when Math.random() is below the 80% weight', () => {
+    Math.random = () => 0.1;
+    const result = service.pickNewWord('guild-devaneios', '2026-01-01');
+
+    const { readFileSync } = require('fs');
+    const { join } = require('path');
+    const devaneiosWords = new Set(
+      readFileSync(join(__dirname, '../devaneios-wordlist.txt'), 'utf-8')
+        .split('\n')
+        .map((w: string) => w.trim().toLowerCase())
+        .filter((w: string) => w.length > 0),
+    );
+
+    expect(devaneiosWords.has(result.word)).toBe(true);
+  });
+
+  it('picks from wordlist.txt when Math.random() is at/above the 80% weight', () => {
+    Math.random = () => 0.9;
+    const result = service.pickNewWord('guild-wordlist', '2026-01-02');
+
+    const { readFileSync } = require('fs');
+    const { join } = require('path');
+    const wordlistWords = new Set(
+      readFileSync(join(__dirname, '../wordlist.txt'), 'utf-8')
+        .split('\n')
+        .map((w: string) => w.trim().toLowerCase())
+        .filter((w: string) => w.length > 0),
+    );
+
+    expect(wordlistWords.has(result.word)).toBe(true);
+  });
+});
 
 describe('WordleService.getGroupStreak', () => {
   let service: WordleService;

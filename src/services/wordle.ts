@@ -79,6 +79,22 @@ function getWordlist(): string[] {
   return wordlistCache;
 }
 
+// Alternative answer bank: devaneios-wordlist.txt (picked DEVANEIOS_WEIGHT of the time, see pickNewWord)
+const DEVANEIOS_WORDLIST_PATH = join(__dirname, '../../devaneios-wordlist.txt');
+let devaneiosWordlistCache: string[] | null = null;
+
+function getDevaneiosWordlist(): string[] {
+  if (devaneiosWordlistCache) return devaneiosWordlistCache;
+  const raw = readFileSync(DEVANEIOS_WORDLIST_PATH, 'utf-8');
+  devaneiosWordlistCache = raw
+    .split('\n')
+    .map((w) => w.trim().toLowerCase())
+    .filter((w) => w.length > 0);
+  return devaneiosWordlistCache;
+}
+
+const DEVANEIOS_WEIGHT = 0.75;
+
 // Validation bank: valid-guesses.txt (pre-built union of wordlist + ICF, 5–12 chars)
 const VALID_GUESSES_PATH = join(__dirname, '../../valid-guesses.txt');
 let validationSetCache: Set<string> | null = null;
@@ -222,14 +238,23 @@ export class WordleService {
       .all();
     const usedSet = new Set(usedRows.map((r) => r.word));
 
-    const wordlist = getWordlist();
     // Only pick words of reasonable length for playability
     const MIN_LENGTH = 5;
     const MAX_LENGTH = 6;
-    const available = wordlist.filter(
-      (w) =>
-        !usedSet.has(w) && w.length >= MIN_LENGTH && w.length <= MAX_LENGTH,
-    );
+    const filterAvailable = (list: string[]) =>
+      list.filter(
+        (w) =>
+          !usedSet.has(w) && w.length >= MIN_LENGTH && w.length <= MAX_LENGTH,
+      );
+
+    const useDevaneios = Math.random() < DEVANEIOS_WEIGHT;
+    const primary = useDevaneios ? getDevaneiosWordlist() : getWordlist();
+    const fallback = useDevaneios ? getWordlist() : getDevaneiosWordlist();
+
+    let available = filterAvailable(primary);
+    if (available.length === 0) {
+      available = filterAvailable(fallback);
+    }
 
     if (available.length === 0) {
       throw new Error('No available words left in the wordlist');

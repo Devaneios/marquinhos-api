@@ -3,8 +3,20 @@ import { EvolutiveAchievementsService } from '../services/evolutiveAchievements'
 
 const service = new EvolutiveAchievementsService();
 
+interface UserGuildParams {
+  userId: string;
+  guildId: string;
+}
+
 export const evolutiveAchievements = {
-  checkAndEvolve(req: Request, res: Response): void {
+  checkAndEvolve(
+    req: Request<
+      UserGuildParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ): void {
     const { userId, guildId } = req.params;
     try {
       const evolutions = service.checkAndEvolveAll(userId, guildId);
@@ -15,7 +27,14 @@ export const evolutiveAchievements = {
     }
   },
 
-  getUserEvolutiveAchievements(req: Request, res: Response): void {
+  getUserEvolutiveAchievements(
+    req: Request<
+      UserGuildParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ): void {
     const { userId, guildId } = req.params;
     try {
       const achievements = service.getUserEvolutiveAchievements(
@@ -32,7 +51,14 @@ export const evolutiveAchievements = {
     }
   },
 
-  getEvolutionTimeline(req: Request, res: Response): void {
+  getEvolutionTimeline(
+    req: Request<
+      UserGuildParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ): void {
     const { userId, guildId } = req.params;
     try {
       const timeline = service.getEvolutionTimeline(userId, guildId);

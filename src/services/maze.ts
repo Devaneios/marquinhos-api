@@ -186,10 +186,9 @@ export class MazeService {
     direction: string,
   ): MazeViewportState | null {
     const session = db
-      .query<
-        MazeSessionRow,
-        { $id: string }
-      >('SELECT * FROM maze_sessions WHERE id = $id')
+      .query<MazeSessionRow, { $id: string }>(
+        'SELECT * FROM maze_sessions WHERE id = $id',
+      )
       .get({ $id: sessionId });
 
     if (!session || session.user_id !== userId || session.status !== 'active') {
@@ -291,10 +290,9 @@ export class MazeService {
 
   getMazeSession(sessionId: string): MazeViewportState | null {
     const session = db
-      .query<
-        MazeSessionRow,
-        { $id: string }
-      >('SELECT * FROM maze_sessions WHERE id = $id')
+      .query<MazeSessionRow, { $id: string }>(
+        'SELECT * FROM maze_sessions WHERE id = $id',
+      )
       .get({ $id: sessionId });
 
     if (!session) return null;

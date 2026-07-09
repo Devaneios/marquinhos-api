@@ -3,6 +3,15 @@ import { WordleService } from '../services/wordle';
 
 const service = new WordleService();
 
+interface GuildIdParams {
+  guildId: string;
+}
+
+interface UserGuildIdParams {
+  userId: string;
+  guildId: string;
+}
+
 export default class WordleController {
   submitGuess(req: Request, res: Response): void {
     const { userId, guildId, guess } = req.body as {
@@ -31,7 +40,14 @@ export default class WordleController {
     }
   }
 
-  getStats(req: Request, res: Response): void {
+  getStats(
+    req: Request<
+      GuildIdParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ): void {
     const { guildId } = req.params;
     if (!guildId) {
       res.status(400).json({ message: 'guildId é obrigatório.' });
@@ -47,7 +63,14 @@ export default class WordleController {
     }
   }
 
-  getUserSession(req: Request, res: Response): void {
+  getUserSession(
+    req: Request<
+      UserGuildIdParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ): void {
     const { userId, guildId } = req.params;
     if (!userId || !guildId) {
       res.status(400).json({ message: 'userId e guildId são obrigatórios.' });
@@ -63,7 +86,14 @@ export default class WordleController {
     }
   }
 
-  getDayGuesses(req: Request, res: Response): void {
+  getDayGuesses(
+    req: Request<
+      GuildIdParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ): void {
     const { guildId } = req.params;
     if (!guildId) {
       res.status(400).json({ message: 'guildId é obrigatório.' });
@@ -96,7 +126,14 @@ export default class WordleController {
     }
   }
 
-  getLeaderboard(req: Request, res: Response): void {
+  getLeaderboard(
+    req: Request<
+      GuildIdParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ): void {
     const { guildId } = req.params;
     if (!guildId) {
       res.status(400).json({ message: 'guildId é obrigatório.' });
@@ -143,7 +180,14 @@ export default class WordleController {
     }
   }
 
-  validateGuess(req: Request, res: Response): void {
+  validateGuess(
+    req: Request<
+      GuildIdParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ): void {
     const { guildId } = req.params;
     const guess = req.query.guess as string | undefined;
 
@@ -161,7 +205,14 @@ export default class WordleController {
     }
   }
 
-  getConfig(req: Request, res: Response): void {
+  getConfig(
+    req: Request<
+      GuildIdParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ): void {
     const { guildId } = req.params;
     if (!guildId) {
       res.status(400).json({ message: 'guildId é obrigatório.' });
@@ -177,7 +228,14 @@ export default class WordleController {
     }
   }
 
-  getStreak(req: Request, res: Response): void {
+  getStreak(
+    req: Request<
+      UserGuildIdParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ): void {
     const { userId, guildId } = req.params;
     if (!userId || !guildId) {
       res.status(400).json({ message: 'userId e guildId são obrigatórios.' });

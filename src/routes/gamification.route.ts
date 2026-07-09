@@ -8,58 +8,84 @@ const gamification = new GamificationController();
 router.get(
   '/xp-config',
   checkToken,
-  gamification.getXpConfig.bind(gamification),
+  gamification.getXpConfig.bind(
+    gamification,
+  ) as unknown as express.RequestHandler,
 );
-router.post('/xp', checkToken, gamification.addXP.bind(gamification));
+router.post(
+  '/xp',
+  checkToken,
+  gamification.addXP.bind(gamification) as unknown as express.RequestHandler,
+);
 router.get(
   '/level/:userId/:guildId',
   checkToken,
-  gamification.getUserLevel.bind(gamification),
+  gamification.getUserLevel.bind(
+    gamification,
+  ) as unknown as express.RequestHandler,
 );
 router.get(
   '/leaderboard/:guildId',
   checkToken,
-  gamification.getLeaderboard.bind(gamification),
+  gamification.getLeaderboard.bind(
+    gamification,
+  ) as unknown as express.RequestHandler,
 );
 router.post(
   '/achievement/unlock',
   checkToken,
-  gamification.unlockAchievement.bind(gamification),
+  gamification.unlockAchievement.bind(
+    gamification,
+  ) as unknown as express.RequestHandler,
 );
 router.get(
   '/achievements/:userId/:guildId',
   checkToken,
-  gamification.getUserAchievements.bind(gamification),
+  gamification.getUserAchievements.bind(
+    gamification,
+  ) as unknown as express.RequestHandler,
 );
 router.get(
   '/achievements',
   checkToken,
-  gamification.getAllAchievements.bind(gamification),
+  gamification.getAllAchievements.bind(
+    gamification,
+  ) as unknown as express.RequestHandler,
 );
 router.post(
   '/achievements',
   checkToken,
-  gamification.createAchievement.bind(gamification),
+  gamification.createAchievement.bind(
+    gamification,
+  ) as unknown as express.RequestHandler,
 );
 router.post(
   '/achievements/initialize',
   checkToken,
-  gamification.initializeDefaults.bind(gamification),
+  gamification.initializeDefaults.bind(
+    gamification,
+  ) as unknown as express.RequestHandler,
 );
 router.post(
   '/game-result',
   checkToken,
-  gamification.recordGameResult.bind(gamification),
+  gamification.recordGameResult.bind(
+    gamification,
+  ) as unknown as express.RequestHandler,
 );
 router.get(
   '/game-stats/:userId/:guildId',
   checkToken,
-  gamification.getUserGameStats.bind(gamification),
+  gamification.getUserGameStats.bind(
+    gamification,
+  ) as unknown as express.RequestHandler,
 );
 router.get(
   '/game-leaderboard/:guildId/:gameType',
   checkToken,
-  gamification.getGameLeaderboard.bind(gamification),
+  gamification.getGameLeaderboard.bind(
+    gamification,
+  ) as unknown as express.RequestHandler,
 );
 
 export default router;

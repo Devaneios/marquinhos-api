@@ -6,6 +6,20 @@ import {
   UserLevel,
 } from '../services/gamification';
 
+interface UserGuildParams {
+  userId: string;
+  guildId: string;
+}
+
+interface GuildParams {
+  guildId: string;
+}
+
+interface GuildGameTypeParams {
+  guildId: string;
+  gameType: string;
+}
+
 // Transform helpers — convert snake_case DB rows to camelCase for bot/web consumers
 function formatLevel(row: UserLevel) {
   return {
@@ -86,7 +100,14 @@ class GamificationController {
     }
   }
 
-  getUserLevel(req: Request, res: Response) {
+  getUserLevel(
+    req: Request<
+      UserGuildParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ) {
     try {
       const { userId, guildId } = req.params;
       const row = this.service.getUserLevel(userId, guildId);
@@ -97,7 +118,10 @@ class GamificationController {
     }
   }
 
-  getLeaderboard(req: Request, res: Response) {
+  getLeaderboard(
+    req: Request<GuildParams, Record<string, unknown>, Record<string, unknown>>,
+    res: Response,
+  ) {
     try {
       const { guildId } = req.params;
       const limit = Math.min(parseInt(req.query.limit as string) || 10, 25);
@@ -138,7 +162,14 @@ class GamificationController {
     }
   }
 
-  getUserAchievements(req: Request, res: Response) {
+  getUserAchievements(
+    req: Request<
+      UserGuildParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ) {
     try {
       const { userId, guildId } = req.params;
       const rows = this.service.getUserAchievements(userId, guildId);
@@ -216,7 +247,14 @@ class GamificationController {
     }
   }
 
-  getUserGameStats(req: Request, res: Response) {
+  getUserGameStats(
+    req: Request<
+      UserGuildParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ) {
     try {
       const { userId, guildId } = req.params;
       const data = this.service.getUserGameStats(userId, guildId);
@@ -227,7 +265,14 @@ class GamificationController {
     }
   }
 
-  getGameLeaderboard(req: Request, res: Response) {
+  getGameLeaderboard(
+    req: Request<
+      GuildGameTypeParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ) {
     try {
       const { guildId, gameType } = req.params;
       const data = this.service.getGameLeaderboard(guildId, gameType);

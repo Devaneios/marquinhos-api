@@ -11,25 +11,33 @@ router.post(
   '/queue',
   checkToken,
   validateRequest(addScrobbleToQueueSchema),
-  scrobbleController.addScrobbleToQueue.bind(scrobbleController),
+  scrobbleController.addScrobbleToQueue.bind(
+    scrobbleController,
+  ) as unknown as express.RequestHandler,
 );
 
 router.post(
   '/:id',
   checkToken,
-  scrobbleController.dispatchScrobble.bind(scrobbleController),
+  scrobbleController.dispatchScrobble.bind(
+    scrobbleController,
+  ) as unknown as express.RequestHandler,
 );
 
 router.delete(
   '/:scrobbleId/:userId',
   checkToken,
-  scrobbleController.removeUserFromScrobble.bind(scrobbleController),
+  scrobbleController.removeUserFromScrobble.bind(
+    scrobbleController,
+  ) as unknown as express.RequestHandler,
 );
 
 router.post(
   '/:scrobbleId/:userId',
   checkToken,
-  scrobbleController.addUserToScrobble.bind(scrobbleController),
+  scrobbleController.addUserToScrobble.bind(
+    scrobbleController,
+  ) as unknown as express.RequestHandler,
 );
 
 export default router;

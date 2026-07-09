@@ -38,10 +38,9 @@ export class GamificationService {
     this.levelingService.ensureUser(userId, guildId);
 
     const config = db
-      .query<
-        XpConfig,
-        { $eventType: string }
-      >('SELECT * FROM xp_config WHERE event_type = $eventType')
+      .query<XpConfig, { $eventType: string }>(
+        'SELECT * FROM xp_config WHERE event_type = $eventType',
+      )
       .get({ $eventType: eventType });
 
     if (!config) throw new Error(`Unknown event type: ${eventType}`);
@@ -130,19 +129,17 @@ export class GamificationService {
 
       const winXp = (
         db
-          .query<
-            { xp_amount: number },
-            { $event: string }
-          >('SELECT xp_amount FROM xp_config WHERE event_type = $event')
+          .query<{ xp_amount: number }, { $event: string }>(
+            'SELECT xp_amount FROM xp_config WHERE event_type = $event',
+          )
           .get({ $event: 'game_win' }) ?? { xp_amount: 20 }
       ).xp_amount;
 
       const participateXp = (
         db
-          .query<
-            { xp_amount: number },
-            { $event: string }
-          >('SELECT xp_amount FROM xp_config WHERE event_type = $event')
+          .query<{ xp_amount: number }, { $event: string }>(
+            'SELECT xp_amount FROM xp_config WHERE event_type = $event',
+          )
           .get({ $event: 'game_participate' }) ?? { xp_amount: 5 }
       ).xp_amount;
 
@@ -211,10 +208,9 @@ export class GamificationService {
     this.levelingService.ensureUser(userId, guildId);
 
     const stats = db
-      .query<
-        UserStats,
-        { $userId: string; $guildId: string }
-      >('SELECT * FROM user_stats WHERE user_id = $userId AND guild_id = $guildId')
+      .query<UserStats, { $userId: string; $guildId: string }>(
+        'SELECT * FROM user_stats WHERE user_id = $userId AND guild_id = $guildId',
+      )
       .get({ $userId: userId, $guildId: guildId })!;
 
     const byGame = db

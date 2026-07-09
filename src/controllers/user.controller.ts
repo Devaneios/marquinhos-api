@@ -5,6 +5,15 @@ import { UserService } from '../services/user';
 import { ApiResponse, LastfmTopListenedPeriod } from '../types';
 import { decryptToken } from '../utils/crypto';
 
+interface UserIdParams {
+  id: string;
+}
+
+interface UserIdPeriodParams {
+  id: string;
+  period: string;
+}
+
 class UserController {
   userService: UserService;
   discordService: DiscordService;
@@ -139,7 +148,11 @@ class UserController {
   }
 
   public async exists(
-    req: Request,
+    req: Request<
+      UserIdParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
     res: Response,
   ): Promise<Response<ApiResponse<boolean>>> {
     if (!req.user) {
@@ -178,7 +191,14 @@ class UserController {
     }
   }
 
-  public async getTopArtists(req: Request, res: Response): Promise<Response> {
+  public async getTopArtists(
+    req: Request<
+      UserIdPeriodParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ): Promise<Response> {
     const id = req.params.id;
     const period = req.params.period as LastfmTopListenedPeriod;
 
@@ -192,7 +212,14 @@ class UserController {
     }
   }
 
-  public async getTopAlbums(req: Request, res: Response): Promise<Response> {
+  public async getTopAlbums(
+    req: Request<
+      UserIdPeriodParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ): Promise<Response> {
     const id = req.params.id;
     const period = req.params.period as LastfmTopListenedPeriod;
 
@@ -206,7 +233,14 @@ class UserController {
     }
   }
 
-  public async getTopTracks(req: Request, res: Response): Promise<Response> {
+  public async getTopTracks(
+    req: Request<
+      UserIdPeriodParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ): Promise<Response> {
     const id = req.params.id;
     const period = req.params.period as LastfmTopListenedPeriod;
 

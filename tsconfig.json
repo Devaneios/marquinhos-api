@@ -1,11 +1,10 @@
 {
   "compilerOptions": {
-    "target": "es6",
-    "module": "commonjs",
+    "target": "es2020",
+    "module": "es2020",
     "outDir": "dist/",
     "sourceMap": true,
     "strict": true,
-    "moduleResolution": "node",
     "importHelpers": true,
     "experimentalDecorators": true,
     "esModuleInterop": true,
@@ -14,8 +13,11 @@
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
     "removeComments": true,
+    "types": ["bun"],
     "typeRoots": ["node_modules/@types"],
-    "baseUrl": "./src"
+    "paths": {
+      "*": ["./src/*"]
+    }
   },
   "include": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"],
   "exclude": ["typings/*", "node_modules", "tests/**/*.spec.ts"]

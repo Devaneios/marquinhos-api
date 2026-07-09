@@ -56,10 +56,9 @@ export class LevelingService {
   getUserLevel(userId: string, guildId: string): UserLevel {
     this.ensureUser(userId, guildId);
     return db
-      .query<
-        UserLevel,
-        { $userId: string; $guildId: string }
-      >('SELECT * FROM user_levels WHERE user_id = $userId AND guild_id = $guildId')
+      .query<UserLevel, { $userId: string; $guildId: string }>(
+        'SELECT * FROM user_levels WHERE user_id = $userId AND guild_id = $guildId',
+      )
       .get({ $userId: userId, $guildId: guildId })!;
   }
 
@@ -67,10 +66,9 @@ export class LevelingService {
     const fn = db.transaction(() => {
       let leveled = false;
       let row = db
-        .query<
-          UserLevel,
-          { $userId: string; $guildId: string }
-        >('SELECT * FROM user_levels WHERE user_id = $userId AND guild_id = $guildId')
+        .query<UserLevel, { $userId: string; $guildId: string }>(
+          'SELECT * FROM user_levels WHERE user_id = $userId AND guild_id = $guildId',
+        )
         .get({ $userId: userId, $guildId: guildId })!;
 
       while (row.xp >= this.getRequiredXP(row.level)) {
@@ -79,10 +77,9 @@ export class LevelingService {
           'UPDATE user_levels SET level = level + 1, xp = xp - $required WHERE user_id = $userId AND guild_id = $guildId',
         ).run({ $required: required, $userId: userId, $guildId: guildId });
         row = db
-          .query<
-            UserLevel,
-            { $userId: string; $guildId: string }
-          >('SELECT * FROM user_levels WHERE user_id = $userId AND guild_id = $guildId')
+          .query<UserLevel, { $userId: string; $guildId: string }>(
+            'SELECT * FROM user_levels WHERE user_id = $userId AND guild_id = $guildId',
+          )
           .get({ $userId: userId, $guildId: guildId })!;
         leveled = true;
       }
@@ -93,10 +90,9 @@ export class LevelingService {
 
   getLeaderboard(guildId: string, limit: number = 10): UserLevel[] {
     return db
-      .query<
-        UserLevel,
-        { $guildId: string; $limit: number }
-      >('SELECT * FROM user_levels WHERE guild_id = $guildId ORDER BY level DESC, total_xp DESC LIMIT $limit')
+      .query<UserLevel, { $guildId: string; $limit: number }>(
+        'SELECT * FROM user_levels WHERE guild_id = $guildId ORDER BY level DESC, total_xp DESC LIMIT $limit',
+      )
       .all({ $guildId: guildId, $limit: limit });
   }
 }

@@ -243,13 +243,12 @@ export class WordleService {
     const usedRows = db
       .query<{ word: string }, []>('SELECT word FROM wordle_used_words')
       .all();
-    const usedSet = new Set(usedRows.map((r) => r.word));
+    const usedSet = new Set(usedRows.map((r: { word: string }) => r.word));
 
     const bannedRows = db
-      .query<
-        { word: string },
-        []
-      >('SELECT word FROM wordlist_review WHERE is_banned = 1')
+      .query<{ word: string }, []>(
+        'SELECT word FROM wordlist_review WHERE is_banned = 1',
+      )
       .all();
     const bannedSet = new Set(bannedRows.map((r: { word: string }) => r.word));
 
@@ -314,20 +313,18 @@ export class WordleService {
   getDailyWord(guildId: string): WordleDaily {
     const today = getRecifeDate();
     const row = db
-      .query<
-        WordleDaily,
-        { $guild_id: string }
-      >('SELECT * FROM wordle_daily WHERE guild_id = $guild_id')
+      .query<WordleDaily, { $guild_id: string }>(
+        'SELECT * FROM wordle_daily WHERE guild_id = $guild_id',
+      )
       .get({ $guild_id: guildId });
 
     if (!row || row.word_date !== today) {
       // Lazy init: pick a new word for today
       this.pickNewWord(guildId, today);
       return db
-        .query<
-          WordleDaily,
-          { $guild_id: string }
-        >('SELECT * FROM wordle_daily WHERE guild_id = $guild_id')
+        .query<WordleDaily, { $guild_id: string }>(
+          'SELECT * FROM wordle_daily WHERE guild_id = $guild_id',
+        )
         .get({ $guild_id: guildId })!;
     }
 
@@ -364,7 +361,9 @@ export class WordleService {
       .query<
         { id: string; guesses: string; solved: number; attempts: number },
         { $user_id: string; $guild_id: string; $word_date: string }
-      >('SELECT id, guesses, solved, attempts FROM wordle_sessions WHERE user_id = $user_id AND guild_id = $guild_id AND word_date = $word_date')
+      >(
+        'SELECT id, guesses, solved, attempts FROM wordle_sessions WHERE user_id = $user_id AND guild_id = $guild_id AND word_date = $word_date',
+      )
       .get({ $user_id: userId, $guild_id: guildId, $word_date: today });
 
     if (sessionRow?.solved) {
@@ -545,10 +544,9 @@ export class WordleService {
 
   getDayGuesses(guildId: string): DayGuesses | null {
     const daily = db
-      .query<
-        WordleDaily,
-        { $guild_id: string }
-      >('SELECT * FROM wordle_daily WHERE guild_id = $guild_id')
+      .query<WordleDaily, { $guild_id: string }>(
+        'SELECT * FROM wordle_daily WHERE guild_id = $guild_id',
+      )
       .get({ $guild_id: guildId });
 
     if (!daily) return null;
@@ -727,7 +725,7 @@ export class WordleService {
            LIMIT $limit`,
         )
         .all({ $guild_id: guildId, $today: today, $limit: limit })
-        .map((row) => ({
+        .map((row: { user_id: string; attempts: number; solved: number }) => ({
           userId: row.user_id,
           attempts: row.attempts,
           solved: row.solved === 1,
@@ -780,11 +778,13 @@ export class WordleService {
           ? { $guild_id: guildId, $limit: limit, $date_from: dateFrom }
           : { $guild_id: guildId, $limit: limit },
       )
-      .map((row) => ({
-        userId: row.user_id,
-        totalDays: row.total_days,
-        avgScore: row.avg_score,
-      }));
+      .map(
+        (row: { user_id: string; total_days: number; avg_score: number }) => ({
+          userId: row.user_id,
+          totalDays: row.total_days,
+          avgScore: row.avg_score,
+        }),
+      );
   }
 
   getGroupStreak(guildId: string): number {
@@ -837,10 +837,9 @@ export class WordleService {
 
   getConfig(guildId: string): { channelId: string } | null {
     const row = db
-      .query<
-        { channel_id: string },
-        { $guild_id: string }
-      >('SELECT channel_id FROM wordle_config WHERE guild_id = $guild_id')
+      .query<{ channel_id: string }, { $guild_id: string }>(
+        'SELECT channel_id FROM wordle_config WHERE guild_id = $guild_id',
+      )
       .get({ $guild_id: guildId });
 
     return row ? { channelId: row.channel_id } : null;
@@ -852,15 +851,17 @@ export class WordleService {
         'SELECT guild_id, channel_id FROM wordle_config',
       )
       .all()
-      .map((r) => ({ guildId: r.guild_id, channelId: r.channel_id }));
+      .map((r: { guild_id: string; channel_id: string }) => ({
+        guildId: r.guild_id,
+        channelId: r.channel_id,
+      }));
   }
 
   private ensureReviewSeeded(): void {
     const { count } = db
-      .query<
-        { count: number },
-        []
-      >('SELECT COUNT(*) as count FROM wordlist_review')
+      .query<{ count: number }, []>(
+        'SELECT COUNT(*) as count FROM wordlist_review',
+      )
       .get()!;
     if (count > 0) return;
 
@@ -877,22 +878,19 @@ export class WordleService {
     this.ensureReviewSeeded();
 
     const total = db
-      .query<
-        { count: number },
-        []
-      >('SELECT COUNT(*) as count FROM wordlist_review')
+      .query<{ count: number }, []>(
+        'SELECT COUNT(*) as count FROM wordlist_review',
+      )
       .get()!.count;
     const reviewed = db
-      .query<
-        { count: number },
-        []
-      >('SELECT COUNT(*) as count FROM wordlist_review WHERE is_banned IS NOT NULL')
+      .query<{ count: number }, []>(
+        'SELECT COUNT(*) as count FROM wordlist_review WHERE is_banned IS NOT NULL',
+      )
       .get()!.count;
     const next = db
-      .query<
-        { word: string },
-        []
-      >('SELECT word FROM wordlist_review WHERE is_banned IS NULL ORDER BY rowid LIMIT 1')
+      .query<{ word: string }, []>(
+        'SELECT word FROM wordlist_review WHERE is_banned IS NULL ORDER BY rowid LIMIT 1',
+      )
       .get();
 
     if (!next) {
@@ -920,10 +918,9 @@ export class WordleService {
     const total = wordlist.filter((w) => w.length >= 5 && w.length <= 6).length;
     const used =
       db
-        .query<
-          { count: number },
-          []
-        >('SELECT COUNT(*) as count FROM wordle_used_words')
+        .query<{ count: number }, []>(
+          'SELECT COUNT(*) as count FROM wordle_used_words',
+        )
         .get()?.count ?? 0;
     return { total, used, remaining: total - used };
   }

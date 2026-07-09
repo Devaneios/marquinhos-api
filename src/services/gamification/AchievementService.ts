@@ -74,10 +74,9 @@ export class AchievementService {
 
   initializeDefaults(): void {
     const achievCount = db
-      .query<
-        { count: number },
-        []
-      >('SELECT COUNT(*) as count FROM achievements')
+      .query<{ count: number }, []>(
+        'SELECT COUNT(*) as count FROM achievements',
+      )
       .get();
     if (!achievCount || achievCount.count === 0) {
       const insertAchiev = db.prepare(
@@ -101,17 +100,15 @@ export class AchievementService {
 
   checkAndAwardAchievements(userId: string, guildId: string): string[] {
     const stats = db
-      .query<
-        UserStats,
-        { $userId: string; $guildId: string }
-      >('SELECT * FROM user_stats WHERE user_id = $userId AND guild_id = $guildId')
+      .query<UserStats, { $userId: string; $guildId: string }>(
+        'SELECT * FROM user_stats WHERE user_id = $userId AND guild_id = $guildId',
+      )
       .get({ $userId: userId, $guildId: guildId });
 
     const userLevel = db
-      .query<
-        UserLevel,
-        { $userId: string; $guildId: string }
-      >('SELECT * FROM user_levels WHERE user_id = $userId AND guild_id = $guildId')
+      .query<UserLevel, { $userId: string; $guildId: string }>(
+        'SELECT * FROM user_levels WHERE user_id = $userId AND guild_id = $guildId',
+      )
       .get({ $userId: userId, $guildId: guildId });
 
     if (!stats || !userLevel) return [];
@@ -188,10 +185,9 @@ export class AchievementService {
     this.levelingService.ensureUser(userId, guildId);
 
     const achievement = db
-      .query<
-        Achievement,
-        { $id: string }
-      >('SELECT * FROM achievements WHERE id = $id')
+      .query<Achievement, { $id: string }>(
+        'SELECT * FROM achievements WHERE id = $id',
+      )
       .get({ $id: achievementId });
 
     if (!achievement) return false;
@@ -200,7 +196,9 @@ export class AchievementService {
       .query<
         { n: number },
         { $userId: string; $guildId: string; $achievementId: string }
-      >('SELECT 1 as n FROM user_achievements WHERE user_id = $userId AND guild_id = $guildId AND achievement_id = $achievementId')
+      >(
+        'SELECT 1 as n FROM user_achievements WHERE user_id = $userId AND guild_id = $guildId AND achievement_id = $achievementId',
+      )
       .get({
         $userId: userId,
         $guildId: guildId,
@@ -274,10 +272,9 @@ export class AchievementService {
       $reward_xp: data.reward_xp,
     });
     return db
-      .query<
-        Achievement,
-        { $id: string }
-      >('SELECT * FROM achievements WHERE id = $id')
+      .query<Achievement, { $id: string }>(
+        'SELECT * FROM achievements WHERE id = $id',
+      )
       .get({ $id: data.id })!;
   }
 }

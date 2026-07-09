@@ -1,6 +1,15 @@
 import { Request, Response } from 'express';
 import { ScrobblerService } from '../services/scrobbler';
 
+interface IdParams {
+  id: string;
+}
+
+interface ScrobbleUserParams {
+  scrobbleId: string;
+  userId: string;
+}
+
 class ScrobbleController {
   scrobblerService: ScrobblerService;
 
@@ -20,7 +29,10 @@ class ScrobbleController {
     }
   }
 
-  async dispatchScrobble(req: Request, res: Response) {
+  async dispatchScrobble(
+    req: Request<IdParams, Record<string, unknown>, Record<string, unknown>>,
+    res: Response,
+  ) {
     try {
       const id = await this.scrobblerService.dispatchScrobble(req.params.id);
       return res.status(200).json({ data: id, message: 'Scrobbled' });
@@ -30,7 +42,14 @@ class ScrobbleController {
     }
   }
 
-  async removeUserFromScrobble(req: Request, res: Response) {
+  async removeUserFromScrobble(
+    req: Request<
+      ScrobbleUserParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ) {
     try {
       const id = await this.scrobblerService.removeUserFromScrobble(
         req.params.scrobbleId,
@@ -43,7 +62,14 @@ class ScrobbleController {
     }
   }
 
-  async addUserToScrobble(req: Request, res: Response) {
+  async addUserToScrobble(
+    req: Request<
+      ScrobbleUserParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ) {
     try {
       const id = await this.scrobblerService.addUserToScrobble(
         req.params.scrobbleId,

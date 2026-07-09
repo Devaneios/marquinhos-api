@@ -5,6 +5,10 @@ const VALID_SIZES = [15, 31, 51, 99];
 const VALID_MODES = ['open', 'foggy'];
 const VALID_DIRECTIONS = ['up', 'down', 'left', 'right'];
 
+interface SessionIdParams {
+  sessionId: string;
+}
+
 export class MazeController {
   private service = new MazeService();
 
@@ -46,7 +50,14 @@ export class MazeController {
     }
   }
 
-  moveMaze(req: Request, res: Response) {
+  moveMaze(
+    req: Request<
+      SessionIdParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ) {
     try {
       const { sessionId } = req.params;
       const { userId, direction } = req.body as {
@@ -76,7 +87,14 @@ export class MazeController {
     }
   }
 
-  getMaze(req: Request, res: Response) {
+  getMaze(
+    req: Request<
+      SessionIdParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ) {
     try {
       const { sessionId } = req.params;
       const data = this.service.getMazeSession(sessionId);
@@ -90,7 +108,14 @@ export class MazeController {
     }
   }
 
-  abandonMaze(req: Request, res: Response) {
+  abandonMaze(
+    req: Request<
+      SessionIdParams,
+      Record<string, unknown>,
+      Record<string, unknown>
+    >,
+    res: Response,
+  ) {
     try {
       const { sessionId } = req.params;
       const { userId } = req.body as { userId: string };

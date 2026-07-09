@@ -2,10 +2,7 @@ import { db } from '../database/sqlite';
 
 type Rarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythical';
 type StatKey =
-  | 'total_scrobbles'
-  | 'total_commands'
-  | 'total_voice_joins'
-  | 'games_won';
+  'total_scrobbles' | 'total_commands' | 'total_voice_joins' | 'games_won';
 
 interface TierDef {
   tier: number;
@@ -163,10 +160,9 @@ export interface EvolutionResult {
 export class EvolutiveAchievementsService {
   checkAndEvolveAll(userId: string, guildId: string): EvolutionResult[] {
     const stats = db
-      .query<
-        UserStatsRow,
-        { $userId: string; $guildId: string }
-      >('SELECT total_commands, total_scrobbles, total_voice_joins, total_games, games_won FROM user_stats WHERE user_id = $userId AND guild_id = $guildId')
+      .query<UserStatsRow, { $userId: string; $guildId: string }>(
+        'SELECT total_commands, total_scrobbles, total_voice_joins, total_games, games_won FROM user_stats WHERE user_id = $userId AND guild_id = $guildId',
+      )
       .get({ $userId: userId, $guildId: guildId });
 
     if (!stats) return [];
@@ -180,7 +176,9 @@ export class EvolutiveAchievementsService {
         .query<
           EvolutiveRow,
           { $userId: string; $guildId: string; $baseId: string }
-        >('SELECT * FROM evolutive_achievements WHERE user_id = $userId AND guild_id = $guildId AND base_id = $baseId')
+        >(
+          'SELECT * FROM evolutive_achievements WHERE user_id = $userId AND guild_id = $guildId AND base_id = $baseId',
+        )
         .get({ $userId: userId, $guildId: guildId, $baseId: baseId });
 
       // Auto-initialize at tier 1 when the user first qualifies
@@ -207,7 +205,9 @@ export class EvolutiveAchievementsService {
           .query<
             EvolutiveRow,
             { $userId: string; $guildId: string; $baseId: string }
-          >('SELECT * FROM evolutive_achievements WHERE user_id = $userId AND guild_id = $guildId AND base_id = $baseId')
+          >(
+            'SELECT * FROM evolutive_achievements WHERE user_id = $userId AND guild_id = $guildId AND base_id = $baseId',
+          )
           .get({ $userId: userId, $guildId: guildId, $baseId: baseId });
       }
 
@@ -254,20 +254,18 @@ export class EvolutiveAchievementsService {
     guildId: string,
   ): EvolutiveAchievement[] {
     const rows = db
-      .query<
-        EvolutiveRow,
-        { $userId: string; $guildId: string }
-      >('SELECT * FROM evolutive_achievements WHERE user_id = $userId AND guild_id = $guildId')
+      .query<EvolutiveRow, { $userId: string; $guildId: string }>(
+        'SELECT * FROM evolutive_achievements WHERE user_id = $userId AND guild_id = $guildId',
+      )
       .all({ $userId: userId, $guildId: guildId });
 
     const stats = db
-      .query<
-        UserStatsRow,
-        { $userId: string; $guildId: string }
-      >('SELECT total_commands, total_scrobbles, total_voice_joins, total_games, games_won FROM user_stats WHERE user_id = $userId AND guild_id = $guildId')
+      .query<UserStatsRow, { $userId: string; $guildId: string }>(
+        'SELECT total_commands, total_scrobbles, total_voice_joins, total_games, games_won FROM user_stats WHERE user_id = $userId AND guild_id = $guildId',
+      )
       .get({ $userId: userId, $guildId: guildId });
 
-    return rows.map((row) => {
+    return rows.map((row: EvolutiveRow) => {
       const def = BASE_ACHIEVEMENTS[row.base_id];
       const tierDef = def.evolutionPath[row.current_tier - 1];
       const nextThreshold =
@@ -297,13 +295,12 @@ export class EvolutiveAchievementsService {
     guildId: string,
   ): { baseId: string; name: string; events: EvolutionEvent[] }[] {
     const rows = db
-      .query<
-        EvolutiveRow,
-        { $userId: string; $guildId: string }
-      >('SELECT * FROM evolutive_achievements WHERE user_id = $userId AND guild_id = $guildId ORDER BY unlocked_at ASC')
+      .query<EvolutiveRow, { $userId: string; $guildId: string }>(
+        'SELECT * FROM evolutive_achievements WHERE user_id = $userId AND guild_id = $guildId ORDER BY unlocked_at ASC',
+      )
       .all({ $userId: userId, $guildId: guildId });
 
-    return rows.map((row) => ({
+    return rows.map((row: EvolutiveRow) => ({
       baseId: row.base_id,
       name: BASE_ACHIEVEMENTS[row.base_id]?.name ?? row.base_id,
       events: JSON.parse(row.evolution_log) as EvolutionEvent[],

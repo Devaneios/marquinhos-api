@@ -19,6 +19,7 @@
   "devDependencies": {
     "@commitlint/cli": "^19.0.0",
     "@commitlint/config-conventional": "^19.0.0",
+    "@types/autocannon": "^7.12.7",
     "@types/bun": "^1.3.11",
     "@types/cookie-parser": "^1.4.3",
     "@types/cors": "^2.8.13",
@@ -28,6 +29,7 @@
     "@types/spotify-web-api-node": "^5.0.10",
     "@typescript-eslint/eslint-plugin": "^8.33.1",
     "@typescript-eslint/parser": "^8.33.1",
+    "autocannon": "^8.0.0",
     "eslint": "^9.23.0",
     "eslint-import-resolver-typescript": "^4.4.2",
     "eslint-plugin-import": "^2.31.0",
@@ -50,6 +52,8 @@
     "lint:fix": "eslint src/**/*.ts --fix",
     "clean": "rm -rf dist/ .logs/",
     "start": "bun run src/index.ts",
+    "profile": "bun --inspect src/index.ts",
+    "bench": "bun scripts/bench/run.ts",
     "prepare": "husky"
   },
   "author": "Devaneios",

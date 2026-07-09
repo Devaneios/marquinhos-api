@@ -359,36 +359,20 @@ export class WordleService {
     const today = getRecifeDate();
     const now = Math.floor(Date.now() / 1000);
 
-    // Get or create session
-    let sessionRow = db
+    // Get existing session, if any
+    const sessionRow = db
       .query<
         { id: string; guesses: string; solved: number; attempts: number },
         { $user_id: string; $guild_id: string; $word_date: string }
       >('SELECT id, guesses, solved, attempts FROM wordle_sessions WHERE user_id = $user_id AND guild_id = $guild_id AND word_date = $word_date')
       .get({ $user_id: userId, $guild_id: guildId, $word_date: today });
 
-    if (!sessionRow) {
-      const id = randomUUID();
-      db.query(
-        `INSERT INTO wordle_sessions (id, user_id, guild_id, word_date, guesses, solved, attempts, word_length, created_at)
-         VALUES ($id, $user_id, $guild_id, $word_date, '[]', 0, 0, $word_length, $now)`,
-      ).run({
-        $id: id,
-        $user_id: userId,
-        $guild_id: guildId,
-        $word_date: today,
-        $word_length: daily.word.length,
-        $now: now,
-      });
-      sessionRow = { id, guesses: '[]', solved: 0, attempts: 0 };
-    }
-
-    if (sessionRow.solved) {
+    if (sessionRow?.solved) {
       return { error: 'Você já acertou a palavra de hoje!' };
     }
 
     const previousGuesses: { guess: string; feedback: LetterFeedback[] }[] =
-      JSON.parse(sessionRow.guesses);
+      sessionRow ? JSON.parse(sessionRow.guesses) : [];
 
     if (
       previousGuesses.some((g) => stripDiacritics(g.guess) === strippedGuess)
@@ -402,30 +386,63 @@ export class WordleService {
       ...previousGuesses,
       { guess: canonicalGuess, feedback },
     ];
-    const newAttempts = sessionRow.attempts + 1;
+    const newAttempts = (sessionRow?.attempts ?? 0) + 1;
 
-    // Update session
-    db.query(
-      `UPDATE wordle_sessions SET guesses = $guesses, solved = $solved, attempts = $attempts
-       WHERE id = $id`,
-    ).run({
-      $guesses: JSON.stringify(newGuesses),
-      $solved: solved ? 1 : 0,
-      $attempts: newAttempts,
-      $id: sessionRow.id,
-    });
+    const fn = db.transaction(() => {
+      const sessionId = sessionRow?.id ?? randomUUID();
 
-    // Update daily stats.
-    // players_count is incremented exactly once per user per day: on their first guess,
-    // regardless of whether that guess solves the puzzle. The previous CASE WHEN expression
-    // caused a bug where a user who solved on a later guess never incremented players_count
-    // (previousGuesses.length > 0 → $is_new_player = 0).
-    if (previousGuesses.length === 0) {
-      // First guess of the day for this user
-      if (solved) {
+      if (!sessionRow) {
+        db.query(
+          `INSERT INTO wordle_sessions (id, user_id, guild_id, word_date, guesses, solved, attempts, word_length, created_at)
+           VALUES ($id, $user_id, $guild_id, $word_date, '[]', 0, 0, $word_length, $now)`,
+        ).run({
+          $id: sessionId,
+          $user_id: userId,
+          $guild_id: guildId,
+          $word_date: today,
+          $word_length: daily.word.length,
+          $now: now,
+        });
+      }
+
+      // Update session
+      db.query(
+        `UPDATE wordle_sessions SET guesses = $guesses, solved = $solved, attempts = $attempts
+         WHERE id = $id`,
+      ).run({
+        $guesses: JSON.stringify(newGuesses),
+        $solved: solved ? 1 : 0,
+        $attempts: newAttempts,
+        $id: sessionId,
+      });
+
+      // Update daily stats.
+      // players_count is incremented exactly once per user per day: on their first guess,
+      // regardless of whether that guess solves the puzzle. The previous CASE WHEN expression
+      // caused a bug where a user who solved on a later guess never incremented players_count
+      // (previousGuesses.length > 0 → $is_new_player = 0).
+      if (previousGuesses.length === 0) {
+        // First guess of the day for this user
+        if (solved) {
+          db.query(
+            `UPDATE wordle_daily SET
+              players_count = players_count + 1,
+              winners_count = winners_count + 1,
+              total_attempts = total_attempts + $attempts
+             WHERE guild_id = $guild_id`,
+          ).run({
+            $attempts: newAttempts,
+            $guild_id: guildId,
+          });
+        } else {
+          db.query(
+            'UPDATE wordle_daily SET players_count = players_count + 1 WHERE guild_id = $guild_id',
+          ).run({ $guild_id: guildId });
+        }
+      } else if (solved) {
+        // Returning player (already counted) who now solved
         db.query(
           `UPDATE wordle_daily SET
-            players_count = players_count + 1,
             winners_count = winners_count + 1,
             total_attempts = total_attempts + $attempts
            WHERE guild_id = $guild_id`,
@@ -433,38 +450,25 @@ export class WordleService {
           $attempts: newAttempts,
           $guild_id: guildId,
         });
-      } else {
-        db.query(
-          'UPDATE wordle_daily SET players_count = players_count + 1 WHERE guild_id = $guild_id',
-        ).run({ $guild_id: guildId });
       }
-    } else if (solved) {
-      // Returning player (already counted) who now solved
-      db.query(
-        `UPDATE wordle_daily SET
-          winners_count = winners_count + 1,
-          total_attempts = total_attempts + $attempts
-         WHERE guild_id = $guild_id`,
-      ).run({
-        $attempts: newAttempts,
-        $guild_id: guildId,
-      });
-    }
 
-    const result: GuessResult = {
-      guess: canonicalGuess,
-      feedback,
-      guesses: newGuesses,
-      solved,
-      attempts: newAttempts,
-      wordLength: daily.word.length,
-    };
+      const result: GuessResult = {
+        guess: canonicalGuess,
+        feedback,
+        guesses: newGuesses,
+        solved,
+        attempts: newAttempts,
+        wordLength: daily.word.length,
+      };
 
-    if (solved) {
-      result.streak = this.updateStreak(userId, guildId);
-    }
+      if (solved) {
+        result.streak = this.updateStreak(userId, guildId);
+      }
 
-    return result;
+      return result;
+    });
+
+    return fn();
   }
 
   getUserSession(userId: string, guildId: string): WordleSession | null {

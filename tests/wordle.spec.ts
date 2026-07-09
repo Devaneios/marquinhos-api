@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import type { GuessResult } from '../src/services/wordle';
 
 // Set in-memory db BEFORE any imports that load the db module
 process.env.SQLITE_PATH = ':memory:';
@@ -205,5 +206,119 @@ describe('WordleService.getLeaderboard with period', () => {
     // user1 played both days (avg 2.5); user2 played only day 1 and gets penalised
     // for day 2 (avg (1+6)/2 = 3.5) — so user1 ranks first
     expect(entries[0].userId).toBe('user1');
+  });
+});
+
+describe('WordleService.submitGuess', () => {
+  let service: WordleService;
+  const guildId = 'guild-atomic';
+  let dailyWord: string;
+
+  beforeEach(() => {
+    db.run('DELETE FROM wordle_sessions');
+    db.run('DELETE FROM wordle_daily');
+    db.run('DELETE FROM wordle_streaks');
+    service = new WordleService();
+
+    const { readFileSync } = require('fs');
+    const { join } = require('path');
+    const wordlistWords: string[] = readFileSync(
+      join(__dirname, '../wordlist.txt'),
+      'utf-8',
+    )
+      .split('\n')
+      .map((w: string) => w.trim().toLowerCase())
+      .filter((w: string) => w.length > 0);
+    dailyWord = wordlistWords[0];
+
+    db.run(
+      `INSERT OR REPLACE INTO wordle_daily
+         (guild_id, word, word_date, players_count, winners_count, total_attempts, created_at)
+       VALUES ($guild_id, $word, $word_date, 0, 0, 0, 0)`,
+      { $guild_id: guildId, $word: dailyWord, $word_date: getRecifeDate() },
+    );
+  });
+
+  it('rolls back the session insert and daily stats if a later write in the sequence throws', () => {
+    const userId = 'user-atomic-rollback';
+    service.updateStreak = () => {
+      throw new Error('boom');
+    };
+
+    expect(() => service.submitGuess(userId, guildId, dailyWord)).toThrow(
+      'boom',
+    );
+
+    const session = db
+      .query(
+        'SELECT solved FROM wordle_sessions WHERE user_id = $user_id AND guild_id = $guild_id',
+      )
+      .get({ $user_id: userId, $guild_id: guildId });
+    const daily = db
+      .query(
+        'SELECT players_count, winners_count FROM wordle_daily WHERE guild_id = $guild_id',
+      )
+      .get({ $guild_id: guildId }) as {
+      players_count: number;
+      winners_count: number;
+    };
+
+    expect(session).toBeNull();
+    expect(daily.players_count).toBe(0);
+    expect(daily.winners_count).toBe(0);
+  });
+
+  it('atomically updates session, daily stats, and streak on a solved guess', () => {
+    const userId = 'user-atomic-happy';
+
+    const result = service.submitGuess(userId, guildId, dailyWord);
+
+    expect('error' in result).toBe(false);
+    expect((result as GuessResult).solved).toBe(true);
+    expect((result as GuessResult).streak).toBe(1);
+
+    const session = db
+      .query(
+        'SELECT solved FROM wordle_sessions WHERE user_id = $user_id AND guild_id = $guild_id',
+      )
+      .get({ $user_id: userId, $guild_id: guildId }) as { solved: number };
+    const daily = db
+      .query(
+        'SELECT winners_count FROM wordle_daily WHERE guild_id = $guild_id',
+      )
+      .get({ $guild_id: guildId }) as { winners_count: number };
+    const streak = db
+      .query(
+        'SELECT current_streak FROM wordle_streaks WHERE user_id = $user_id AND guild_id = $guild_id',
+      )
+      .get({ $user_id: userId, $guild_id: guildId }) as {
+      current_streak: number;
+    };
+
+    expect(session.solved).toBe(1);
+    expect(daily.winners_count).toBe(1);
+    expect(streak.current_streak).toBe(1);
+  });
+
+  it('makes no writes when guessing again on an already-solved session', () => {
+    const userId = 'user-already-solved';
+    seedSession(guildId, userId, getRecifeDate(), 1, true);
+
+    const before = db
+      .query(
+        'SELECT players_count, winners_count FROM wordle_daily WHERE guild_id = $guild_id',
+      )
+      .get({ $guild_id: guildId });
+
+    const result = service.submitGuess(userId, guildId, dailyWord);
+
+    expect(result).toEqual({ error: 'Você já acertou a palavra de hoje!' });
+
+    const after = db
+      .query(
+        'SELECT players_count, winners_count FROM wordle_daily WHERE guild_id = $guild_id',
+      )
+      .get({ $guild_id: guildId });
+    expect(after).toEqual(before);
   });
 });

@@ -1,10 +1,21 @@
-import { describe, expect, it } from 'bun:test';
-import {
-  buildUniqueDayGuesses,
-  computeFeedback,
-  resolveCanonical,
-  stripDiacritics,
-} from '../src/services/wordle';
+import { beforeAll, describe, expect, it } from 'bun:test';
+
+// Set in-memory db BEFORE any imports that load the db module
+process.env.SQLITE_PATH = ':memory:';
+
+let buildUniqueDayGuesses: typeof import('../src/services/wordle').buildUniqueDayGuesses;
+let computeFeedback: typeof import('../src/services/wordle').computeFeedback;
+let resolveCanonical: typeof import('../src/services/wordle').resolveCanonical;
+let stripDiacritics: typeof import('../src/services/wordle').stripDiacritics;
+
+beforeAll(async () => {
+  ({
+    buildUniqueDayGuesses,
+    computeFeedback,
+    resolveCanonical,
+    stripDiacritics,
+  } = await import('../src/services/wordle'));
+});
 
 describe('computeFeedback', () => {
   it('returns all correct when guess matches answer exactly', () => {

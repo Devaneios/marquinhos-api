@@ -1,4 +1,4 @@
-import { NextFunction, Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { DiscordService } from '../services/discord';
 import { UserService } from '../services/user';
 import { decryptTokenFull } from '../utils/crypto';

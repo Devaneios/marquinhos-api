@@ -226,8 +226,9 @@ export function computeFeedback(guess: string, word: string): LetterFeedback[] {
 
   // Second pass: present (wrong position)
   for (let i = 0; i < guessChars.length; i++) {
-    if (guessChars[i] === '\0') continue;
-    const idx = wordChars.indexOf(guessChars[i]);
+    const gc = guessChars[i];
+    if (gc === undefined || gc === '\0') continue;
+    const idx = wordChars.indexOf(gc);
     if (idx !== -1) {
       result[i] = 'present';
       wordChars[idx] = '\0'; // consume to handle duplicates
@@ -291,8 +292,12 @@ export class WordleService {
     }
     const lengths = Array.from(byLength.keys());
     const chosenLength = lengths[Math.floor(Math.random() * lengths.length)];
-    const pool = byLength.get(chosenLength)!;
-    const word = pool[Math.floor(Math.random() * pool.length)];
+    const pool =
+      chosenLength !== undefined ? byLength.get(chosenLength) : undefined;
+    const word = pool?.[Math.floor(Math.random() * pool.length)];
+    if (word === undefined) {
+      throw new Error('No available words left in the wordlist');
+    }
     const now = Math.floor(Date.now() / 1000);
 
     // Save to used words
@@ -574,7 +579,7 @@ export class WordleService {
   private getYesterday(today: string): string {
     const d = new Date(`${today}T12:00:00`);
     d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
+    return d.toISOString().slice(0, 10);
   }
 
   private computeStreakFromHistory(
@@ -737,7 +742,7 @@ export class WordleService {
       const today = getRecifeDate();
       const d = new Date(`${today}T12:00:00`);
       d.setDate(d.getDate() - 6);
-      dateFrom = d.toISOString().split('T')[0];
+      dateFrom = d.toISOString().slice(0, 10);
     } else if (period === 'monthly') {
       dateFrom = `${getRecifeDate().substring(0, 8)}01`;
     }

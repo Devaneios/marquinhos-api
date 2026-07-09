@@ -1,4 +1,5 @@
-import autocannon, { Request, Result } from 'autocannon';
+import type { Request, Result } from 'autocannon';
+import autocannon from 'autocannon';
 import { randomUUID } from 'crypto';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -21,7 +22,11 @@ const wordlist = readFileSync(WORDLIST_PATH, 'utf-8')
 // word instead of hammering the same cache entry.
 function makeWordCycler(): () => string {
   let i = 0;
-  return () => wordlist[i++ % wordlist.length];
+  return () => {
+    const word = wordlist[i++ % wordlist.length];
+    if (word === undefined) throw new Error('Wordlist is empty');
+    return word;
+  };
 }
 
 interface Target {

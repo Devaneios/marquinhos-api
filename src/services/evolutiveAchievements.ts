@@ -218,13 +218,15 @@ export class EvolutiveAchievementsService {
 
       // Evolve to next tier
       const nextTierDef = def.evolutionPath[row.current_tier]; // index = current_tier (0-based), which is next tier
+      if (!nextTierDef) continue;
       const log: EvolutionEvent[] = JSON.parse(row.evolution_log);
       const now = Date.now();
       log.push({
         tier: nextTierDef.tier,
         evolvedAt: new Date(now).toISOString(),
         reason:
-          def.reasons[Math.min(nextTierDef.tier - 2, def.reasons.length - 1)],
+          def.reasons[Math.min(nextTierDef.tier - 2, def.reasons.length - 1)] ??
+          '',
       });
 
       db.query(
@@ -265,28 +267,31 @@ export class EvolutiveAchievementsService {
       )
       .get({ $userId: userId, $guildId: guildId });
 
-    return rows.map((row: EvolutiveRow) => {
+    return rows.flatMap((row: EvolutiveRow) => {
       const def = BASE_ACHIEVEMENTS[row.base_id];
-      const tierDef = def.evolutionPath[row.current_tier - 1];
+      const tierDef = def?.evolutionPath[row.current_tier - 1];
+      if (!def || !tierDef) return [];
       const nextThreshold =
         row.current_tier < 5
           ? (def.thresholds[row.current_tier] ?? null)
           : null;
 
-      return {
-        baseId: row.base_id,
-        name: def.name,
-        currentTier: row.current_tier,
-        currentTierName: tierDef.name,
-        icon: tierDef.icon,
-        rarity: tierDef.rarity,
-        description: def.description,
-        unlockedAt: new Date(row.unlocked_at),
-        lastEvolved: row.last_evolved ? new Date(row.last_evolved) : null,
-        evolutionLog: JSON.parse(row.evolution_log) as EvolutionEvent[],
-        nextTierThreshold: nextThreshold,
-        currentStatValue: stats ? stats[def.statKey] : 0,
-      };
+      return [
+        {
+          baseId: row.base_id,
+          name: def.name,
+          currentTier: row.current_tier,
+          currentTierName: tierDef.name,
+          icon: tierDef.icon,
+          rarity: tierDef.rarity,
+          description: def.description,
+          unlockedAt: new Date(row.unlocked_at),
+          lastEvolved: row.last_evolved ? new Date(row.last_evolved) : null,
+          evolutionLog: JSON.parse(row.evolution_log) as EvolutionEvent[],
+          nextTierThreshold: nextThreshold,
+          currentStatValue: stats ? stats[def.statKey] : 0,
+        },
+      ];
     });
   }
 

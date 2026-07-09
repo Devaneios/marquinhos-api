@@ -1,10 +1,10 @@
-import { Request, Response } from 'express';
-import {
+import type { Request, Response } from 'express';
+import type {
   AddXpResult,
-  GamificationService,
   UserAchievement,
   UserLevel,
 } from '../services/gamification';
+import { GamificationService } from '../services/gamification';
 
 interface UserGuildParams {
   userId: string;

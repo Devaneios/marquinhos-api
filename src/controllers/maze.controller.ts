@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { MazeService } from '../services/maze';
 
 const VALID_SIZES = [15, 31, 51, 99];

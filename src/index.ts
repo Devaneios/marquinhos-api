@@ -1,6 +1,7 @@
 import cors from 'cors';
 import dotenv from 'dotenv';
-import express, { Express, NextFunction, Request, Response } from 'express';
+import type { Express, NextFunction, Request, Response } from 'express';
+import express from 'express';
 import http from 'http';
 import morgan from 'morgan';
 import './database/sqlite';

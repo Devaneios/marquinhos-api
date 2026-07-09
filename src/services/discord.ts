@@ -2,15 +2,26 @@ import axios from 'axios';
 import { URLSearchParams } from 'url';
 // URLSearchParams is available globally in Node.js >= 15 but we import for clarity
 
+export interface DiscordUser {
+  id: string;
+  highestRole?: string;
+  [key: string]: unknown;
+}
+
+interface DiscordGuildMember {
+  roles: string[];
+  [key: string]: unknown;
+}
+
 export class DiscordService {
-  getDiscordUser = async (token: string) => {
+  getDiscordUser = async (token: string): Promise<DiscordUser> => {
     const response = await fetch('https://discord.com/api/users/@me', {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
 
-    const data = await response.json();
+    const data = (await response.json()) as DiscordUser;
 
     return data;
   };
@@ -25,7 +36,7 @@ export class DiscordService {
       },
     );
 
-    const guildUser = await guildUserResponse.json();
+    const guildUser = (await guildUserResponse.json()) as DiscordGuildMember;
 
     const guildRolesResponse = await axios.get(
       `https://discord.com/api/guilds/305861924648779779/roles`,

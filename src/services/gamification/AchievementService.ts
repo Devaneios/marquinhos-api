@@ -1,6 +1,11 @@
 import { db } from '../../database/sqlite';
 import { LevelingService } from './LevelingService';
-import { Achievement, UserAchievement, UserLevel, UserStats } from './types';
+import type {
+  Achievement,
+  UserAchievement,
+  UserLevel,
+  UserStats,
+} from './types';
 
 const DEFAULT_ACHIEVEMENTS = [
   {

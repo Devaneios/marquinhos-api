@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
-import { PlaybackData, Track } from 'types';
+import type { PlaybackData, Track } from 'types';
 import { SpotifyService } from './spotify';
 
 export class ParserService {
@@ -85,8 +85,8 @@ export class ParserService {
     if (spotifyTrackIdMatch) {
       try {
         return await this.spotifyService.getTrack(spotifyTrackIdMatch);
-      } catch (_error: unknown) {
-        throw new Error('SpotifyRequestUnknownError');
+      } catch (error: unknown) {
+        throw new Error('SpotifyRequestUnknownError', { cause: error });
       }
     }
 

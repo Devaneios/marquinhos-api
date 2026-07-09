@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { LastfmTopListenedPeriod, Track } from 'types';
+import type { LastfmTopListenedPeriod, Track } from 'types';
 import { db } from '../database/sqlite';
 import { decryptToken, encryptToken } from '../utils/crypto';
 import { DiscordService } from './discord';

@@ -14,6 +14,12 @@
  * Exit:  maze[height-1][width-2]  (hole in bottom wall, second-to-last col)
  */
 
+function at<T>(arr: T[], i: number): T {
+  const v = arr[i];
+  if (v === undefined) throw new Error('Index out of bounds');
+  return v;
+}
+
 // --- Union-Find (disjoint set) ---
 
 function makeUnionFind(size: number): { parent: number[]; rank: number[] } {
@@ -24,9 +30,9 @@ function makeUnionFind(size: number): { parent: number[]; rank: number[] } {
 }
 
 function find(uf: { parent: number[] }, x: number): number {
-  while (uf.parent[x] !== x) {
-    uf.parent[x] = uf.parent[uf.parent[x]]; // path compression
-    x = uf.parent[x];
+  while (at(uf.parent, x) !== x) {
+    uf.parent[x] = at(uf.parent, at(uf.parent, x));
+    x = at(uf.parent, x);
   }
   return x;
 }
@@ -39,13 +45,13 @@ function union(
   const ra = find(uf, a);
   const rb = find(uf, b);
   if (ra === rb) return false; // already connected
-  if (uf.rank[ra] < uf.rank[rb]) {
+  if (at(uf.rank, ra) < at(uf.rank, rb)) {
     uf.parent[ra] = rb;
-  } else if (uf.rank[ra] > uf.rank[rb]) {
+  } else if (at(uf.rank, ra) > at(uf.rank, rb)) {
     uf.parent[rb] = ra;
   } else {
     uf.parent[rb] = ra;
-    uf.rank[ra]++;
+    uf.rank[ra] = at(uf.rank, ra) + 1;
   }
   return true;
 }
@@ -55,7 +61,9 @@ function union(
 function shuffle<T>(arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+    const tmp = at(arr, i);
+    arr[i] = at(arr, j);
+    arr[j] = tmp;
   }
   return arr;
 }
@@ -106,18 +114,18 @@ export function generateMaze(width: number, height: number): number[][] {
       const gc2 = c2 * 2 + 1;
 
       // Carve both cells and the passage between them
-      maze[gr1][gc1] = 0;
-      maze[gr2][gc2] = 0;
-      maze[(gr1 + gr2) / 2][(gc1 + gc2) / 2] = 0;
+      at(maze, gr1)[gc1] = 0;
+      at(maze, gr2)[gc2] = 0;
+      at(maze, (gr1 + gr2) / 2)[(gc1 + gc2) / 2] = 0;
     }
   }
 
   // Entry: top wall above col 1 (navigable cell 0,0 is at grid row 1, col 1)
-  maze[0][1] = 0;
+  at(maze, 0)[1] = 0;
 
   // Exit: bottom wall below second-to-last navigable col of last navigable row
-  maze[height - 1][width - 2] = 0;
-  maze[height - 2][width - 2] = 0; // ensure connectivity to last row
+  at(maze, height - 1)[width - 2] = 0;
+  at(maze, height - 2)[width - 2] = 0; // ensure connectivity to last row
 
   return maze;
 }

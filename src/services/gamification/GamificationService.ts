@@ -2,7 +2,7 @@ import { db } from '../../database/sqlite';
 import { EvolutiveAchievementsService } from '../evolutiveAchievements';
 import { AchievementService } from './AchievementService';
 import { LevelingService } from './LevelingService';
-import {
+import type {
   AddXpResult,
   GameResultInput,
   UserLevel,

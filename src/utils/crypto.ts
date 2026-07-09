@@ -43,6 +43,7 @@ function decryptRaw(encryptedToken: string): string | null {
     const parts = encryptedToken.split(':');
     if (parts.length !== 3) return null;
     const [ivB64, tagB64, ciphertextB64] = parts;
+    if (!ivB64 || !tagB64 || !ciphertextB64) return null;
     const iv = Buffer.from(ivB64, 'base64');
     const tag = Buffer.from(tagB64, 'base64');
     const ciphertext = Buffer.from(ciphertextB64, 'base64');

@@ -1,8 +1,8 @@
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { DiscordService } from '../services/discord';
 import { LastfmService } from '../services/lastfm';
 import { UserService } from '../services/user';
-import { ApiResponse, LastfmTopListenedPeriod } from '../types';
+import type { ApiResponse, LastfmTopListenedPeriod } from '../types';
 import { decryptToken } from '../utils/crypto';
 
 interface UserIdParams {
@@ -32,6 +32,11 @@ class UserController {
     try {
       const authorization = req.headers['authorization'] as string;
       const access_token = authorization && authorization.split(' ')[1];
+
+      if (!access_token) {
+        return res.status(401).json({ message: 'Token not provided' });
+      }
+
       const decryptedToken = decryptToken(access_token);
 
       if (!decryptedToken) {

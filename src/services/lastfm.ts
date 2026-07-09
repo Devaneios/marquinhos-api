@@ -25,7 +25,7 @@ SOFTWARE.
 import axios from 'axios';
 import crypto from 'crypto';
 import { getUnixTime, parseISO } from 'date-fns';
-import {
+import type {
   LastfmSessionResponse,
   LastfmTopListenedPeriod,
   PlaybackData,
@@ -78,16 +78,16 @@ export class LastfmService {
     } catch (error: unknown) {
       const err = error as LastfmErrorResponse;
       if (err?.response?.data?.error === 14) {
-        throw new Error('LastfmTokenNotAuthorized');
+        throw new Error('LastfmTokenNotAuthorized', { cause: error });
       }
       if (
         err?.response?.data?.error === 11 ||
         err?.response?.data?.error === 16
       ) {
-        throw new Error('LastfmServiceUnavailable');
+        throw new Error('LastfmServiceUnavailable', { cause: error });
       } else {
         logger.error('LastfmRequestUnknownError:', error);
-        throw new Error('LastfmRequestUnknownError');
+        throw new Error('LastfmRequestUnknownError', { cause: error });
       }
     }
 
@@ -111,11 +111,14 @@ export class LastfmService {
     params.set('sk', sessionKey || '');
 
     for (const [i, track] of tracks.entries()) {
+      const playbackData = playbacksData[i];
+      if (!playbackData) continue;
+
       params.set(`artist[${i}]`, track.artist);
       params.set(`track[${i}]`, track.name);
       params.set(
         `timestamp[${i}]`,
-        getUnixTime(parseISO(playbacksData[i].timestamp.toString())).toString(),
+        getUnixTime(parseISO(playbackData.timestamp.toString())).toString(),
       );
       if (track.album) {
         params.set(`album[${i}]`, track.album);
@@ -127,10 +130,10 @@ export class LastfmService {
     } catch (error: unknown) {
       const err = error as LastfmErrorResponse;
       if (err?.response?.data?.error === 9) {
-        throw new Error('LastfmInvalidSessionKey');
+        throw new Error('LastfmInvalidSessionKey', { cause: error });
       } else {
         logger.error('Scrobble error:', error);
-        throw new Error('LastfmRequestUnknownError');
+        throw new Error('LastfmRequestUnknownError', { cause: error });
       }
     }
     // TODO: Check scrobble history/queue on fail
@@ -149,10 +152,10 @@ export class LastfmService {
     } catch (error: unknown) {
       const err = error as LastfmErrorResponse;
       if (err?.response?.data?.error === 9) {
-        throw new Error('LastfmInvalidSessionKey');
+        throw new Error('LastfmInvalidSessionKey', { cause: error });
       } else {
         logger.error('getUserInfo error:', error);
-        throw new Error('LastfmRequestUnknownError');
+        throw new Error('LastfmRequestUnknownError', { cause: error });
       }
     }
   }
@@ -333,7 +336,7 @@ export class LastfmService {
       });
     } catch (error: unknown) {
       logger.error('getTopArtists error:', error);
-      throw new Error('LastfmRequestUnknownError');
+      throw new Error('LastfmRequestUnknownError', { cause: error });
     }
   }
 
@@ -360,7 +363,7 @@ export class LastfmService {
       );
     } catch (error: unknown) {
       logger.error('getTopAlbums error:', error);
-      throw new Error('LastfmRequestUnknownError');
+      throw new Error('LastfmRequestUnknownError', { cause: error });
     }
   }
 
@@ -387,7 +390,7 @@ export class LastfmService {
       );
     } catch (error: unknown) {
       logger.error('getTopTracks error:', error);
-      throw new Error('LastfmRequestUnknownError');
+      throw new Error('LastfmRequestUnknownError', { cause: error });
     }
   }
 

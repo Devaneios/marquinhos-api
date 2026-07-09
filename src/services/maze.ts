@@ -41,6 +41,18 @@ const VIEWPORT_SIZE = 8;
 // Player sits at viewport index 3 (0-indexed), so view starts at player - 3
 const PLAYER_VIEWPORT_OFFSET = 3;
 
+function mazeWidth(maze: number[][]): number {
+  const firstRow = maze[0];
+  if (!firstRow) throw new Error('Invalid maze: empty grid');
+  return firstRow.length;
+}
+
+function mazeCell(maze: number[][], row: number, col: number): number {
+  const cell = maze[row]?.[col];
+  if (cell === undefined) throw new Error('Invalid maze coordinates');
+  return cell;
+}
+
 function computeFoggyVisibility(
   maze: number[][],
   px: number,
@@ -62,8 +74,8 @@ function computeFoggyVisibility(
       r >= 0 &&
       r < maze.length &&
       c >= 0 &&
-      c < maze[0].length &&
-      maze[r][c] === 0
+      c < mazeWidth(maze) &&
+      mazeCell(maze, r, c) === 0
     ) {
       visible.add(`${r},${c}`);
       r += dr;
@@ -82,7 +94,7 @@ function computeViewport(
   exitY: number,
 ): number[][] {
   const mazeHeight = maze.length;
-  const mazeWidth = maze[0].length;
+  const width = mazeWidth(maze);
   const viewTopRow = py - PLAYER_VIEWPORT_OFFSET;
   const viewTopCol = px - PLAYER_VIEWPORT_OFFSET;
 
@@ -96,7 +108,7 @@ function computeViewport(
       const mr = viewTopRow + vr;
       const mc = viewTopCol + vc;
 
-      if (mr < 0 || mr >= mazeHeight || mc < 0 || mc >= mazeWidth) {
+      if (mr < 0 || mr >= mazeHeight || mc < 0 || mc >= width) {
         row.push(4); // BORDER (out of bounds)
         continue;
       }
@@ -121,7 +133,7 @@ function computeViewport(
       }
 
       // maze: 0 = path → type 1 (PATH), 1 = wall → type 0 (WALL)
-      row.push(maze[mr][mc] === 0 ? 1 : 0);
+      row.push(mazeCell(maze, mr, mc) === 0 ? 1 : 0);
     }
     viewport.push(row);
   }
@@ -142,9 +154,9 @@ export class MazeService {
 
     const maze = generateMaze(size, size);
     const mazeHeight = maze.length;
-    const mazeWidth = maze[0].length;
+    const width = mazeWidth(maze);
 
-    const exitX = mazeWidth - 2;
+    const exitX = width - 2;
     const exitY = mazeHeight - 1;
 
     const sessionId = crypto.randomUUID();
@@ -163,7 +175,7 @@ export class MazeService {
       $userId: userId,
       $guildId: guildId,
       $mode: mode,
-      $width: mazeWidth,
+      $width: width,
       $height: mazeHeight,
       $grid: JSON.stringify(maze),
       $px: startX,
@@ -225,7 +237,7 @@ export class MazeService {
       newX >= session.maze_width ||
       newY < 0 ||
       newY >= session.maze_height ||
-      maze[newY][newX] === 1
+      mazeCell(maze, newY, newX) === 1
     ) {
       return this._buildState(session, maze, exitX, exitY);
     }

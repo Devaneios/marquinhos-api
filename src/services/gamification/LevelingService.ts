@@ -1,5 +1,5 @@
 import { db } from '../../database/sqlite';
-import { UserLevel, XpConfig } from './types';
+import type { UserLevel, XpConfig } from './types';
 
 const DEFAULT_XP_CONFIG = [
   { event_type: 'command', xp_amount: 5, cooldown_ms: 60_000 },

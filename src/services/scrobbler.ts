@@ -1,4 +1,4 @@
-import { PlaybackData } from 'types';
+import type { PlaybackData } from 'types';
 import { DiscordService } from './discord';
 import { LastfmService } from './lastfm';
 import { ParserService } from './parser';

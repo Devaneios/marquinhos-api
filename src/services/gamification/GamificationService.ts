@@ -49,7 +49,7 @@ export class GamificationService {
       const now = Date.now();
       const result = db
         .query<
-          { allowed: number },
+          { granted: number },
           {
             $userId: string;
             $guildId: string;
@@ -65,7 +65,7 @@ export class GamificationService {
                WHEN ($now - xp_cooldowns.last_gain) >= $cooldownMs THEN $now
                ELSE xp_cooldowns.last_gain
              END
-           RETURNING ($now - last_gain) < $cooldownMs AS allowed`,
+           RETURNING (last_gain = $now) AS granted`,
         )
         .get({
           $userId: userId,
@@ -75,7 +75,7 @@ export class GamificationService {
           $cooldownMs: config.cooldown_ms,
         });
 
-      if (result && result.allowed === 1) {
+      if (result && result.granted !== 1) {
         return {
           userLevel: this.levelingService.getUserLevel(userId, guildId),
           onCooldown: true,

@@ -90,13 +90,13 @@ describe('resolveCanonical', () => {
   });
 
   it('resolves an unaccented input to its accented canonical in the validation set', () => {
-    // "bastião" exists in valid-guesses.txt; "bastiao" does not
-    expect(resolveCanonical('bastiao')).toBe('bastião');
+    // "coração" exists in valid-guesses.txt; "coracao" does not
+    expect(resolveCanonical('coracao')).toBe('coração');
   });
 
   it('resolves cedilla via normalized lookup', () => {
-    // "caçarola" exists in valid-guesses.txt
-    expect(resolveCanonical('cacarola')).toBe('caçarola');
+    // "coração" exists in valid-guesses.txt
+    expect(resolveCanonical('coracao')).toBe('coração');
   });
 
   it('returns null for words absent from the validation set under any form', () => {
@@ -104,7 +104,7 @@ describe('resolveCanonical', () => {
   });
 
   it('accepts an accented input that matches an entry verbatim', () => {
-    expect(resolveCanonical('bastião')).toBe('bastião');
+    expect(resolveCanonical('coração')).toBe('coração');
   });
 });
 

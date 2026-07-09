@@ -83,10 +83,9 @@ function addXP(
   ensureUser(db, userId, guildId);
 
   const config = db
-    .query<
-      XpConfig,
-      { $eventType: string }
-    >('SELECT * FROM xp_config WHERE event_type = $eventType')
+    .query<XpConfig, { $eventType: string }>(
+      'SELECT * FROM xp_config WHERE event_type = $eventType',
+    )
     .get({ $eventType: eventType });
 
   if (!config) throw new Error(`Unknown event type: ${eventType}`);
@@ -96,7 +95,7 @@ function addXP(
   if (config.cooldown_ms !== null) {
     const result = db
       .query<
-        { allowed: number },
+        { granted: number },
         {
           $userId: string;
           $guildId: string;
@@ -112,7 +111,7 @@ function addXP(
              WHEN ($now - xp_cooldowns.last_gain) >= $cooldownMs THEN $now
              ELSE xp_cooldowns.last_gain
            END
-         RETURNING ($now - last_gain) < $cooldownMs AS allowed`,
+         RETURNING (last_gain = $now) AS granted`,
       )
       .get({
         $userId: userId,
@@ -122,7 +121,7 @@ function addXP(
         $cooldownMs: config.cooldown_ms,
       });
 
-    if (result && result.allowed === 1) {
+    if (result && result.granted !== 1) {
       return { xpGained: 0, onCooldown: true };
     }
   }

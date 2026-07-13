@@ -3,6 +3,7 @@ import { join } from 'path';
 
 const ROOT = join(__dirname, '..');
 const WORDLIST_PATH = join(ROOT, 'wordlist.txt');
+const DEVANEIOS_WORDLIST_PATH = join(ROOT, 'devaneios-wordlist.txt');
 const OUTPUT_PATH = join(ROOT, 'valid-guesses.txt');
 
 const MIN_LEN = 5;
@@ -46,12 +47,16 @@ function generatePlurals(word: string): string[] {
 
 const words = new Set<string>();
 
-const wordlist = readFileSync(WORDLIST_PATH, 'utf-8')
-  .split('\n')
-  .map((w) => w.trim().toLowerCase())
-  .filter((w) => w.length >= MIN_LEN && w.length <= MAX_LEN);
+// Answers can be picked from either wordlist.txt or devaneios-wordlist.txt
+// (see pickNewWord in src/services/wordle.ts), so both must be accepted here.
+const sourceWords = [WORDLIST_PATH, DEVANEIOS_WORDLIST_PATH].flatMap((path) =>
+  readFileSync(path, 'utf-8')
+    .split('\n')
+    .map((w) => w.trim().toLowerCase())
+    .filter((w) => w.length >= MIN_LEN && w.length <= MAX_LEN),
+);
 
-for (const w of wordlist) {
+for (const w of sourceWords) {
   words.add(w);
   for (const plural of generatePlurals(w)) {
     if (plural.length >= MIN_LEN && plural.length <= MAX_LEN) {

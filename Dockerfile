@@ -8,8 +8,8 @@ COPY package.json bun.lock* ./
 
 RUN bun install --frozen-lockfile
 
-# Generate the merged validation word list from ICF + wordlist
-COPY wordlist.txt ./
+# Generate the merged validation word list from wordlist + devaneios-wordlist
+COPY wordlist.txt devaneios-wordlist.txt ./
 COPY scripts/ ./scripts/
 RUN bun run scripts/build-valid-guesses.ts
 

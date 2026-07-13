@@ -321,4 +321,21 @@ describe('WordleService.submitGuess', () => {
       .get({ $guild_id: guildId });
     expect(after).toEqual(before);
   });
+
+  it('accepts a devaneios-only daily word (e.g. "boltar") as a correct guess', () => {
+    const userId = 'user-devaneios-word';
+    const devaneiosWord = 'boltar';
+
+    db.run(
+      `INSERT OR REPLACE INTO wordle_daily
+         (guild_id, word, word_date, players_count, winners_count, total_attempts, created_at)
+       VALUES ($guild_id, $word, $word_date, 0, 0, 0, 0)`,
+      { $guild_id: guildId, $word: devaneiosWord, $word_date: getRecifeDate() },
+    );
+
+    const result = service.submitGuess(userId, guildId, devaneiosWord);
+
+    expect('error' in result).toBe(false);
+    expect((result as GuessResult).solved).toBe(true);
+  });
 });

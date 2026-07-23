@@ -9,6 +9,8 @@ export type ResponseCategory =
 
 export type AiChatCategory = ResponseCategory | 'guardrail_roast';
 
+export type ResponseFormat = 'embed' | 'text';
+
 export interface AiChatRequest {
   userId: string;
   guildId: string;
@@ -22,4 +24,6 @@ export interface AiChatResult {
   status: 'ok' | 'rate_limited' | 'error';
   category?: AiChatCategory;
   reply?: string;
+  format?: ResponseFormat;
+  embedTitle?: string;
 }

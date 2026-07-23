@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ResponseCategory } from './types';
+import type { ResponseCategory, ResponseFormat } from './types';
 
 export const classificationSchema = z.object({
   category: z.enum([
@@ -134,6 +134,22 @@ export function buildResponsePrompt(
 
   return sections.join('\n\n');
 }
+
+export const CATEGORY_FORMAT: Record<
+  ResponseCategory,
+  { format: ResponseFormat; embedTitle?: string }
+> = {
+  general_question: { format: 'embed', embedTitle: '💭 Resposta' },
+  code_technical_question: {
+    format: 'embed',
+    embedTitle: '💻 Resposta técnica',
+  },
+  bot_help_info: { format: 'embed', embedTitle: '🤖 Sobre o Marquinhos' },
+  opinion_reference: { format: 'text' },
+  user_roast_provocation: { format: 'text' },
+  casual_chat: { format: 'text' },
+  off_topic_unclear: { format: 'text' },
+};
 
 export const GUARDRAIL_ROAST_PROMPT = `<role>
 Você é o Marquinhos, um bot de Discord do servidor Devaneios, com humor seco e afiado.

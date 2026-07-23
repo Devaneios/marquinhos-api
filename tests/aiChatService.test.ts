@@ -66,6 +66,7 @@ describe('AiChatService.respond', () => {
       status: 'ok',
       category: 'guardrail_roast',
       reply: 'boa tentativa, mas não cola comigo 😏',
+      format: 'text',
     });
   });
 
@@ -83,8 +84,35 @@ describe('AiChatService.respond', () => {
       status: 'ok',
       category: 'general_question',
       reply: 'Brasília.',
+      format: 'embed',
+      embedTitle: '💭 Resposta',
     });
   });
+
+  it.each([
+    ['general_question', 'embed', '💭 Resposta'],
+    ['code_technical_question', 'embed', '💻 Resposta técnica'],
+    ['bot_help_info', 'embed', '🤖 Sobre o Marquinhos'],
+    ['opinion_reference', 'text', undefined],
+    ['user_roast_provocation', 'text', undefined],
+    ['casual_chat', 'text', undefined],
+    ['off_topic_unclear', 'text', undefined],
+  ] as const)(
+    'maps category %s to format %s',
+    async (category, format, embedTitle) => {
+      const service = new AiChatService(
+        fakeRateLimitService(true),
+        fakeGuardrailService(false),
+        fakeOpenAiClient({
+          classifyResult: { category },
+          chatResponses: ['resposta qualquer'],
+        }),
+      );
+      const result = await service.respond(baseRequest);
+      expect(result.format).toBe(format);
+      expect(result.embedTitle).toBe(embedTitle);
+    },
+  );
 
   it('falls back to off_topic_unclear when the classifier returns an unknown category', async () => {
     const service = new AiChatService(

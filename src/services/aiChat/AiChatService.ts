@@ -2,6 +2,7 @@ import { GuardrailService } from './GuardrailService';
 import { OpenAiClient } from './OpenAiClient';
 import {
   buildResponsePrompt,
+  CATEGORY_FORMAT,
   classificationSchema,
   CLASSIFY_SYSTEM_PROMPT,
   GUARDRAIL_ROAST_PROMPT,
@@ -33,12 +34,18 @@ export class AiChatService {
           temperature: 0.9,
           maxTokens: 120,
         });
-        return { status: 'ok', category: 'guardrail_roast', reply };
+        return {
+          status: 'ok',
+          category: 'guardrail_roast',
+          reply,
+          format: 'text',
+        };
       }
 
       const category = await this.classify(request.content);
       const reply = await this.generateReply(category, request);
-      return { status: 'ok', category, reply };
+      const { format, embedTitle } = CATEGORY_FORMAT[category];
+      return { status: 'ok', category, reply, format, embedTitle };
     } catch (error) {
       console.error('AiChatService error:', error);
       return { status: 'error' };

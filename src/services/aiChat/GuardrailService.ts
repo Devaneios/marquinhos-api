@@ -5,8 +5,8 @@ const INJECTION_PATTERNS: RegExp[] = [
   /system\s+prompt/i,
   /pretend\s+(you\s+are|to\s+be)/i,
   /modo\s+desenvolvedor/i,
-  /ignore\s+(tudo|todas)\s+(as\s+)?instru[cç][oõ]es/i,
-  /esque[cç][ae]\s+(as\s+)?instru[cç][oõ]es(\s+anteriores)?/i,
+  /ignore\s+(tudo|tod[oa]s)\s+((os|as)\s+)?(instru[cç][oõ]es|prompts?|regras)/i,
+  /esque[cç][ae]\s+((tudo|tod[oa]s)\s+)?((os|as)\s+)?(instru[cç][oõ]es|prompts?|regras)(\s+anteriores)?/i,
   /finja\s+(que\s+)?(ser|voc[eê]\s+[eé])/i,
 ];
 

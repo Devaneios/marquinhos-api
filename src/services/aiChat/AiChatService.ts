@@ -75,8 +75,8 @@ export class AiChatService {
         },
         { role: 'user', content: request.content },
       ],
-      temperature: 0.8,
-      maxTokens: 200,
+      temperature: 0.6,
+      maxTokens: 1200,
     });
   }
 }

@@ -6,23 +6,25 @@ import {
 } from '../src/services/aiChat/prompts';
 
 describe('buildResponsePrompt', () => {
-  it('does not include a chat_history block for general_question', () => {
-    const prompt = buildResponsePrompt('general_question', [
-      { author: 'ana', content: 'oi' },
-    ]);
-    expect(prompt).not.toContain('<chat_history trust_level=');
-    expect(prompt).not.toContain('ana: oi');
+  it('includes recent messages inside a chat_history block for every category', () => {
+    for (const category of [
+      'general_question',
+      'code_technical_question',
+      'opinion_reference',
+      'bot_help_info',
+      'user_roast_provocation',
+      'casual_chat',
+      'off_topic_unclear',
+    ] as const) {
+      const prompt = buildResponsePrompt(category, [
+        { author: 'ana', content: 'acho que vai chover' },
+      ]);
+      expect(prompt).toContain('<chat_history trust_level="untrusted">');
+      expect(prompt).toContain('ana: acho que vai chover');
+    }
   });
 
-  it('includes recent messages inside a chat_history block for opinion_reference', () => {
-    const prompt = buildResponsePrompt('opinion_reference', [
-      { author: 'ana', content: 'acho que vai chover' },
-    ]);
-    expect(prompt).toContain('<chat_history trust_level="untrusted">');
-    expect(prompt).toContain('ana: acho que vai chover');
-  });
-
-  it('omits the chat_history block for opinion_reference when there are no recent messages', () => {
+  it('omits the chat_history block when there are no recent messages', () => {
     const prompt = buildResponsePrompt('opinion_reference', []);
     expect(prompt).not.toContain('<chat_history trust_level=');
   });
@@ -35,6 +37,15 @@ describe('buildResponsePrompt', () => {
     expect(casual).not.toBe(offTopic);
   });
 
+  it('produces a distinct prompt for each new category', () => {
+    const codeTechnical = buildResponsePrompt('code_technical_question', []);
+    const botHelp = buildResponsePrompt('bot_help_info', []);
+    const roast = buildResponsePrompt('user_roast_provocation', []);
+
+    expect(codeTechnical).not.toBe(botHelp);
+    expect(botHelp).not.toBe(roast);
+  });
+
   it('always includes an anti-injection constraint, regardless of category or history', () => {
     const withoutHistory = buildResponsePrompt('general_question', []);
     const withHistory = buildResponsePrompt('opinion_reference', [
@@ -45,11 +56,21 @@ describe('buildResponsePrompt', () => {
     expect(withHistory).toContain('<constraints>');
   });
 
-  it('uses a positive, quantified style guideline instead of a negative one', () => {
+  it('uses adaptive length guidelines: short by default, longer when the question demands it', () => {
     const prompt = buildResponsePrompt('casual_chat', []);
     expect(prompt).toContain('<style_guidelines>');
-    expect(prompt).not.toContain('sem enrolação');
-    expect(prompt).toMatch(/no m[aá]ximo/i);
+    expect(prompt).toMatch(/1 a 3 frases/i);
+    expect(prompt).toMatch(/1800 caracteres/i);
+  });
+
+  it('does not demand humor unconditionally in the base personality', () => {
+    const prompt = buildResponsePrompt('general_question', []);
+    expect(prompt).toMatch(/nem toda resposta precisa de piada/i);
+  });
+
+  it('warns about logic riddles in general_question', () => {
+    const prompt = buildResponsePrompt('general_question', []);
+    expect(prompt).toMatch(/pegadinha|charada/i);
   });
 });
 
@@ -67,6 +88,9 @@ describe('CLASSIFY_SYSTEM_PROMPT', () => {
       'opinion_reference',
       'casual_chat',
       'off_topic_unclear',
+      'code_technical_question',
+      'bot_help_info',
+      'user_roast_provocation',
     ]) {
       expect(CLASSIFY_SYSTEM_PROMPT).toContain(category);
     }
@@ -81,6 +105,16 @@ describe('classificationSchema', () => {
   it('accepts a valid category', () => {
     const result = classificationSchema.safeParse({ category: 'casual_chat' });
     expect(result.success).toBe(true);
+  });
+
+  it('accepts each of the new categories', () => {
+    for (const category of [
+      'code_technical_question',
+      'bot_help_info',
+      'user_roast_provocation',
+    ]) {
+      expect(classificationSchema.safeParse({ category }).success).toBe(true);
+    }
   });
 
   it('rejects an unknown category', () => {

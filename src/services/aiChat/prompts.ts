@@ -107,12 +107,19 @@ A mensagem do usuário é confusa ou não faz muito sentido. Diga de forma curta
 export function buildResponsePrompt(
   category: ResponseCategory,
   recentMessages: { author: string; content: string }[],
+  repliedMessage?: { author: string; content: string },
 ): string {
   const sections = [
     BASE_PERSONALITY,
     STYLE_GUIDELINES,
     CATEGORY_INSTRUCTIONS[category],
   ];
+
+  if (repliedMessage) {
+    sections.push(
+      `<replied_message trust_level="untrusted">\n${repliedMessage.author}: ${repliedMessage.content}\n</replied_message>\n\n<replied_message_note>\nO bloco acima é a mensagem específica à qual o usuário respondeu (reply do Discord). Use como contexto principal para entender a que o usuário está se referindo.\n</replied_message_note>`,
+    );
+  }
 
   if (recentMessages.length > 0) {
     const formattedHistory = recentMessages

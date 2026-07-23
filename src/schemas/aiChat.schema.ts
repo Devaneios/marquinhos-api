@@ -9,5 +9,8 @@ export const aiChatRespondSchema = z.object({
     recentMessages: z
       .array(z.object({ author: z.string(), content: z.string() }))
       .max(20),
+    repliedMessage: z
+      .object({ author: z.string(), content: z.string() })
+      .optional(),
   }),
 });

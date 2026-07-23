@@ -15,6 +15,7 @@ export interface AiChatRequest {
   channelId: string;
   content: string;
   recentMessages: { author: string; content: string }[];
+  repliedMessage?: { author: string; content: string };
 }
 
 export interface AiChatResult {

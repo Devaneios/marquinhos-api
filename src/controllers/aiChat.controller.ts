@@ -10,14 +10,21 @@ class AiChatController {
 
   async respond(req: Request, res: Response) {
     try {
-      const { userId, guildId, channelId, content, recentMessages } =
-        req.body as {
-          userId: string;
-          guildId: string;
-          channelId: string;
-          content: string;
-          recentMessages: { author: string; content: string }[];
-        };
+      const {
+        userId,
+        guildId,
+        channelId,
+        content,
+        recentMessages,
+        repliedMessage,
+      } = req.body as {
+        userId: string;
+        guildId: string;
+        channelId: string;
+        content: string;
+        recentMessages: { author: string; content: string }[];
+        repliedMessage?: { author: string; content: string };
+      };
 
       const result = await this.service.respond({
         userId,
@@ -25,6 +32,7 @@ class AiChatController {
         channelId,
         content,
         recentMessages,
+        repliedMessage,
       });
 
       return res.status(200).json({ data: result });

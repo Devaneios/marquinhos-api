@@ -67,11 +67,20 @@ export class AiChatService {
     const safeRecentMessages = this.guardrailService.filterSafeMessages(
       request.recentMessages,
     );
+    const safeRepliedMessage =
+      request.repliedMessage &&
+      !this.guardrailService.isInjectionAttempt(request.repliedMessage.content)
+        ? request.repliedMessage
+        : undefined;
     return this.openAiClient.chat({
       messages: [
         {
           role: 'system',
-          content: buildResponsePrompt(category, safeRecentMessages),
+          content: buildResponsePrompt(
+            category,
+            safeRecentMessages,
+            safeRepliedMessage,
+          ),
         },
         { role: 'user', content: request.content },
       ],

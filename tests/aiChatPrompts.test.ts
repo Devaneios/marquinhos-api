@@ -72,6 +72,20 @@ describe('buildResponsePrompt', () => {
     const prompt = buildResponsePrompt('general_question', []);
     expect(prompt).toMatch(/pegadinha|charada/i);
   });
+
+  it('includes a replied_message block when repliedMessage is provided', () => {
+    const prompt = buildResponsePrompt('general_question', [], {
+      author: 'ana',
+      content: 'alguém sabe a capital da Mongólia?',
+    });
+    expect(prompt).toContain('<replied_message trust_level="untrusted">');
+    expect(prompt).toContain('ana: alguém sabe a capital da Mongólia?');
+  });
+
+  it('omits the replied_message block when repliedMessage is not provided', () => {
+    const prompt = buildResponsePrompt('general_question', []);
+    expect(prompt).not.toContain('<replied_message');
+  });
 });
 
 describe('CLASSIFY_SYSTEM_PROMPT', () => {

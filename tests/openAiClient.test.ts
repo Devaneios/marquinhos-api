@@ -1,19 +1,30 @@
-import axios from 'axios';
-import { afterEach, describe, expect, it, spyOn } from 'bun:test';
+import { describe, expect, it, mock } from 'bun:test';
+import { z } from 'zod';
 import { OpenAiClient } from '../src/services/aiChat/OpenAiClient';
 
+function fakeSdkClient(overrides: {
+  create?: (...args: unknown[]) => unknown;
+  parse?: (...args: unknown[]) => unknown;
+}) {
+  return {
+    chat: {
+      completions: {
+        create: mock(overrides.create ?? (async () => ({}))),
+        parse: mock(overrides.parse ?? (async () => ({}))),
+      },
+    },
+  } as any;
+}
+
 describe('OpenAiClient.chat', () => {
-  afterEach(() => {
-    delete process.env.OPENAI_API_KEY;
-  });
-
   it('returns the assistant message content from the API response', async () => {
-    process.env.OPENAI_API_KEY = 'test-key';
-    const postSpy = spyOn(axios, 'post').mockResolvedValue({
-      data: { choices: [{ message: { content: 'oi tudo bem' } }] },
-    } as any);
+    const sdk = fakeSdkClient({
+      create: async () => ({
+        choices: [{ message: { content: 'oi tudo bem' } }],
+      }),
+    });
 
-    const client = new OpenAiClient();
+    const client = new OpenAiClient(sdk);
     const result = await client.chat({
       messages: [{ role: 'user', content: 'oi' }],
       temperature: 0.5,
@@ -21,73 +32,109 @@ describe('OpenAiClient.chat', () => {
     });
 
     expect(result).toBe('oi tudo bem');
-    postSpy.mockRestore();
   });
 
-  it('sends the Authorization header built from OPENAI_API_KEY and model gpt-4o-mini', async () => {
-    process.env.OPENAI_API_KEY = 'test-key';
-    const postSpy = spyOn(axios, 'post').mockResolvedValue({
-      data: { choices: [{ message: { content: 'ok' } }] },
-    } as any);
+  it('calls the SDK with model gpt-4o-mini and the given messages/params', async () => {
+    const sdk = fakeSdkClient({
+      create: async () => ({ choices: [{ message: { content: 'ok' } }] }),
+    });
 
-    const client = new OpenAiClient();
+    const client = new OpenAiClient(sdk);
     await client.chat({
       messages: [{ role: 'user', content: 'oi' }],
       temperature: 0.5,
       maxTokens: 50,
     });
 
-    expect(postSpy).toHaveBeenCalledWith(
-      'https://api.openai.com/v1/chat/completions',
-      expect.objectContaining({ model: 'gpt-4o-mini' }),
+    expect(sdk.chat.completions.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: 'Bearer test-key' }),
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: 'oi' }],
+        temperature: 0.5,
+        max_tokens: 50,
       }),
     );
-    postSpy.mockRestore();
   });
 
-  it('includes response_format json_object when jsonMode is true', async () => {
-    process.env.OPENAI_API_KEY = 'test-key';
-    const postSpy = spyOn(axios, 'post').mockResolvedValue({
-      data: {
-        choices: [{ message: { content: '{"category":"casual_chat"}' } }],
-      },
-    } as any);
-
-    const client = new OpenAiClient();
-    await client.chat({
-      messages: [{ role: 'system', content: 'classify' }],
-      temperature: 0.1,
-      maxTokens: 20,
-      jsonMode: true,
+  it('throws when the SDK returns no completion content', async () => {
+    const sdk = fakeSdkClient({
+      create: async () => ({ choices: [{ message: { content: null } }] }),
     });
 
-    expect(postSpy).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        response_format: { type: 'json_object' },
+    const client = new OpenAiClient(sdk);
+    await expect(
+      client.chat({
+        messages: [{ role: 'user', content: 'oi' }],
+        temperature: 0.5,
+        maxTokens: 50,
       }),
-      expect.any(Object),
-    );
-    postSpy.mockRestore();
+    ).rejects.toThrow();
   });
+});
 
-  it('omits response_format when jsonMode is not set', async () => {
-    process.env.OPENAI_API_KEY = 'test-key';
-    const postSpy = spyOn(axios, 'post').mockResolvedValue({
-      data: { choices: [{ message: { content: 'ok' } }] },
-    } as any);
+describe('OpenAiClient.classify', () => {
+  const schema = z.object({ category: z.enum(['a', 'b']) });
 
-    const client = new OpenAiClient();
-    await client.chat({
-      messages: [{ role: 'user', content: 'oi' }],
-      temperature: 0.5,
-      maxTokens: 50,
+  it('returns the parsed, schema-validated object from the SDK', async () => {
+    const sdk = fakeSdkClient({
+      parse: async () => ({
+        choices: [{ message: { parsed: { category: 'a' } } }],
+      }),
     });
 
-    const [, body] = postSpy.mock.calls[0] as [string, Record<string, unknown>];
-    expect(body.response_format).toBeUndefined();
-    postSpy.mockRestore();
+    const client = new OpenAiClient(sdk);
+    const result = await client.classify(
+      [{ role: 'system', content: 'classify' }],
+      schema,
+      'classification',
+      { temperature: 0.1, maxTokens: 20 },
+    );
+
+    expect(result).toEqual({ category: 'a' });
+  });
+
+  it('calls chat.completions.parse with a json_schema response_format built from the zod schema', async () => {
+    const sdk = fakeSdkClient({
+      parse: async () => ({
+        choices: [{ message: { parsed: { category: 'a' } } }],
+      }),
+    });
+
+    const client = new OpenAiClient(sdk);
+    await client.classify(
+      [{ role: 'system', content: 'classify' }],
+      schema,
+      'classification',
+      { temperature: 0.1, maxTokens: 20 },
+    );
+
+    expect(sdk.chat.completions.parse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'gpt-4o-mini',
+        response_format: expect.objectContaining({
+          type: 'json_schema',
+          json_schema: expect.objectContaining({
+            name: 'classification',
+            strict: true,
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('throws when the SDK returns no parsed classification', async () => {
+    const sdk = fakeSdkClient({
+      parse: async () => ({ choices: [{ message: { parsed: null } }] }),
+    });
+
+    const client = new OpenAiClient(sdk);
+    await expect(
+      client.classify(
+        [{ role: 'system', content: 'classify' }],
+        schema,
+        'classification',
+        { temperature: 0.1, maxTokens: 20 },
+      ),
+    ).rejects.toThrow();
   });
 });

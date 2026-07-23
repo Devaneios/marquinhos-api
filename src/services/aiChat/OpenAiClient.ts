@@ -1,6 +1,7 @@
-import axios from 'axios';
+import OpenAI from 'openai';
+import { zodResponseFormat } from 'openai/helpers/zod';
+import type { ZodType } from 'zod';
 
-const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const OPENAI_MODEL = 'gpt-4o-mini';
 const REQUEST_TIMEOUT_MS = 15000;
 
@@ -13,39 +14,54 @@ export interface OpenAiChatOptions {
   messages: OpenAiMessage[];
   temperature: number;
   maxTokens: number;
-  jsonMode?: boolean;
 }
 
-interface OpenAiChatCompletionResponse {
-  choices: { message: { content: string } }[];
+export interface OpenAiClassifyOptions {
+  temperature: number;
+  maxTokens: number;
 }
 
 export class OpenAiClient {
-  async chat(options: OpenAiChatOptions): Promise<string> {
-    const response = await axios.post<OpenAiChatCompletionResponse>(
-      OPENAI_API_URL,
-      {
-        model: OPENAI_MODEL,
-        messages: options.messages,
-        temperature: options.temperature,
-        max_tokens: options.maxTokens,
-        ...(options.jsonMode
-          ? { response_format: { type: 'json_object' } }
-          : {}),
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: REQUEST_TIMEOUT_MS,
-      },
-    );
+  constructor(
+    private client: OpenAI = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      timeout: REQUEST_TIMEOUT_MS,
+    }),
+  ) {}
 
-    const content = response.data.choices[0]?.message?.content;
-    if (content === undefined) {
+  async chat(options: OpenAiChatOptions): Promise<string> {
+    const completion = await this.client.chat.completions.create({
+      model: OPENAI_MODEL,
+      messages: options.messages,
+      temperature: options.temperature,
+      max_tokens: options.maxTokens,
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    if (content === null || content === undefined) {
       throw new Error('OpenAI returned no completion content');
     }
     return content;
+  }
+
+  async classify<T>(
+    messages: OpenAiMessage[],
+    schema: ZodType<T>,
+    schemaName: string,
+    options: OpenAiClassifyOptions,
+  ): Promise<T> {
+    const completion = await this.client.chat.completions.parse({
+      model: OPENAI_MODEL,
+      messages,
+      temperature: options.temperature,
+      max_tokens: options.maxTokens,
+      response_format: zodResponseFormat(schema, schemaName),
+    });
+
+    const parsed = completion.choices[0]?.message?.parsed;
+    if (parsed === null || parsed === undefined) {
+      throw new Error('OpenAI returned no parsed classification');
+    }
+    return parsed;
   }
 }

@@ -14,4 +14,10 @@ export class GuardrailService {
   isInjectionAttempt(content: string): boolean {
     return INJECTION_PATTERNS.some((pattern) => pattern.test(content));
   }
+
+  filterSafeMessages<T extends { content: string }>(messages: T[]): T[] {
+    return messages.filter(
+      (message) => !this.isInjectionAttempt(message.content),
+    );
+  }
 }

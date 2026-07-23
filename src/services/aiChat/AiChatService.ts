@@ -2,18 +2,12 @@ import { GuardrailService } from './GuardrailService';
 import { OpenAiClient } from './OpenAiClient';
 import {
   buildResponsePrompt,
+  classificationSchema,
   CLASSIFY_SYSTEM_PROMPT,
   GUARDRAIL_ROAST_PROMPT,
 } from './prompts';
 import { RateLimitService } from './RateLimitService';
 import type { AiChatRequest, AiChatResult, ResponseCategory } from './types';
-
-const RESPONSE_CATEGORIES: ResponseCategory[] = [
-  'general_question',
-  'opinion_reference',
-  'casual_chat',
-  'off_topic_unclear',
-];
 
 export class AiChatService {
   constructor(
@@ -52,31 +46,32 @@ export class AiChatService {
   }
 
   private async classify(content: string): Promise<ResponseCategory> {
-    const raw = await this.openAiClient.chat({
-      messages: [
+    const result = await this.openAiClient.classify(
+      [
         { role: 'system', content: CLASSIFY_SYSTEM_PROMPT },
         { role: 'user', content },
       ],
-      temperature: 0.1,
-      maxTokens: 20,
-      jsonMode: true,
-    });
+      classificationSchema,
+      'classification',
+      { temperature: 0.1, maxTokens: 20 },
+    );
 
-    const parsed = JSON.parse(raw) as { category: string };
-    return RESPONSE_CATEGORIES.includes(parsed.category as ResponseCategory)
-      ? (parsed.category as ResponseCategory)
-      : 'off_topic_unclear';
+    const parsed = classificationSchema.safeParse(result);
+    return parsed.success ? parsed.data.category : 'off_topic_unclear';
   }
 
   private async generateReply(
     category: ResponseCategory,
     request: AiChatRequest,
   ): Promise<string> {
+    const safeRecentMessages = this.guardrailService.filterSafeMessages(
+      request.recentMessages,
+    );
     return this.openAiClient.chat({
       messages: [
         {
           role: 'system',
-          content: buildResponsePrompt(category, request.recentMessages),
+          content: buildResponsePrompt(category, safeRecentMessages),
         },
         { role: 'user', content: request.content },
       ],

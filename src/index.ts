@@ -5,6 +5,7 @@ import express from 'express';
 import http from 'http';
 import morgan from 'morgan';
 import './database/sqlite';
+import aiChatRouter from './routes/aiChat.route';
 import * as auth from './routes/auth.route';
 import evolutiveAchievementsRouter from './routes/evolutiveAchievements.route';
 import gamificationRouter from './routes/gamification.route';
@@ -13,6 +14,7 @@ import * as privacyPolicy from './routes/privacyPolicy.route';
 import * as scrobble from './routes/scrobble.route';
 import * as user from './routes/user.route';
 import wordleRouter from './routes/wordle.route';
+import { RateLimitService } from './services/aiChat/RateLimitService';
 import { GamificationService } from './services/gamification';
 import { getValidationSet } from './services/wordle';
 
@@ -91,6 +93,7 @@ app.use('/api/auth', auth.default);
 app.use('/api/user', user.default);
 app.use('/api/scrobble', scrobble.default);
 app.use('/api/privacy-policy', privacyPolicy.default);
+app.use('/api/ai-chat', aiChatRouter);
 app.use('/api/gamification', gamificationRouter);
 app.use('/api/evolutive-achievements', evolutiveAchievementsRouter);
 app.use('/api/games/maze', mazeRouter);
@@ -119,6 +122,7 @@ import { runMigrations } from './database/migrate';
 try {
   runMigrations();
   new GamificationService().initializeDefaults();
+  new RateLimitService().seedDefaults();
 } catch (err) {
   console.error('Fatal: gamification initialization failed', err);
   process.exit(1);

@@ -230,6 +230,32 @@ db.run(`
   )
 `);
 
+db.run(`
+  CREATE TABLE IF NOT EXISTS ai_chat_config (
+    key   TEXT    NOT NULL PRIMARY KEY,
+    value INTEGER NOT NULL
+  )
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS ai_chat_usage (
+    user_id    TEXT    NOT NULL,
+    guild_id   TEXT    NOT NULL,
+    usage_date TEXT    NOT NULL,
+    count      INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, guild_id, usage_date)
+  )
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS ai_chat_global_usage (
+    guild_id   TEXT    NOT NULL,
+    usage_date TEXT    NOT NULL,
+    count      INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, usage_date)
+  )
+`);
+
 const cleanupStmt = db.prepare(
   `DELETE FROM scrobbles_queue WHERE created_at < (unixepoch() - ${TTL_SECONDS})`,
 );

@@ -2,13 +2,22 @@ import { GuardrailService } from './GuardrailService';
 import { OpenAiClient } from './OpenAiClient';
 import {
   buildResponsePrompt,
-  CATEGORY_FORMAT,
-  classificationSchema,
-  CLASSIFY_SYSTEM_PROMPT,
+  buildRevisionInput,
+  buildRevisionPrompt,
+  FALLBACK_FORMAT,
   GUARDRAIL_ROAST_PROMPT,
+  MAIN_CLASSIFY_SYSTEM_PROMPT,
+  mainClassificationSchema,
+  revisionSchema,
+  SUB_CLASSIFIERS,
 } from './prompts';
 import { RateLimitService } from './RateLimitService';
-import type { AiChatRequest, AiChatResult, ResponseCategory } from './types';
+import type {
+  AiChatRequest,
+  AiChatResult,
+  MainCategory,
+  ResponseCategory,
+} from './types';
 
 export class AiChatService {
   constructor(
@@ -42,29 +51,52 @@ export class AiChatService {
         };
       }
 
-      const category = await this.classify(request.content);
-      const reply = await this.generateReply(category, request);
-      const { format, embedTitle } = CATEGORY_FORMAT[category];
-      return { status: 'ok', category, reply, format, embedTitle };
+      const mainCategory = await this.classifyMain(request.content);
+      const category =
+        mainCategory === 'unclear'
+          ? 'off_topic_unclear'
+          : await this.classifySub(mainCategory, request.content);
+      const draft = await this.generateReply(category, request);
+      const revised = await this.revise(category, request.content, draft);
+      return { status: 'ok', category, ...revised };
     } catch (error) {
       console.error('AiChatService error:', error);
       return { status: 'error' };
     }
   }
 
-  private async classify(content: string): Promise<ResponseCategory> {
-    const result = await this.openAiClient.classify(
+  private async classifyMain(content: string): Promise<MainCategory> {
+    const result = await this.openAiClient.structured(
       [
-        { role: 'system', content: CLASSIFY_SYSTEM_PROMPT },
+        { role: 'system', content: MAIN_CLASSIFY_SYSTEM_PROMPT },
         { role: 'user', content },
       ],
-      classificationSchema,
-      'classification',
+      mainClassificationSchema,
+      'main_classification',
       { temperature: 0.1, maxTokens: 20 },
     );
 
-    const parsed = classificationSchema.safeParse(result);
-    return parsed.success ? parsed.data.category : 'off_topic_unclear';
+    const parsed = mainClassificationSchema.safeParse(result);
+    return parsed.success ? parsed.data.category : 'unclear';
+  }
+
+  private async classifySub(
+    mainCategory: Exclude<MainCategory, 'unclear'>,
+    content: string,
+  ): Promise<ResponseCategory> {
+    const { schema, prompt, fallback } = SUB_CLASSIFIERS[mainCategory];
+    const result = await this.openAiClient.structured(
+      [
+        { role: 'system', content: prompt },
+        { role: 'user', content },
+      ],
+      schema,
+      'sub_classification',
+      { temperature: 0.1, maxTokens: 20 },
+    );
+
+    const parsed = schema.safeParse(result);
+    return parsed.success ? parsed.data.category : fallback;
   }
 
   private async generateReply(
@@ -94,5 +126,35 @@ export class AiChatService {
       temperature: 0.6,
       maxTokens: 1200,
     });
+  }
+
+  private async revise(
+    category: ResponseCategory,
+    userContent: string,
+    draft: string,
+  ): Promise<Pick<AiChatResult, 'reply' | 'format' | 'embedTitle'>> {
+    try {
+      const result = await this.openAiClient.structured(
+        [
+          { role: 'system', content: buildRevisionPrompt(category) },
+          { role: 'user', content: buildRevisionInput(userContent, draft) },
+        ],
+        revisionSchema,
+        'revision',
+        { temperature: 0.3, maxTokens: 1400 },
+      );
+
+      const parsed = revisionSchema.safeParse(result);
+      if (!parsed.success)
+        return { reply: draft, ...FALLBACK_FORMAT[category] };
+      return {
+        reply: parsed.data.reply,
+        format: parsed.data.format,
+        embedTitle: parsed.data.embedTitle ?? undefined,
+      };
+    } catch (error) {
+      console.error('AiChatService revision error:', error);
+      return { reply: draft, ...FALLBACK_FORMAT[category] };
+    }
   }
 }

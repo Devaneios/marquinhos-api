@@ -1,10 +1,16 @@
+export type MainCategory =
+  'question' | 'social' | 'context_reaction' | 'unclear';
+
 export type ResponseCategory =
   | 'general_question'
   | 'code_technical_question'
-  | 'opinion_reference'
+  | 'trick_riddle'
   | 'bot_help_info'
-  | 'user_roast_provocation'
   | 'casual_chat'
+  | 'user_roast_provocation'
+  | 'praise_thanks'
+  | 'opinion_reference'
+  | 'follow_up_on_bot'
   | 'off_topic_unclear';
 
 export type AiChatCategory = ResponseCategory | 'guardrail_roast';

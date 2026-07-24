@@ -2,6 +2,10 @@ import { describe, expect, it, mock } from 'bun:test';
 import { AiChatService } from '../src/services/aiChat/AiChatService';
 import { GuardrailService } from '../src/services/aiChat/GuardrailService';
 import type { OpenAiClient } from '../src/services/aiChat/OpenAiClient';
+import {
+  MAIN_CLASSIFY_SYSTEM_PROMPT,
+  SUB_CLASSIFIERS,
+} from '../src/services/aiChat/prompts';
 import type { RateLimitService } from '../src/services/aiChat/RateLimitService';
 
 function fakeRateLimitService(allowed: boolean): RateLimitService {
@@ -17,19 +21,32 @@ function fakeGuardrailService(flagged: boolean): GuardrailService {
 }
 
 function fakeOpenAiClient(options: {
-  classifyResult?: { category: string } | Error;
-  chatResponses?: string[];
+  structuredResults?: unknown[];
+  chatResponses?: (string | Error)[];
 }): OpenAiClient {
-  let call = 0;
+  let structuredCall = 0;
+  let chatCall = 0;
+  const structuredResults = options.structuredResults ?? [];
   const chatResponses = options.chatResponses ?? [];
   return {
-    classify: mock(async () => {
-      if (options.classifyResult instanceof Error) throw options.classifyResult;
-      return options.classifyResult;
+    structured: mock(async () => {
+      const result = structuredResults[structuredCall++];
+      if (result instanceof Error) throw result;
+      return result;
     }),
-    chat: mock(async () => chatResponses[call++]),
+    chat: mock(async () => {
+      const result = chatResponses[chatCall++];
+      if (result instanceof Error) throw result;
+      return result;
+    }),
   } as unknown as OpenAiClient;
 }
+
+const REVISION_OK = {
+  reply: 'resposta revisada',
+  format: 'text',
+  embedTitle: null,
+};
 
 const baseRequest = {
   userId: 'user1',
@@ -50,13 +67,14 @@ describe('AiChatService.respond', () => {
     expect(result).toEqual({ status: 'rate_limited' });
   });
 
-  it('returns a guardrail_roast reply when the guardrail flags the content', async () => {
+  it('returns a guardrail_roast reply without classification or revision when the guardrail flags the content', async () => {
+    const client = fakeOpenAiClient({
+      chatResponses: ['boa tentativa, mas não cola comigo 😏'],
+    });
     const service = new AiChatService(
       fakeRateLimitService(true),
       fakeGuardrailService(true),
-      fakeOpenAiClient({
-        chatResponses: ['boa tentativa, mas não cola comigo 😏'],
-      }),
+      client,
     );
     const result = await service.respond({
       ...baseRequest,
@@ -68,88 +86,248 @@ describe('AiChatService.respond', () => {
       reply: 'boa tentativa, mas não cola comigo 😏',
       format: 'text',
     });
+    expect(client.structured).toHaveBeenCalledTimes(0);
   });
 
-  it('classifies then generates a reply for normal content', async () => {
+  it('runs main classify, sub classify, generation and revision for normal content', async () => {
+    const client = fakeOpenAiClient({
+      structuredResults: [
+        { category: 'question' },
+        { category: 'code_technical_question' },
+        {
+          reply: 'usa um handler global de unhandledRejection.',
+          format: 'embed',
+          embedTitle: '💻 Resposta técnica',
+        },
+      ],
+      chatResponses: ['rascunho da resposta técnica'],
+    });
     const service = new AiChatService(
       fakeRateLimitService(true),
       fakeGuardrailService(false),
-      fakeOpenAiClient({
-        classifyResult: { category: 'general_question' },
-        chatResponses: ['Brasília.'],
-      }),
+      client,
+    );
+    const result = await service.respond(baseRequest);
+    expect(result).toEqual({
+      status: 'ok',
+      category: 'code_technical_question',
+      reply: 'usa um handler global de unhandledRejection.',
+      format: 'embed',
+      embedTitle: '💻 Resposta técnica',
+    });
+    expect(client.structured).toHaveBeenCalledTimes(3);
+    expect(client.chat).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the main classifier prompt on the first call and the sub classifier prompt on the second', async () => {
+    const client = fakeOpenAiClient({
+      structuredResults: [
+        { category: 'question' },
+        { category: 'general_question' },
+        REVISION_OK,
+      ],
+      chatResponses: ['rascunho'],
+    });
+    const service = new AiChatService(
+      fakeRateLimitService(true),
+      fakeGuardrailService(false),
+      client,
+    );
+    await service.respond(baseRequest);
+
+    const structuredMock = client.structured as unknown as ReturnType<
+      typeof mock
+    >;
+    const firstMessages = structuredMock.mock.calls[0]?.[0] as {
+      role: string;
+      content: string;
+    }[];
+    const secondMessages = structuredMock.mock.calls[1]?.[0] as {
+      role: string;
+      content: string;
+    }[];
+    expect(firstMessages[0]?.content).toBe(MAIN_CLASSIFY_SYSTEM_PROMPT);
+    expect(secondMessages[0]?.content).toBe(SUB_CLASSIFIERS.question.prompt);
+  });
+
+  it('skips the sub classifier and answers as off_topic_unclear when the main category is unclear', async () => {
+    const client = fakeOpenAiClient({
+      structuredResults: [{ category: 'unclear' }, REVISION_OK],
+      chatResponses: ['hein? não entendi nada.'],
+    });
+    const service = new AiChatService(
+      fakeRateLimitService(true),
+      fakeGuardrailService(false),
+      client,
+    );
+    const result = await service.respond(baseRequest);
+    expect(result.category).toBe('off_topic_unclear');
+    expect(client.structured).toHaveBeenCalledTimes(2);
+  });
+
+  it('treats an unknown main classification as unclear', async () => {
+    const client = fakeOpenAiClient({
+      structuredResults: [{ category: 'banana' }, REVISION_OK],
+      chatResponses: ['hein?'],
+    });
+    const service = new AiChatService(
+      fakeRateLimitService(true),
+      fakeGuardrailService(false),
+      client,
+    );
+    const result = await service.respond(baseRequest);
+    expect(result.category).toBe('off_topic_unclear');
+    expect(client.structured).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ['question', 'general_question'],
+    ['social', 'casual_chat'],
+    ['context_reaction', 'opinion_reference'],
+  ] as const)(
+    'falls back to the default subcategory of %s when the sub classification is unknown',
+    async (main, fallback) => {
+      const client = fakeOpenAiClient({
+        structuredResults: [
+          { category: main },
+          { category: 'banana' },
+          REVISION_OK,
+        ],
+        chatResponses: ['rascunho'],
+      });
+      const service = new AiChatService(
+        fakeRateLimitService(true),
+        fakeGuardrailService(false),
+        client,
+      );
+      const result = await service.respond(baseRequest);
+      expect(result.category).toBe(fallback);
+    },
+  );
+
+  it('sends the user message and the draft to the revision call', async () => {
+    const client = fakeOpenAiClient({
+      structuredResults: [
+        { category: 'question' },
+        { category: 'general_question' },
+        REVISION_OK,
+      ],
+      chatResponses: ['rascunho: Brasília.'],
+    });
+    const service = new AiChatService(
+      fakeRateLimitService(true),
+      fakeGuardrailService(false),
+      client,
+    );
+    await service.respond(baseRequest);
+
+    const structuredMock = client.structured as unknown as ReturnType<
+      typeof mock
+    >;
+    const revisionMessages = structuredMock.mock.calls[2]?.[0] as {
+      role: string;
+      content: string;
+    }[];
+    const revisionInput = revisionMessages[1]?.content;
+    expect(revisionInput).toContain('qual a capital do brasil?');
+    expect(revisionInput).toContain('rascunho: Brasília.');
+  });
+
+  it('returns the revised reply as text without an embed title when the reviser picks text', async () => {
+    const client = fakeOpenAiClient({
+      structuredResults: [
+        { category: 'question' },
+        { category: 'general_question' },
+        { reply: 'Brasília.', format: 'text', embedTitle: null },
+      ],
+      chatResponses: ['A capital do Brasil é Brasília, definida em 1960...'],
+    });
+    const service = new AiChatService(
+      fakeRateLimitService(true),
+      fakeGuardrailService(false),
+      client,
     );
     const result = await service.respond(baseRequest);
     expect(result).toEqual({
       status: 'ok',
       category: 'general_question',
       reply: 'Brasília.',
-      format: 'embed',
-      embedTitle: '💭 Resposta',
+      format: 'text',
     });
   });
 
-  it.each([
-    ['general_question', 'embed', '💭 Resposta'],
-    ['code_technical_question', 'embed', '💻 Resposta técnica'],
-    ['bot_help_info', 'embed', '🤖 Sobre o Marquinhos'],
-    ['opinion_reference', 'text', undefined],
-    ['user_roast_provocation', 'text', undefined],
-    ['casual_chat', 'text', undefined],
-    ['off_topic_unclear', 'text', undefined],
-  ] as const)(
-    'maps category %s to format %s',
-    async (category, format, embedTitle) => {
-      const service = new AiChatService(
-        fakeRateLimitService(true),
-        fakeGuardrailService(false),
-        fakeOpenAiClient({
-          classifyResult: { category },
-          chatResponses: ['resposta qualquer'],
-        }),
-      );
-      const result = await service.respond(baseRequest);
-      expect(result.format).toBe(format);
-      expect(result.embedTitle).toBe(embedTitle);
-    },
-  );
-
-  it('falls back to off_topic_unclear when the classifier returns an unknown category', async () => {
+  it('falls back to the draft reply and the static format when the revision call throws', async () => {
+    const client = fakeOpenAiClient({
+      structuredResults: [
+        { category: 'question' },
+        { category: 'code_technical_question' },
+        new Error('timeout'),
+      ],
+      chatResponses: ['rascunho técnico completo'],
+    });
     const service = new AiChatService(
       fakeRateLimitService(true),
       fakeGuardrailService(false),
-      fakeOpenAiClient({
-        classifyResult: { category: 'banana' },
-        chatResponses: ['hein?'],
-      }),
+      client,
     );
     const result = await service.respond(baseRequest);
-    expect(result.category).toBe('off_topic_unclear');
+    expect(result).toEqual({
+      status: 'ok',
+      category: 'code_technical_question',
+      reply: 'rascunho técnico completo',
+      format: 'embed',
+      embedTitle: '💻 Resposta técnica',
+    });
   });
 
-  it('returns status error when OpenAI throws', async () => {
-    const throwingClient = {
-      classify: mock(async () => {
-        throw new Error('timeout');
-      }),
-      chat: mock(async () => {
-        throw new Error('timeout');
-      }),
-    } as unknown as OpenAiClient;
+  it('falls back to the draft reply when the revision result does not match the schema', async () => {
+    const client = fakeOpenAiClient({
+      structuredResults: [
+        { category: 'social' },
+        { category: 'casual_chat' },
+        { bogus: true },
+      ],
+      chatResponses: ['rascunho casual'],
+    });
     const service = new AiChatService(
       fakeRateLimitService(true),
       fakeGuardrailService(false),
-      throwingClient,
+      client,
+    );
+    const result = await service.respond(baseRequest);
+    expect(result).toEqual({
+      status: 'ok',
+      category: 'casual_chat',
+      reply: 'rascunho casual',
+      format: 'text',
+    });
+  });
+
+  it('returns status error when the main classification throws', async () => {
+    const client = fakeOpenAiClient({
+      structuredResults: [new Error('timeout')],
+    });
+    const service = new AiChatService(
+      fakeRateLimitService(true),
+      fakeGuardrailService(false),
+      client,
     );
     const result = await service.respond(baseRequest);
     expect(result).toEqual({ status: 'error' });
   });
 
-  it('returns status error when classification throws', async () => {
+  it('returns status error when the generation call throws', async () => {
+    const client = fakeOpenAiClient({
+      structuredResults: [
+        { category: 'question' },
+        { category: 'general_question' },
+      ],
+      chatResponses: [new Error('timeout')],
+    });
     const service = new AiChatService(
       fakeRateLimitService(true),
       fakeGuardrailService(false),
-      fakeOpenAiClient({ classifyResult: new Error('bad schema') }),
+      client,
     );
     const result = await service.respond(baseRequest);
     expect(result).toEqual({ status: 'error' });
@@ -157,7 +335,11 @@ describe('AiChatService.respond', () => {
 
   it('filters injection-flagged messages out of recentMessages before building the response prompt', async () => {
     const client = fakeOpenAiClient({
-      classifyResult: { category: 'opinion_reference' },
+      structuredResults: [
+        { category: 'context_reaction' },
+        { category: 'opinion_reference' },
+        REVISION_OK,
+      ],
       chatResponses: ['sei lá, parece bobagem.'],
     });
     const service = new AiChatService(
@@ -190,7 +372,11 @@ describe('AiChatService.respond', () => {
 
   it('includes repliedMessage in the response prompt when provided', async () => {
     const client = fakeOpenAiClient({
-      classifyResult: { category: 'general_question' },
+      structuredResults: [
+        { category: 'question' },
+        { category: 'general_question' },
+        REVISION_OK,
+      ],
       chatResponses: ['a capital é Brasília.'],
     });
     const service = new AiChatService(
@@ -215,7 +401,11 @@ describe('AiChatService.respond', () => {
 
   it('drops repliedMessage from the prompt when it is an injection attempt', async () => {
     const client = fakeOpenAiClient({
-      classifyResult: { category: 'general_question' },
+      structuredResults: [
+        { category: 'question' },
+        { category: 'general_question' },
+        REVISION_OK,
+      ],
       chatResponses: ['ok.'],
     });
     const service = new AiChatService(

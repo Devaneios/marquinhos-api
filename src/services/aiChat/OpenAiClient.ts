@@ -16,7 +16,7 @@ export interface OpenAiChatOptions {
   maxTokens: number;
 }
 
-export interface OpenAiClassifyOptions {
+export interface OpenAiStructuredOptions {
   temperature: number;
   maxTokens: number;
 }
@@ -44,11 +44,11 @@ export class OpenAiClient {
     return content;
   }
 
-  async classify<T>(
+  async structured<T>(
     messages: OpenAiMessage[],
     schema: ZodType<T>,
     schemaName: string,
-    options: OpenAiClassifyOptions,
+    options: OpenAiStructuredOptions,
   ): Promise<T> {
     const completion = await this.client.chat.completions.parse({
       model: OPENAI_MODEL,
@@ -60,7 +60,7 @@ export class OpenAiClient {
 
     const parsed = completion.choices[0]?.message?.parsed;
     if (parsed === null || parsed === undefined) {
-      throw new Error('OpenAI returned no parsed classification');
+      throw new Error('OpenAI returned no parsed structured output');
     }
     return parsed;
   }

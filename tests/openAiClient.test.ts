@@ -72,7 +72,7 @@ describe('OpenAiClient.chat', () => {
   });
 });
 
-describe('OpenAiClient.classify', () => {
+describe('OpenAiClient.structured', () => {
   const schema = z.object({ category: z.enum(['a', 'b']) });
 
   it('returns the parsed, schema-validated object from the SDK', async () => {
@@ -83,7 +83,7 @@ describe('OpenAiClient.classify', () => {
     });
 
     const client = new OpenAiClient(sdk);
-    const result = await client.classify(
+    const result = await client.structured(
       [{ role: 'system', content: 'classify' }],
       schema,
       'classification',
@@ -101,7 +101,7 @@ describe('OpenAiClient.classify', () => {
     });
 
     const client = new OpenAiClient(sdk);
-    await client.classify(
+    await client.structured(
       [{ role: 'system', content: 'classify' }],
       schema,
       'classification',
@@ -129,7 +129,7 @@ describe('OpenAiClient.classify', () => {
 
     const client = new OpenAiClient(sdk);
     await expect(
-      client.classify(
+      client.structured(
         [{ role: 'system', content: 'classify' }],
         schema,
         'classification',

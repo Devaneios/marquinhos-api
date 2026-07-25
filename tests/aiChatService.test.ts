@@ -96,6 +96,23 @@ describe('AiChatService.respond', () => {
     expect(result).toEqual({ status: 'rate_limited' });
   });
 
+  it('constructs without OPENAI_API_KEY when its collaborators are injected', async () => {
+    const previousKey = process.env.OPENAI_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const service = new AiChatService(
+        fakeRateLimitService(false),
+        fakeGuardrailService(false),
+        fakeOpenAiClient({}),
+      );
+      expect(await service.respond(baseRequest)).toEqual({
+        status: 'rate_limited',
+      });
+    } finally {
+      if (previousKey !== undefined) process.env.OPENAI_API_KEY = previousKey;
+    }
+  });
+
   it('returns a guardrail_roast reply without classification or revision when the guardrail flags the content', async () => {
     const client = fakeOpenAiClient({
       chatResponses: ['boa tentativa, mas não cola comigo 😏'],

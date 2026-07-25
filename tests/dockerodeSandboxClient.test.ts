@@ -34,7 +34,7 @@ describe('DockerodeSandboxClient.exec', () => {
   });
 
   it('reports a timeout when the command outlives the deadline', async () => {
-    const client = clientWithSpawn(['sh', '-c', 'sleep 5']);
+    const client = clientWithSpawn(['sleep', '10']);
 
     const result = await client.exec('container-id', ['ignored'], 150);
 

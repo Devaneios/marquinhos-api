@@ -27,9 +27,14 @@ export class AiChatService {
     private rateLimitService: RateLimitService = new RateLimitService(),
     private guardrailService: GuardrailService = new GuardrailService(),
     private openAiClient: OpenAiClient = new OpenAiClient(),
-    private agentToolLoopService: AgentToolLoopService = new AgentToolLoopService(),
+    private agentToolLoopService?: AgentToolLoopService,
     private traceRecorder: AiTraceRecorder = new AiTraceRecorder(),
   ) {}
+
+  private agentLoop(): AgentToolLoopService {
+    this.agentToolLoopService ??= new AgentToolLoopService();
+    return this.agentToolLoopService;
+  }
 
   async respond(request: AiChatRequest): Promise<AiChatResult> {
     const allowed = this.rateLimitService.checkAndIncrement(
@@ -75,7 +80,7 @@ export class AiChatService {
 
       const mainCategory = await this.classifyMain(request.content, trace);
       if (mainCategory === 'agent_task') {
-        return await this.agentToolLoopService.run(request, trace);
+        return await this.agentLoop().run(request, trace);
       }
       const category =
         mainCategory === 'unclear'

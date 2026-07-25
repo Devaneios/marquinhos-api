@@ -1,10 +1,11 @@
 import { Database } from 'bun:sqlite';
-import { describe, expect, it, mock } from 'bun:test';
+import { describe, expect, it, mock, spyOn } from 'bun:test';
 import type { DockerClient } from '../src/services/aiChat/sandbox/DockerClient';
 import {
   SandboxCapacityError,
   SandboxManager,
 } from '../src/services/aiChat/sandbox/SandboxManager';
+import { logger } from '../src/utils/logger';
 
 function setupDb(): Database {
   const db = new Database(':memory:');
@@ -290,5 +291,67 @@ describe('SandboxManager.sweepIdleSessions', () => {
       .query('SELECT * FROM agent_sandbox_sessions WHERE user_id = ?')
       .get('u1');
     expect(row).toBeNull();
+  });
+});
+
+describe('SandboxManager lifecycle logging', () => {
+  function captureLogs() {
+    const events: { level: string; event: string }[] = [];
+    const spies = (['info', 'warn', 'error'] as const).map((level) =>
+      spyOn(logger, level).mockImplementation((event: string) => {
+        events.push({ level, event });
+      }),
+    );
+    return { events, restore: () => spies.forEach((s) => s.mockRestore()) };
+  }
+
+  it('logs a created session with its container id', async () => {
+    const { events, restore } = captureLogs();
+    try {
+      await new SandboxManager(fakeDocker(), setupDb()).getOrCreateSession(
+        'u1',
+        'g1',
+        'c1',
+      );
+    } finally {
+      restore();
+    }
+    expect(events.map((e) => e.event)).toContain('sandbox.session_created');
+  });
+
+  it('logs a reused session instead of creating a second container', async () => {
+    const db = setupDb();
+    insertSession(db, { userId: 'u1', channelId: 'c1' });
+    const { events, restore } = captureLogs();
+    try {
+      await new SandboxManager(fakeDocker(), db).getOrCreateSession(
+        'u1',
+        'g1',
+        'c1',
+      );
+    } finally {
+      restore();
+    }
+    expect(events.map((e) => e.event)).toContain('sandbox.session_reused');
+  });
+
+  it('logs the capacity ceiling before rejecting a new session', async () => {
+    const db = setupDb();
+    for (let i = 0; i < 8; i++) {
+      insertSession(db, { userId: `u${i}`, channelId: `c${i}` });
+    }
+    const { events, restore } = captureLogs();
+    try {
+      await expect(
+        new SandboxManager(fakeDocker(), db).getOrCreateSession(
+          'new',
+          'g1',
+          'new',
+        ),
+      ).rejects.toBeInstanceOf(SandboxCapacityError);
+    } finally {
+      restore();
+    }
+    expect(events.map((e) => e.event)).toContain('sandbox.at_capacity');
   });
 });

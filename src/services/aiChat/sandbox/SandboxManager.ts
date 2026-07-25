@@ -1,5 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { db as defaultDb } from '../../../database/sqlite';
+import { logger } from '../../../utils/logger';
 import type { DockerClient } from './DockerClient';
 
 const SANDBOX_IMAGE = 'marquinhos-sandbox:latest';
@@ -50,8 +51,18 @@ export class SandboxManager {
       const running = await this.docker.isRunning(existing.container_id);
       if (running) {
         this.touchSession(userId, channelId);
+        logger.info('sandbox.session_reused', {
+          userId,
+          channelId,
+          containerId: existing.container_id,
+        });
         return existing.container_id;
       }
+      logger.warn('sandbox.session_stale', {
+        userId,
+        channelId,
+        containerId: existing.container_id,
+      });
       this.deleteSession(userId, channelId);
     }
 
@@ -76,9 +87,23 @@ export class SandboxManager {
     try {
       await this.docker.startContainer(containerId);
     } catch (error) {
+      logger.error('sandbox.start_failed', {
+        userId,
+        channelId,
+        containerId,
+        error,
+      });
       await this.docker.removeContainer(containerId).catch(() => undefined);
       throw error;
     }
+
+    logger.info('sandbox.session_created', {
+      userId,
+      guildId,
+      channelId,
+      containerId,
+      image: SANDBOX_IMAGE,
+    });
 
     const now = Date.now();
     this.db
@@ -128,6 +153,12 @@ export class SandboxManager {
         await this.docker.stopContainer(row.container_id);
         await this.docker.removeContainer(row.container_id);
         this.deleteSession(row.user_id, row.channel_id);
+        logger.info('sandbox.session_swept', {
+          userId: row.user_id,
+          channelId: row.channel_id,
+          containerId: row.container_id,
+          idleMs: Date.now() - row.last_used_at,
+        });
       }
     }
   }
@@ -166,6 +197,10 @@ export class SandboxManager {
     }
 
     if (liveCount >= MAX_CONCURRENT_SESSIONS) {
+      logger.warn('sandbox.at_capacity', {
+        liveCount,
+        maxConcurrentSessions: MAX_CONCURRENT_SESSIONS,
+      });
       throw new SandboxCapacityError();
     }
   }

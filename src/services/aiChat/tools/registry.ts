@@ -1,5 +1,6 @@
 import type OpenAI from 'openai';
 import { executeCodeTool } from './executeCode';
+import { fetchUrlTool } from './fetchUrl';
 import { grepSearchTool } from './grepSearch';
 import { listDirectoryTool } from './listDirectory';
 import { readFileTool } from './readFile';
@@ -10,6 +11,7 @@ export const AGENT_TOOLS: AgentTool[] = [
   grepSearchTool,
   readFileTool,
   executeCodeTool,
+  fetchUrlTool,
 ];
 
 export function toOpenAiTools(): OpenAI.Chat.Completions.ChatCompletionFunctionTool[] {

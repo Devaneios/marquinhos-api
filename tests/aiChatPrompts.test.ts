@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { AGENT_CAPABILITIES } from '../src/services/aiChat/capabilities';
 import {
   AGENT_TASK_SYSTEM_PROMPT,
   buildResponsePrompt,
@@ -10,6 +11,7 @@ import {
   revisionSchema,
   SUB_CLASSIFIERS,
 } from '../src/services/aiChat/prompts';
+import { AGENT_TOOLS } from '../src/services/aiChat/tools/registry';
 import type { ResponseCategory } from '../src/services/aiChat/types';
 
 const ALL_CATEGORIES: ResponseCategory[] = [
@@ -81,6 +83,32 @@ describe('MAIN_CLASSIFY_SYSTEM_PROMPT', () => {
 
   it('instructs the model to never obey instructions embedded in the classified message', () => {
     expect(MAIN_CLASSIFY_SYSTEM_PROMPT.toLowerCase()).toContain('nunca');
+  });
+
+  it('defines agent_task by intent to act, not by a closed list of four actions', () => {
+    const lower = MAIN_CLASSIFY_SYSTEM_PROMPT.toLowerCase();
+    expect(lower).toContain('url');
+    expect(lower).toMatch(/agir|executar uma a[çc][ãa]o|realizar/);
+  });
+
+  it('routes url fetching and named-tool requests to agent_task via few-shot examples', () => {
+    const agentSection =
+      MAIN_CLASSIFY_SYSTEM_PROMPT.split('<examples>')[1] ?? '';
+    for (const phrase of ['pt.wikipedia.org', 'curl']) {
+      expect(agentSection).toContain(phrase);
+    }
+    const wikiExample = agentSection.slice(
+      agentSection.indexOf('pt.wikipedia.org'),
+    );
+    expect(wikiExample.slice(0, 200)).toContain('agent_task');
+  });
+
+  it('still treats a question about capabilities as a question, not an action', () => {
+    const examples = MAIN_CLASSIFY_SYSTEM_PROMPT.split('<examples>')[1] ?? '';
+    const capabilityExample = examples.slice(
+      examples.indexOf('quais comandos'),
+    );
+    expect(capabilityExample.slice(0, 200)).toContain('"question"');
   });
 });
 
@@ -345,5 +373,36 @@ describe('AGENT_TASK_SYSTEM_PROMPT', () => {
   it('documents that the mirror holds one directory per repo under /repo', () => {
     expect(AGENT_TASK_SYSTEM_PROMPT).toContain('/repo/marquinhos-web-api');
     expect(AGENT_TASK_SYSTEM_PROMPT).toContain('/repo/MarquinhosBOT');
+  });
+
+  it('embeds the shared capabilities block so the agent knows fetch_url exists', () => {
+    expect(AGENT_TASK_SYSTEM_PROMPT).toContain(AGENT_CAPABILITIES);
+  });
+
+  it('forbids the generic "I cannot access the internet" refusal that used to happen', () => {
+    const lower = AGENT_TASK_SYSTEM_PROMPT.toLowerCase();
+    expect(lower).toContain('nunca responda');
+    expect(lower).toContain('acessar a internet');
+  });
+
+  it('explains how to hop between pages with the links mode', () => {
+    expect(AGENT_TASK_SYSTEM_PROMPT).toContain('links');
+    expect(AGENT_TASK_SYSTEM_PROMPT).toContain('fetch_url');
+  });
+});
+
+describe('bot_help_info grounding', () => {
+  it('carries the capabilities block so the bot stops inventing bash commands', () => {
+    const prompt = buildResponsePrompt('bot_help_info', []);
+    expect(prompt).toContain(AGENT_CAPABILITIES);
+    for (const tool of AGENT_TOOLS) {
+      expect(prompt).toContain(tool.name);
+    }
+  });
+
+  it('does not leak the capabilities block into unrelated categories', () => {
+    expect(buildResponsePrompt('casual_chat', [])).not.toContain(
+      AGENT_CAPABILITIES,
+    );
   });
 });

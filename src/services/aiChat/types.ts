@@ -33,4 +33,5 @@ export interface AiChatResult {
   reply?: string;
   format?: ResponseFormat;
   embedTitle?: string;
+  traceId?: string;
 }

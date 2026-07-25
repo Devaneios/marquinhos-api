@@ -3,6 +3,7 @@ import { Database } from 'bun:sqlite';
 const SQLITE_PATH = process.env.SQLITE_PATH ?? './marquinhos.db';
 const TTL_SECONDS = 600;
 const CLEANUP_INTERVAL_MS = 60_000;
+const AI_TRACE_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 
 export const db = new Database(SQLITE_PATH, { create: true });
 
@@ -284,9 +285,82 @@ db.run(`
   )
 `);
 
+db.run(`
+  CREATE TABLE IF NOT EXISTS ai_traces (
+    trace_id          TEXT    NOT NULL PRIMARY KEY,
+    user_id           TEXT    NOT NULL,
+    guild_id          TEXT    NOT NULL,
+    channel_id        TEXT    NOT NULL,
+    content           TEXT    NOT NULL,
+    main_category     TEXT,
+    category          TEXT,
+    status            TEXT,
+    reply             TEXT,
+    format            TEXT,
+    error             TEXT,
+    iterations        INTEGER NOT NULL DEFAULT 0,
+    tool_calls_used   INTEGER NOT NULL DEFAULT 0,
+    prompt_tokens     INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    duration_ms       INTEGER,
+    created_at        INTEGER NOT NULL
+  )
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS ai_trace_events (
+    id          INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    trace_id    TEXT    NOT NULL,
+    seq         INTEGER NOT NULL,
+    type        TEXT    NOT NULL,
+    phase       TEXT,
+    name        TEXT,
+    input       TEXT,
+    output      TEXT,
+    status      TEXT,
+    exit_code   INTEGER,
+    duration_ms INTEGER,
+    created_at  INTEGER NOT NULL
+  )
+`);
+
+db.run(`
+  CREATE INDEX IF NOT EXISTS idx_ai_trace_events_trace
+  ON ai_trace_events (trace_id, seq)
+`);
+
+db.run(`
+  CREATE INDEX IF NOT EXISTS idx_ai_traces_created_at
+  ON ai_traces (created_at)
+`);
+
 const cleanupStmt = db.prepare(
   `DELETE FROM scrobbles_queue WHERE created_at < (unixepoch() - ${TTL_SECONDS})`,
 );
+
+const traceRetentionDays = Number(process.env.AI_TRACE_RETENTION_DAYS ?? 14);
+const traceEventsCleanupStmt = db.prepare(
+  `DELETE FROM ai_trace_events WHERE trace_id IN (
+     SELECT trace_id FROM ai_traces WHERE created_at < $cutoff
+   )`,
+);
+const traceCleanupStmt = db.prepare(
+  'DELETE FROM ai_traces WHERE created_at < $cutoff',
+);
+
+function cleanupAiTraces() {
+  const cutoff = Date.now() - traceRetentionDays * 24 * 60 * 60 * 1000;
+  traceEventsCleanupStmt.run({ $cutoff: cutoff });
+  traceCleanupStmt.run({ $cutoff: cutoff });
+}
+
+setInterval(() => {
+  try {
+    cleanupAiTraces();
+  } catch (err) {
+    console.error('AI trace retention cleanup error:', err);
+  }
+}, AI_TRACE_CLEANUP_INTERVAL_MS);
 
 setInterval(() => {
   try {

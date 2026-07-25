@@ -15,11 +15,13 @@ import * as scrobble from './routes/scrobble.route';
 import * as user from './routes/user.route';
 import wordleRouter from './routes/wordle.route';
 import { AgentRateLimitService } from './services/aiChat/AgentRateLimitService';
+import { describeStaticPrompts } from './services/aiChat/promptRegistry';
 import { RateLimitService } from './services/aiChat/RateLimitService';
 import { DockerodeSandboxClient } from './services/aiChat/sandbox/DockerodeSandboxClient';
 import { SandboxManager } from './services/aiChat/sandbox/SandboxManager';
 import { GamificationService } from './services/gamification';
 import { getValidationSet } from './services/wordle';
+import { logger } from './utils/logger';
 
 dotenv.config();
 
@@ -136,9 +138,13 @@ const SANDBOX_SWEEP_INTERVAL_MS = 5 * 60_000;
 const sandboxManager = new SandboxManager(new DockerodeSandboxClient());
 setInterval(() => {
   sandboxManager.sweepIdleSessions().catch((err) => {
-    console.error('Sandbox session sweep error:', err);
+    logger.error('sandbox.sweep_failed', { error: err });
   });
 }, SANDBOX_SWEEP_INTERVAL_MS);
+
+// Traces reference static prompts by id + hash instead of repeating their full
+// text on every request; this is the one place that maps those ids back.
+logger.info('ai.prompts.loaded', { prompts: describeStaticPrompts() });
 
 try {
   // Pre-warm the validation word set to avoid latency on first guess

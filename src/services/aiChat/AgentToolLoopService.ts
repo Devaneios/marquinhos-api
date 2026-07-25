@@ -1,5 +1,7 @@
 import type OpenAI from 'openai';
+import { logger } from '../../utils/logger';
 import { AgentRateLimitService } from './AgentRateLimitService';
+import { NOOP_TRACE, type TraceContext } from './AiTraceRecorder';
 import { GuardrailService } from './GuardrailService';
 import { OpenAiClient, type OpenAiToolMessage } from './OpenAiClient';
 import { AGENT_TASK_SYSTEM_PROMPT } from './prompts';
@@ -8,11 +10,17 @@ import { SandboxCapacityError, SandboxManager } from './sandbox/SandboxManager';
 import { findTool, toOpenAiTools } from './tools/registry';
 import type { AiChatRequest, AiChatResult } from './types';
 
-const MAX_ITERATIONS = 6;
-const MAX_TOOL_CALLS_TOTAL = 10;
+export const MAX_ITERATIONS = 15;
+export const MAX_TOOL_CALLS_TOTAL = 30;
+// The bot's HTTP client gives respondToTag 120s. Stopping the loop well before
+// that lets us send back what we found instead of the caller timing out.
+export const AGENT_DEADLINE_MS = 90_000;
 const TOOL_RESULT_MAX_CHARS = 4000;
 const EMBED_THRESHOLD_CHARS = 1800;
 const EMBED_TITLE = '🛠️ Resultado';
+const WRAP_UP_INSTRUCTION = `Seu orçamento de ferramentas acabou, então não chame mais nenhuma ferramenta. Responda agora ao pedido original resumindo o que você já descobriu até aqui, incluindo o caminho ou os passos que você percorreu. Se não terminou a tarefa, diga onde parou e o que faltou.`;
+const WRAP_UP_FALLBACK =
+  'Não consegui terminar essa tarefa a tempo. Tenta pedir algo mais simples ou dividir em partes menores.';
 
 export class AgentToolLoopService {
   constructor(
@@ -22,26 +30,48 @@ export class AgentToolLoopService {
       new DockerodeSandboxClient(),
     ),
     private openAiClient: OpenAiClient = new OpenAiClient(),
+    private now: () => number = Date.now,
   ) {}
 
-  async run(request: AiChatRequest): Promise<AiChatResult> {
+  async run(
+    request: AiChatRequest,
+    trace: TraceContext = NOOP_TRACE,
+  ): Promise<AiChatResult> {
     const allowed = this.agentRateLimitService.checkAndIncrement(
       request.userId,
       request.guildId,
     );
-    if (!allowed) return { status: 'rate_limited' };
+    if (!allowed) {
+      trace.finish({ status: 'rate_limited', mainCategory: 'agent_task' });
+      return { status: 'rate_limited' };
+    }
 
     let containerId: string;
+    const sessionStartedAt = Date.now();
     try {
       containerId = await this.sandboxManager.getOrCreateSession(
         request.userId,
         request.guildId,
         request.channelId,
       );
+      trace.sandbox({
+        action: 'session_acquired',
+        containerId,
+        durationMs: Date.now() - sessionStartedAt,
+      });
     } catch (error) {
+      trace.sandbox({
+        action:
+          error instanceof SandboxCapacityError
+            ? 'session_at_capacity'
+            : 'session_failed',
+        durationMs: Date.now() - sessionStartedAt,
+        error,
+      });
       if (error instanceof SandboxCapacityError) {
         return this.finalReply(
           'Muita gente usando o sandbox agora. Tenta de novo em alguns minutos.',
+          trace,
         );
       }
       throw error;
@@ -63,16 +93,31 @@ export class AgentToolLoopService {
     ];
 
     const tools = toOpenAiTools();
+    const deadlineAt = this.now() + AGENT_DEADLINE_MS;
     let toolCallsUsed = 0;
 
     for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+      if (this.now() >= deadlineAt) {
+        return await this.wrapUp(messages, tools, trace, {
+          reason: 'deadline',
+          iterations: iteration,
+          toolCallsUsed,
+        });
+      }
+
       const message = await this.openAiClient.chatWithTools(messages, tools, {
         temperature: 0.3,
         maxTokens: 1000,
+        trace,
+        phase: `agent_loop[${iteration}]`,
       });
 
       if (!message.tool_calls || message.tool_calls.length === 0) {
-        return this.finalReply(message.content ?? '');
+        return this.finalReply(message.content ?? '', trace, {
+          reason: 'final_answer',
+          iterations: iteration + 1,
+          toolCallsUsed,
+        });
       }
 
       messages.push({
@@ -83,6 +128,11 @@ export class AgentToolLoopService {
 
       for (const toolCall of message.tool_calls) {
         if (toolCallsUsed >= MAX_TOOL_CALLS_TOTAL) {
+          logger.warn('ai.tool.budget_exhausted', {
+            traceId: trace.traceId,
+            iteration,
+            toolCallsUsed,
+          });
           messages.push({
             role: 'tool',
             tool_call_id: toolCall.id,
@@ -95,7 +145,12 @@ export class AgentToolLoopService {
         }
         toolCallsUsed++;
 
-        const resultContent = await this.executeToolCall(toolCall, containerId);
+        const resultContent = await this.executeToolCall(
+          toolCall,
+          containerId,
+          trace,
+          iteration,
+        );
         messages.push({
           role: 'tool',
           tool_call_id: toolCall.id,
@@ -104,54 +159,169 @@ export class AgentToolLoopService {
       }
     }
 
-    return this.finalReply(
-      'Não consegui terminar essa tarefa a tempo. Tenta pedir algo mais simples ou dividir em partes menores.',
-    );
+    return await this.wrapUp(messages, tools, trace, {
+      reason: 'max_iterations',
+      iterations: MAX_ITERATIONS,
+      toolCallsUsed,
+    });
+  }
+
+  /**
+   * Budget ran out mid-task. Instead of a bare apology, spend one last
+   * tool-free call asking the model to report what it already found — for a
+   * multi-step task that partial trail is usually what the user asked for.
+   */
+  private async wrapUp(
+    messages: OpenAiToolMessage[],
+    tools: OpenAI.Chat.Completions.ChatCompletionFunctionTool[],
+    trace: TraceContext,
+    outcome: { reason: string; iterations: number; toolCallsUsed: number },
+  ): Promise<AiChatResult> {
+    try {
+      const message = await this.openAiClient.chatWithTools(
+        [...messages, { role: 'user', content: WRAP_UP_INSTRUCTION }],
+        tools,
+        {
+          temperature: 0.3,
+          maxTokens: 800,
+          toolChoice: 'none',
+          trace,
+          phase: `agent_wrap_up[${outcome.reason}]`,
+        },
+      );
+      const reply = message.content?.trim();
+      if (reply) return this.finalReply(reply, trace, outcome);
+    } catch (error) {
+      logger.warn('ai.agent.wrap_up_failed', {
+        traceId: trace.traceId,
+        reason: outcome.reason,
+        error: (error as Error).message,
+      });
+    }
+
+    return this.finalReply(WRAP_UP_FALLBACK, trace, outcome);
   }
 
   private async executeToolCall(
     toolCall: OpenAI.Chat.Completions.ChatCompletionMessageToolCall,
     containerId: string,
+    trace: TraceContext,
+    iteration: number,
   ): Promise<string> {
     if (toolCall.type !== 'function') {
-      return JSON.stringify({
-        status: 'error',
-        message: `Tipo de ferramenta "${toolCall.type}" não suportado.`,
-      });
+      return this.toolError(
+        trace,
+        iteration,
+        toolCall.type,
+        '',
+        `Tipo de ferramenta "${toolCall.type}" não suportado.`,
+      );
     }
 
     const tool = findTool(toolCall.function.name);
     if (!tool) {
-      return JSON.stringify({
-        status: 'error',
-        message: `Ferramenta "${toolCall.function.name}" não encontrada.`,
-      });
+      return this.toolError(
+        trace,
+        iteration,
+        toolCall.function.name,
+        toolCall.function.arguments,
+        `Ferramenta "${toolCall.function.name}" não encontrada.`,
+      );
     }
 
     let args: Record<string, unknown>;
     try {
       args = JSON.parse(toolCall.function.arguments);
     } catch {
-      return JSON.stringify({
-        status: 'error',
-        message:
-          'Argumentos inválidos (JSON malformado). Corrija e tente novamente.',
-      });
+      return this.toolError(
+        trace,
+        iteration,
+        tool.name,
+        toolCall.function.arguments,
+        'Argumentos inválidos (JSON malformado). Corrija e tente novamente.',
+      );
     }
 
+    const startedAt = Date.now();
     try {
       const result = await tool.execute(args, {
         containerId,
-        exec: (id, argv) => this.sandboxManager.exec(id, argv),
+        exec: (id, argv) => this.tracedExec(trace, id, argv),
       });
       const truncated = result.slice(0, TOOL_RESULT_MAX_CHARS);
+      trace.tool({
+        name: tool.name,
+        iteration,
+        rawArguments: toolCall.function.arguments,
+        args,
+        result,
+        status: 'success',
+        durationMs: Date.now() - startedAt,
+      });
       return JSON.stringify({ status: 'success', result: truncated });
     } catch (error) {
       const message = `Erro ao executar ${tool.name}: ${(error as Error).message}`;
+      trace.tool({
+        name: tool.name,
+        iteration,
+        rawArguments: toolCall.function.arguments,
+        args,
+        status: 'error',
+        error: message,
+        durationMs: Date.now() - startedAt,
+      });
       return JSON.stringify({
         status: 'error',
         message: message.slice(0, TOOL_RESULT_MAX_CHARS),
       });
+    }
+  }
+
+  private toolError(
+    trace: TraceContext,
+    iteration: number,
+    name: string,
+    rawArguments: string,
+    message: string,
+  ): string {
+    trace.tool({
+      name,
+      iteration,
+      rawArguments,
+      status: 'error',
+      error: message,
+      durationMs: 0,
+    });
+    return JSON.stringify({ status: 'error', message });
+  }
+
+  private async tracedExec(
+    trace: TraceContext,
+    containerId: string,
+    argv: string[],
+  ) {
+    const startedAt = Date.now();
+    try {
+      const result = await this.sandboxManager.exec(containerId, argv);
+      trace.exec({
+        containerId,
+        argv,
+        stdout: result.stdout,
+        stderr: result.stderr,
+        exitCode: result.exitCode,
+        durationMs: Date.now() - startedAt,
+      });
+      return result;
+    } catch (error) {
+      trace.exec({
+        containerId,
+        argv,
+        stdout: '',
+        stderr: (error as Error).message,
+        exitCode: -1,
+        durationMs: Date.now() - startedAt,
+      });
+      throw error;
     }
   }
 
@@ -178,14 +348,39 @@ export class AgentToolLoopService {
     return sections;
   }
 
-  private finalReply(reply: string): AiChatResult {
+  private finalReply(
+    reply: string,
+    trace: TraceContext = NOOP_TRACE,
+    outcome: {
+      reason: string;
+      iterations?: number;
+      toolCallsUsed?: number;
+    } = { reason: 'sandbox_unavailable' },
+  ): AiChatResult {
     const isLong = reply.length > EMBED_THRESHOLD_CHARS;
+    const format = isLong ? 'embed' : 'text';
+    logger.info('ai.agent.loop_end', {
+      traceId: trace.traceId,
+      reason: outcome.reason,
+      iterations: outcome.iterations,
+      toolCallsUsed: outcome.toolCallsUsed,
+    });
+    trace.finish({
+      status: 'ok',
+      mainCategory: 'agent_task',
+      category: 'agent_task',
+      reply,
+      format,
+      iterations: outcome.iterations,
+      toolCallsUsed: outcome.toolCallsUsed,
+    });
     return {
       status: 'ok',
       category: 'agent_task',
       reply,
-      format: isLong ? 'embed' : 'text',
+      format,
       embedTitle: isLong ? EMBED_TITLE : undefined,
+      traceId: trace.traceId || undefined,
     };
   }
 }

@@ -1,4 +1,6 @@
+import { logger } from '../../utils/logger';
 import { AgentToolLoopService } from './AgentToolLoopService';
+import { AiTraceRecorder, type TraceContext } from './AiTraceRecorder';
 import { GuardrailService } from './GuardrailService';
 import { OpenAiClient } from './OpenAiClient';
 import {
@@ -26,6 +28,7 @@ export class AiChatService {
     private guardrailService: GuardrailService = new GuardrailService(),
     private openAiClient: OpenAiClient = new OpenAiClient(),
     private agentToolLoopService: AgentToolLoopService = new AgentToolLoopService(),
+    private traceRecorder: AiTraceRecorder = new AiTraceRecorder(),
   ) {}
 
   async respond(request: AiChatRequest): Promise<AiChatResult> {
@@ -33,7 +36,15 @@ export class AiChatService {
       request.userId,
       request.guildId,
     );
-    if (!allowed) return { status: 'rate_limited' };
+    if (!allowed) {
+      logger.info('ai.request.rate_limited', {
+        userId: request.userId,
+        guildId: request.guildId,
+      });
+      return { status: 'rate_limited' };
+    }
+
+    const trace = this.traceRecorder.start(request);
 
     try {
       if (this.guardrailService.isInjectionAttempt(request.content)) {
@@ -44,33 +55,57 @@ export class AiChatService {
           ],
           temperature: 0.9,
           maxTokens: 120,
+          trace,
+          phase: 'guardrail_roast',
+        });
+        trace.finish({
+          status: 'ok',
+          category: 'guardrail_roast',
+          reply,
+          format: 'text',
         });
         return {
           status: 'ok',
           category: 'guardrail_roast',
           reply,
           format: 'text',
+          traceId: trace.traceId || undefined,
         };
       }
 
-      const mainCategory = await this.classifyMain(request.content);
+      const mainCategory = await this.classifyMain(request.content, trace);
       if (mainCategory === 'agent_task') {
-        return await this.agentToolLoopService.run(request);
+        return await this.agentToolLoopService.run(request, trace);
       }
       const category =
         mainCategory === 'unclear'
           ? 'off_topic_unclear'
-          : await this.classifySub(mainCategory, request.content);
-      const draft = await this.generateReply(category, request);
-      const revised = await this.revise(category, request.content, draft);
-      return { status: 'ok', category, ...revised };
+          : await this.classifySub(mainCategory, request.content, trace);
+      const draft = await this.generateReply(category, request, trace);
+      const revised = await this.revise(
+        category,
+        request.content,
+        draft,
+        trace,
+      );
+      trace.finish({ status: 'ok', mainCategory, category, ...revised });
+      return {
+        status: 'ok',
+        category,
+        ...revised,
+        traceId: trace.traceId || undefined,
+      };
     } catch (error) {
-      console.error('AiChatService error:', error);
-      return { status: 'error' };
+      logger.error('ai.request.failed', { traceId: trace.traceId, error });
+      trace.finish({ status: 'error', error });
+      return { status: 'error', traceId: trace.traceId || undefined };
     }
   }
 
-  private async classifyMain(content: string): Promise<MainCategory> {
+  private async classifyMain(
+    content: string,
+    trace: TraceContext,
+  ): Promise<MainCategory> {
     const result = await this.openAiClient.structured(
       [
         { role: 'system', content: MAIN_CLASSIFY_SYSTEM_PROMPT },
@@ -78,7 +113,7 @@ export class AiChatService {
       ],
       mainClassificationSchema,
       'main_classification',
-      { temperature: 0.1, maxTokens: 20 },
+      { temperature: 0.1, maxTokens: 20, trace, phase: 'classify_main' },
     );
 
     const parsed = mainClassificationSchema.safeParse(result);
@@ -88,6 +123,7 @@ export class AiChatService {
   private async classifySub(
     mainCategory: Exclude<MainCategory, 'unclear' | 'agent_task'>,
     content: string,
+    trace: TraceContext,
   ): Promise<ResponseCategory> {
     const { schema, prompt, fallback } = SUB_CLASSIFIERS[mainCategory];
     const result = await this.openAiClient.structured(
@@ -97,7 +133,7 @@ export class AiChatService {
       ],
       schema,
       'sub_classification',
-      { temperature: 0.1, maxTokens: 20 },
+      { temperature: 0.1, maxTokens: 20, trace, phase: 'classify_sub' },
     );
 
     const parsed = schema.safeParse(result);
@@ -107,6 +143,7 @@ export class AiChatService {
   private async generateReply(
     category: ResponseCategory,
     request: AiChatRequest,
+    trace: TraceContext,
   ): Promise<string> {
     const safeRecentMessages = this.guardrailService.filterSafeMessages(
       request.recentMessages,
@@ -130,6 +167,8 @@ export class AiChatService {
       ],
       temperature: 0.6,
       maxTokens: 1200,
+      trace,
+      phase: 'generate',
     });
   }
 
@@ -137,6 +176,7 @@ export class AiChatService {
     category: ResponseCategory,
     userContent: string,
     draft: string,
+    trace: TraceContext,
   ): Promise<Pick<AiChatResult, 'reply' | 'format' | 'embedTitle'>> {
     try {
       const result = await this.openAiClient.structured(
@@ -146,7 +186,7 @@ export class AiChatService {
         ],
         revisionSchema,
         'revision',
-        { temperature: 0.3, maxTokens: 1400 },
+        { temperature: 0.3, maxTokens: 1400, trace, phase: 'revise' },
       );
 
       const parsed = revisionSchema.safeParse(result);
@@ -158,7 +198,7 @@ export class AiChatService {
         embedTitle: parsed.data.embedTitle ?? undefined,
       };
     } catch (error) {
-      console.error('AiChatService revision error:', error);
+      logger.error('ai.revision.failed', { traceId: trace.traceId, error });
       return { reply: draft, ...FALLBACK_FORMAT[category] };
     }
   }

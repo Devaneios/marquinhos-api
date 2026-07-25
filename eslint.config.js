@@ -58,6 +58,11 @@ export default [
         RequestInit: 'readonly',
         AbortController: 'readonly',
         AbortSignal: 'readonly',
+        Headers: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly',
+        TextDecoder: 'readonly',
+        TextEncoder: 'readonly',
       },
     },
     plugins: {

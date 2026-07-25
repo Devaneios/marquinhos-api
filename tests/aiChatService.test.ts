@@ -1,6 +1,7 @@
-import { describe, expect, it, mock } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
 import { AgentToolLoopService } from '../src/services/aiChat/AgentToolLoopService';
 import { AiChatService } from '../src/services/aiChat/AiChatService';
+import type { AiTraceRecorder } from '../src/services/aiChat/AiTraceRecorder';
 import { GuardrailService } from '../src/services/aiChat/GuardrailService';
 import type { OpenAiClient } from '../src/services/aiChat/OpenAiClient';
 import {
@@ -48,6 +49,19 @@ function fakeAgentToolLoopService(result: AiChatResult): AgentToolLoopService {
   return { run: mock(async () => result) } as unknown as AgentToolLoopService;
 }
 
+function recordingTrace() {
+  const trace = {
+    traceId: 'trace-1',
+    llm: mock(() => undefined),
+    tool: mock(() => undefined),
+    exec: mock(() => undefined),
+    sandbox: mock(() => undefined),
+    finish: mock(() => undefined),
+  };
+  const recorder = { start: mock(() => trace) } as unknown as AiTraceRecorder;
+  return { trace, recorder };
+}
+
 const REVISION_OK = {
   reply: 'resposta revisada',
   format: 'text',
@@ -63,6 +77,15 @@ const baseRequest = {
 };
 
 describe('AiChatService.respond', () => {
+  // Tracing is exercised in its own block below with an injected recorder;
+  // here it stays off so the default recorder never touches the real database.
+  beforeAll(() => {
+    process.env.AI_TRACE_ENABLED = 'false';
+  });
+  afterAll(() => {
+    delete process.env.AI_TRACE_ENABLED;
+  });
+
   it('returns rate_limited without calling OpenAI when the limit is exceeded', async () => {
     const service = new AiChatService(
       fakeRateLimitService(false),
@@ -493,5 +516,101 @@ describe('AiChatService.respond', () => {
     });
 
     expect(result).toEqual({ status: 'error' });
+  });
+});
+
+describe('AiChatService tracing', () => {
+  it('passes the trace and a phase to every LLM call and finishes it on success', async () => {
+    const { trace, recorder } = recordingTrace();
+    const client = fakeOpenAiClient({
+      structuredResults: [
+        { category: 'question' },
+        { category: 'general_question' },
+        REVISION_OK,
+      ],
+      chatResponses: ['rascunho'],
+    });
+    const service = new AiChatService(
+      fakeRateLimitService(true),
+      fakeGuardrailService(false),
+      client,
+      fakeAgentToolLoopService({ status: 'ok' }),
+      recorder,
+    );
+
+    const result = await service.respond(baseRequest);
+
+    expect(result.traceId).toBe('trace-1');
+    const phases = (
+      client.structured as unknown as ReturnType<typeof mock>
+    ).mock.calls.map((call) => (call[3] as { phase: string }).phase);
+    expect(phases).toEqual(['classify_main', 'classify_sub', 'revise']);
+    const chatOptions = (client.chat as unknown as ReturnType<typeof mock>).mock
+      .calls[0]![0] as { phase: string; trace: unknown };
+    expect(chatOptions.phase).toBe('generate');
+    expect(chatOptions.trace).toBe(trace);
+    expect(trace.finish).toHaveBeenCalledTimes(1);
+    expect(
+      (trace.finish as unknown as ReturnType<typeof mock>).mock.calls[0]![0],
+    ).toMatchObject({
+      status: 'ok',
+      mainCategory: 'question',
+      category: 'general_question',
+    });
+  });
+
+  it('finishes the trace with the error when the pipeline throws', async () => {
+    const { trace, recorder } = recordingTrace();
+    const service = new AiChatService(
+      fakeRateLimitService(true),
+      fakeGuardrailService(false),
+      fakeOpenAiClient({ structuredResults: [new Error('openai down')] }),
+      fakeAgentToolLoopService({ status: 'ok' }),
+      recorder,
+    );
+
+    const result = await service.respond(baseRequest);
+
+    expect(result).toEqual({ status: 'error', traceId: 'trace-1' });
+    expect(
+      (trace.finish as unknown as ReturnType<typeof mock>).mock.calls[0]![0],
+    ).toMatchObject({ status: 'error' });
+  });
+
+  it('hands the same trace to the agent loop so the sandbox steps land in it', async () => {
+    const { trace, recorder } = recordingTrace();
+    const agentLoop = fakeAgentToolLoopService({
+      status: 'ok',
+      category: 'agent_task',
+      reply: 'pronto',
+    });
+    const service = new AiChatService(
+      fakeRateLimitService(true),
+      fakeGuardrailService(false),
+      fakeOpenAiClient({ structuredResults: [{ category: 'agent_task' }] }),
+      agentLoop,
+      recorder,
+    );
+
+    await service.respond(baseRequest);
+
+    expect(
+      (agentLoop.run as unknown as ReturnType<typeof mock>).mock.calls[0]![1],
+    ).toBe(trace);
+  });
+
+  it('never starts a trace when the request is rate limited', async () => {
+    const { recorder } = recordingTrace();
+    const service = new AiChatService(
+      fakeRateLimitService(false),
+      fakeGuardrailService(false),
+      fakeOpenAiClient({}),
+      fakeAgentToolLoopService({ status: 'ok' }),
+      recorder,
+    );
+
+    await service.respond(baseRequest);
+
+    expect(recorder.start).not.toHaveBeenCalled();
   });
 });

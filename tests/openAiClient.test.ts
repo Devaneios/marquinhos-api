@@ -1,7 +1,9 @@
 import { describe, expect, it, mock } from 'bun:test';
 import type OpenAI from 'openai';
 import { z } from 'zod';
+import type { TraceLlmEvent } from '../src/services/aiChat/AiTraceRecorder';
 import { OpenAiClient } from '../src/services/aiChat/OpenAiClient';
+import { MAIN_CLASSIFY_SYSTEM_PROMPT } from '../src/services/aiChat/prompts';
 
 function fakeSdkClient(overrides: {
   create?: (...args: unknown[]) => unknown;
@@ -35,7 +37,7 @@ describe('OpenAiClient.chat', () => {
     expect(result).toBe('oi tudo bem');
   });
 
-  it('calls the SDK with model gpt-4o-mini and the given messages/params', async () => {
+  it('calls the SDK with model gpt-5.4-mini and the given messages/params', async () => {
     const sdk = fakeSdkClient({
       create: async () => ({ choices: [{ message: { content: 'ok' } }] }),
     });
@@ -49,10 +51,10 @@ describe('OpenAiClient.chat', () => {
 
     expect(sdk.chat.completions.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5.4-mini',
         messages: [{ role: 'user', content: 'oi' }],
         temperature: 0.5,
-        max_tokens: 50,
+        max_completion_tokens: 50,
       }),
     );
   });
@@ -111,7 +113,7 @@ describe('OpenAiClient.structured', () => {
 
     expect(sdk.chat.completions.parse).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5.4-mini',
         response_format: expect.objectContaining({
           type: 'json_schema',
           json_schema: expect.objectContaining({
@@ -162,12 +164,36 @@ describe('OpenAiClient.chatWithTools', () => {
 
     expect(sdk.chat.completions.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5.4-mini',
         tools,
         tool_choice: 'auto',
         temperature: 0.5,
-        max_tokens: 50,
+        max_completion_tokens: 50,
       }),
+    );
+  });
+
+  it('forwards tool_choice none so a wrap-up call cannot start another tool call', async () => {
+    const sdk = fakeSdkClient({
+      create: async () => ({
+        choices: [{ message: { role: 'assistant', content: 'resumo' } }],
+      }),
+    });
+    const client = new OpenAiClient(sdk);
+
+    await client.chatWithTools(
+      [{ role: 'user', content: 'resume' }],
+      [
+        {
+          type: 'function' as const,
+          function: { name: 'foo', description: 'desc', parameters: {} },
+        },
+      ],
+      { temperature: 0.3, maxTokens: 50, toolChoice: 'none' },
+    );
+
+    expect(sdk.chat.completions.create).toHaveBeenCalledWith(
+      expect.objectContaining({ tool_choice: 'none' }),
     );
   });
 
@@ -233,5 +259,100 @@ describe('OpenAiClient.chatWithTools', () => {
         maxTokens: 50,
       }),
     ).rejects.toThrow();
+  });
+});
+
+describe('OpenAiClient tracing', () => {
+  function recordingTrace() {
+    return {
+      traceId: 'trace-1',
+      llm: mock(() => undefined),
+      tool: mock(() => undefined),
+      exec: mock(() => undefined),
+      sandbox: mock(() => undefined),
+      finish: mock(() => undefined),
+    };
+  }
+
+  function llmEvents(trace: { llm: unknown }): TraceLlmEvent[] {
+    return (trace.llm as unknown as ReturnType<typeof mock>).mock.calls.map(
+      (call) => call[0] as TraceLlmEvent,
+    );
+  }
+
+  it('records phase, latency and the token usage the SDK reports', async () => {
+    const sdk = fakeSdkClient({
+      create: async () => ({
+        choices: [{ message: { content: 'ok' } }],
+        usage: { prompt_tokens: 42, completion_tokens: 7 },
+      }),
+    });
+    const trace = recordingTrace();
+
+    await new OpenAiClient(sdk).chat({
+      messages: [{ role: 'user', content: 'oi' }],
+      temperature: 0.5,
+      maxTokens: 50,
+      trace,
+      phase: 'generate',
+    });
+
+    const [event] = llmEvents(trace);
+    expect(event!.phase).toBe('generate');
+    expect(event!.output).toBe('ok');
+    expect(event!.usage).toEqual({ promptTokens: 42, completionTokens: 7 });
+    expect(event!.durationMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('replaces static system prompts with a reference but keeps dynamic content verbatim', async () => {
+    const sdk = fakeSdkClient({
+      create: async () => ({ choices: [{ message: { content: 'ok' } }] }),
+    });
+    const trace = recordingTrace();
+
+    await new OpenAiClient(sdk).chat({
+      messages: [
+        { role: 'system', content: MAIN_CLASSIFY_SYSTEM_PROMPT },
+        { role: 'user', content: 'quantos anos tem o pedro?' },
+      ],
+      temperature: 0.1,
+      maxTokens: 20,
+      trace,
+      phase: 'classify_main',
+    });
+
+    const [event] = llmEvents(trace);
+    const messages = event!.messages as {
+      content?: string;
+      promptRef?: { promptId: string; sha1: string };
+    }[];
+    expect(messages[0]!.content).toBeUndefined();
+    expect(messages[0]!.promptRef?.promptId).toBe(
+      'MAIN_CLASSIFY_SYSTEM_PROMPT',
+    );
+    expect(messages[0]!.promptRef?.sha1).toHaveLength(12);
+    expect(messages[1]!.content).toBe('quantos anos tem o pedro?');
+  });
+
+  it('records the failure and rethrows when the SDK call blows up', async () => {
+    const sdk = fakeSdkClient({
+      create: async () => {
+        throw new Error('openai down');
+      },
+    });
+    const trace = recordingTrace();
+
+    await expect(
+      new OpenAiClient(sdk).chat({
+        messages: [{ role: 'user', content: 'oi' }],
+        temperature: 0.5,
+        maxTokens: 50,
+        trace,
+        phase: 'generate',
+      }),
+    ).rejects.toThrow('openai down');
+
+    const [event] = llmEvents(trace);
+    expect((event!.error as Error).message).toBe('openai down');
   });
 });

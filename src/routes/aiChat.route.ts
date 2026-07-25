@@ -14,4 +14,16 @@ router.post(
   aiChat.respond.bind(aiChat) as unknown as express.RequestHandler,
 );
 
+router.get(
+  '/traces',
+  checkToken,
+  aiChat.listTraces.bind(aiChat) as unknown as express.RequestHandler,
+);
+
+router.get(
+  '/traces/:traceId',
+  checkToken,
+  aiChat.getTrace.bind(aiChat) as unknown as express.RequestHandler,
+);
+
 export default router;

@@ -21,6 +21,13 @@ export interface OpenAiStructuredOptions {
   maxTokens: number;
 }
 
+export interface OpenAiToolMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: string | null;
+  tool_calls?: OpenAI.Chat.Completions.ChatCompletionMessageToolCall[];
+  tool_call_id?: string;
+}
+
 export class OpenAiClient {
   constructor(
     private client: OpenAI = new OpenAI({
@@ -63,5 +70,27 @@ export class OpenAiClient {
       throw new Error('OpenAI returned no parsed structured output');
     }
     return parsed;
+  }
+
+  async chatWithTools(
+    messages: OpenAiToolMessage[],
+    tools: OpenAI.Chat.Completions.ChatCompletionTool[],
+    options: { temperature: number; maxTokens: number },
+  ): Promise<OpenAI.Chat.Completions.ChatCompletionMessage> {
+    const completion = await this.client.chat.completions.create({
+      model: OPENAI_MODEL,
+      messages:
+        messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+      tools,
+      tool_choice: 'auto',
+      temperature: options.temperature,
+      max_tokens: options.maxTokens,
+    });
+
+    const message = completion.choices[0]?.message;
+    if (!message) {
+      throw new Error('OpenAI returned no completion message');
+    }
+    return message;
   }
 }

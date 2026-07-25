@@ -1,6 +1,9 @@
 services:
   marquinhos-web-api:
-    build: .
+    build:
+      context: .
+      args:
+        DOCKER_GID: ${DOCKER_GID:-999}
     image: marquinhos-web-api:latest
     container_name: marquinhos-web-api
     env_file:
@@ -14,6 +17,10 @@ services:
       - /etc/ssl/dvns-certificate.crt:/app/dvns-certificate.crt:ro
       - /etc/ssl/dvns-private.key:/app/dvns-private.key:ro
       - marquinhos-sqlite-data:/app/data
+      # Lets SandboxManager create/manage sibling "marquinhos-sandbox"
+      # containers via dockerode. Accepted risk, chosen deliberately — see
+      # docs/superpowers/plans/2026-07-24-agentic-tool-calling.md.
+      - /var/run/docker.sock:/var/run/docker.sock
     restart: on-failure:5
     healthcheck:
       test: ['CMD', 'pgrep', '-f', 'bun']

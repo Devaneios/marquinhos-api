@@ -1,3 +1,4 @@
+import { AgentToolLoopService } from './AgentToolLoopService';
 import { GuardrailService } from './GuardrailService';
 import { OpenAiClient } from './OpenAiClient';
 import {
@@ -24,6 +25,7 @@ export class AiChatService {
     private rateLimitService: RateLimitService = new RateLimitService(),
     private guardrailService: GuardrailService = new GuardrailService(),
     private openAiClient: OpenAiClient = new OpenAiClient(),
+    private agentToolLoopService: AgentToolLoopService = new AgentToolLoopService(),
   ) {}
 
   async respond(request: AiChatRequest): Promise<AiChatResult> {
@@ -52,6 +54,9 @@ export class AiChatService {
       }
 
       const mainCategory = await this.classifyMain(request.content);
+      if (mainCategory === 'agent_task') {
+        return await this.agentToolLoopService.run(request);
+      }
       const category =
         mainCategory === 'unclear'
           ? 'off_topic_unclear'
@@ -81,7 +86,7 @@ export class AiChatService {
   }
 
   private async classifySub(
-    mainCategory: Exclude<MainCategory, 'unclear'>,
+    mainCategory: Exclude<MainCategory, 'unclear' | 'agent_task'>,
     content: string,
   ): Promise<ResponseCategory> {
     const { schema, prompt, fallback } = SUB_CLASSIFIERS[mainCategory];

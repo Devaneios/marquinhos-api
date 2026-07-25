@@ -1,5 +1,5 @@
 export type MainCategory =
-  'question' | 'social' | 'context_reaction' | 'unclear';
+  'question' | 'social' | 'context_reaction' | 'agent_task' | 'unclear';
 
 export type ResponseCategory =
   | 'general_question'
@@ -13,7 +13,8 @@ export type ResponseCategory =
   | 'follow_up_on_bot'
   | 'off_topic_unclear';
 
-export type AiChatCategory = ResponseCategory | 'guardrail_roast';
+export type AiChatCategory =
+  ResponseCategory | 'guardrail_roast' | 'agent_task';
 
 export type ResponseFormat = 'embed' | 'text';
 

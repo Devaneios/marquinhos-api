@@ -16,9 +16,22 @@ RUN bun run scripts/build-valid-guesses.ts
 # ── Stage 2: runtime ─────────────────────────────────────────────
 FROM oven/bun:1-alpine AS runtime
 
+# GID of the host's `docker` group, so the non-root app user can read/write
+# /var/run/docker.sock once it's bind-mounted in (needed to manage sandbox
+# sibling containers via dockerode). Pass with:
+#   --build-arg DOCKER_GID=$(getent group docker | cut -d: -f3)
+ARG DOCKER_GID=999
+
 WORKDIR /app
 
-RUN addgroup -S marquinhos && adduser -S marquinhos -G marquinhos
+# SandboxManager execs commands in sibling containers via `docker exec` rather
+# than dockerode's own exec path, which is broken under Bun — see the comment
+# in sandbox/DockerodeSandboxClient.ts. That needs the CLI present at runtime.
+RUN apk add --no-cache docker-cli
+
+RUN addgroup -S marquinhos && adduser -S marquinhos -G marquinhos \
+    && ( getent group ${DOCKER_GID} > /dev/null || addgroup -g ${DOCKER_GID} dockerhost ) \
+    && addgroup marquinhos "$(getent group ${DOCKER_GID} | cut -d: -f1)"
 
 COPY package.json bun.lock* tsconfig.json ./
 

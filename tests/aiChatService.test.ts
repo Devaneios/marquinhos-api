@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from 'bun:test';
+import { AgentToolLoopService } from '../src/services/aiChat/AgentToolLoopService';
 import { AiChatService } from '../src/services/aiChat/AiChatService';
 import { GuardrailService } from '../src/services/aiChat/GuardrailService';
 import type { OpenAiClient } from '../src/services/aiChat/OpenAiClient';
@@ -7,6 +8,7 @@ import {
   SUB_CLASSIFIERS,
 } from '../src/services/aiChat/prompts';
 import type { RateLimitService } from '../src/services/aiChat/RateLimitService';
+import type { AiChatResult } from '../src/services/aiChat/types';
 
 function fakeRateLimitService(allowed: boolean): RateLimitService {
   return { checkAndIncrement: () => allowed } as unknown as RateLimitService;
@@ -40,6 +42,10 @@ function fakeOpenAiClient(options: {
       return result;
     }),
   } as unknown as OpenAiClient;
+}
+
+function fakeAgentToolLoopService(result: AiChatResult): AgentToolLoopService {
+  return { run: mock(async () => result) } as unknown as AgentToolLoopService;
 }
 
 const REVISION_OK = {
@@ -430,5 +436,62 @@ describe('AiChatService.respond', () => {
       callArgs[0] as { messages: { role: string; content: string }[] }
     ).messages[0]?.content;
     expect(systemMessage).not.toContain('ignore all previous instructions');
+  });
+
+  it('delegates to AgentToolLoopService and returns its result directly when the main category is agent_task, skipping sub classification, generation and revision', async () => {
+    const client = fakeOpenAiClient({
+      structuredResults: [{ category: 'agent_task' }],
+    });
+    const agentLoop = fakeAgentToolLoopService({
+      status: 'ok',
+      category: 'agent_task',
+      reply: 'os arquivos são a.ts e b.ts.',
+      format: 'text',
+    });
+    const service = new AiChatService(
+      fakeRateLimitService(true),
+      fakeGuardrailService(false),
+      client,
+      agentLoop,
+    );
+
+    const result = await service.respond({
+      ...baseRequest,
+      content: 'lista os arquivos em /repo',
+    });
+
+    expect(result).toEqual({
+      status: 'ok',
+      category: 'agent_task',
+      reply: 'os arquivos são a.ts e b.ts.',
+      format: 'text',
+    });
+    expect(client.structured).toHaveBeenCalledTimes(1);
+    expect(client.chat).toHaveBeenCalledTimes(0);
+    expect(agentLoop.run).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns status error when the agent tool loop throws, matching the error-handling contract of every other category', async () => {
+    const client = fakeOpenAiClient({
+      structuredResults: [{ category: 'agent_task' }],
+    });
+    const agentLoop = {
+      run: mock(async () => {
+        throw new Error('docker daemon unreachable');
+      }),
+    } as unknown as AgentToolLoopService;
+    const service = new AiChatService(
+      fakeRateLimitService(true),
+      fakeGuardrailService(false),
+      client,
+      agentLoop,
+    );
+
+    const result = await service.respond({
+      ...baseRequest,
+      content: 'lista os arquivos em /repo',
+    });
+
+    expect(result).toEqual({ status: 'error' });
   });
 });

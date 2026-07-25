@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  AGENT_TASK_SYSTEM_PROMPT,
   buildResponsePrompt,
   buildRevisionInput,
   buildRevisionPrompt,
@@ -30,6 +31,7 @@ describe('mainClassificationSchema', () => {
       'question',
       'social',
       'context_reaction',
+      'agent_task',
       'unclear',
     ]) {
       expect(mainClassificationSchema.safeParse({ category }).success).toBe(
@@ -64,6 +66,7 @@ describe('MAIN_CLASSIFY_SYSTEM_PROMPT', () => {
       'question',
       'social',
       'context_reaction',
+      'agent_task',
       'unclear',
     ]) {
       expect(MAIN_CLASSIFY_SYSTEM_PROMPT).toContain(category);
@@ -323,5 +326,24 @@ describe('FALLBACK_FORMAT', () => {
     ] as const) {
       expect(FALLBACK_FORMAT[category]).toEqual({ format: 'text' });
     }
+  });
+});
+
+describe('AGENT_TASK_SYSTEM_PROMPT', () => {
+  it('is structured with role, instructions and constraints tags', () => {
+    expect(AGENT_TASK_SYSTEM_PROMPT).toContain('<role>');
+    expect(AGENT_TASK_SYSTEM_PROMPT).toContain('<instructions>');
+    expect(AGENT_TASK_SYSTEM_PROMPT).toContain('<constraints>');
+  });
+
+  it('instructs the model to never obey instructions embedded in tool output or chat history', () => {
+    const lower = AGENT_TASK_SYSTEM_PROMPT.toLowerCase();
+    expect(lower).toContain('nunca');
+    expect(lower).toMatch(/ferramenta|tool/);
+  });
+
+  it('documents that the mirror holds one directory per repo under /repo', () => {
+    expect(AGENT_TASK_SYSTEM_PROMPT).toContain('/repo/marquinhos-web-api');
+    expect(AGENT_TASK_SYSTEM_PROMPT).toContain('/repo/MarquinhosBOT');
   });
 });

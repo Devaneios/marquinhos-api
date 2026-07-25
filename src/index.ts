@@ -14,7 +14,10 @@ import * as privacyPolicy from './routes/privacyPolicy.route';
 import * as scrobble from './routes/scrobble.route';
 import * as user from './routes/user.route';
 import wordleRouter from './routes/wordle.route';
+import { AgentRateLimitService } from './services/aiChat/AgentRateLimitService';
 import { RateLimitService } from './services/aiChat/RateLimitService';
+import { DockerodeSandboxClient } from './services/aiChat/sandbox/DockerodeSandboxClient';
+import { SandboxManager } from './services/aiChat/sandbox/SandboxManager';
 import { GamificationService } from './services/gamification';
 import { getValidationSet } from './services/wordle';
 
@@ -123,10 +126,19 @@ try {
   runMigrations();
   new GamificationService().initializeDefaults();
   new RateLimitService().seedDefaults();
+  new AgentRateLimitService().seedDefaults();
 } catch (err) {
   console.error('Fatal: gamification initialization failed', err);
   process.exit(1);
 }
+
+const SANDBOX_SWEEP_INTERVAL_MS = 5 * 60_000;
+const sandboxManager = new SandboxManager(new DockerodeSandboxClient());
+setInterval(() => {
+  sandboxManager.sweepIdleSessions().catch((err) => {
+    console.error('Sandbox session sweep error:', err);
+  });
+}, SANDBOX_SWEEP_INTERVAL_MS);
 
 try {
   // Pre-warm the validation word set to avoid latency on first guess

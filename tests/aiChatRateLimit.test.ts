@@ -148,8 +148,8 @@ describe('RateLimitService.seedDefaults', () => {
       value: number;
     }[];
     expect(rows).toEqual([
-      { key: 'global_daily_limit', value: 200 },
-      { key: 'user_daily_limit', value: 10 },
+      { key: 'global_daily_limit', value: 2000 },
+      { key: 'user_daily_limit', value: 100 },
     ]);
   });
 
@@ -167,5 +167,28 @@ describe('RateLimitService.seedDefaults', () => {
       .query('SELECT value FROM ai_chat_config WHERE key = ?')
       .get('user_daily_limit') as { value: number };
     expect(row.value).toBe(5);
+  });
+
+  it('backfills missing keys even when the table already has other config keys', () => {
+    const db = new Database(':memory:');
+    db.run(
+      'CREATE TABLE ai_chat_config (key TEXT PRIMARY KEY, value INTEGER NOT NULL)',
+    );
+    db.run(
+      "INSERT INTO ai_chat_config (key, value) VALUES ('agent_daily_limit', 50)",
+    );
+    const service = new RateLimitService(db);
+    service.seedDefaults();
+    const rows = db
+      .query('SELECT * FROM ai_chat_config ORDER BY key')
+      .all() as {
+      key: string;
+      value: number;
+    }[];
+    expect(rows).toEqual([
+      { key: 'agent_daily_limit', value: 50 },
+      { key: 'global_daily_limit', value: 2000 },
+      { key: 'user_daily_limit', value: 100 },
+    ]);
   });
 });

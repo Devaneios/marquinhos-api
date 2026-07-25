@@ -49,6 +49,8 @@ export default [
         setImmediate: 'readonly',
         clearImmediate: 'readonly',
         NodeJS: true,
+        // Bun runtime globals
+        Bun: 'readonly',
         // Fetch API globals (Node.js 18+)
         fetch: 'readonly',
         Response: 'readonly',

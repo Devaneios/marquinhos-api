@@ -28,6 +28,9 @@ jobs:
       - name: Type check
         run: bun run typecheck
 
+      - name: Test
+        run: bun run test
+
       - name: Build
         run: bun run build
 
@@ -41,7 +44,12 @@ jobs:
       - name: Build Docker image (with layer cache)
         run: |
           docker compose -f docker-compose.yml build \
-            --build-arg BUILDKIT_INLINE_CACHE=1
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            --build-arg DOCKER_GID=$(getent group docker | cut -d: -f3)
+
+      - name: Build sandbox image
+        run: |
+          docker build -f docker/sandbox.Dockerfile -t marquinhos-sandbox:latest .
 
       - name: Tag image with commit SHA
         run: |

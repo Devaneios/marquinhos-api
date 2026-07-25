@@ -6,8 +6,8 @@ interface AiChatConfigRow {
   value: number;
 }
 
-const DEFAULT_USER_DAILY_LIMIT = 10;
-const DEFAULT_GLOBAL_DAILY_LIMIT = 200;
+const DEFAULT_USER_DAILY_LIMIT = 100;
+const DEFAULT_GLOBAL_DAILY_LIMIT = 2000;
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -19,13 +19,6 @@ export class RateLimitService {
   constructor(private db: Database = defaultDb) {}
 
   seedDefaults(): void {
-    const existing = this.db
-      .query<{ count: number }, []>(
-        'SELECT COUNT(*) as count FROM ai_chat_config',
-      )
-      .get();
-    if (existing && existing.count > 0) return;
-
     const insert = this.db.prepare(
       'INSERT OR IGNORE INTO ai_chat_config (key, value) VALUES ($key, $value)',
     );

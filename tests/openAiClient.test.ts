@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from 'bun:test';
+import type OpenAI from 'openai';
 import { z } from 'zod';
 import { OpenAiClient } from '../src/services/aiChat/OpenAiClient';
 
@@ -13,7 +14,7 @@ function fakeSdkClient(overrides: {
         parse: mock(overrides.parse ?? (async () => ({}))),
       },
     },
-  } as any;
+  } as unknown as OpenAI;
 }
 
 describe('OpenAiClient.chat', () => {
@@ -135,6 +136,102 @@ describe('OpenAiClient.structured', () => {
         'classification',
         { temperature: 0.1, maxTokens: 20 },
       ),
+    ).rejects.toThrow();
+  });
+});
+
+describe('OpenAiClient.chatWithTools', () => {
+  it('calls the SDK with tools and tool_choice auto', async () => {
+    const sdk = fakeSdkClient({
+      create: async () => ({
+        choices: [{ message: { role: 'assistant', content: 'oi' } }],
+      }),
+    });
+    const client = new OpenAiClient(sdk);
+    const tools = [
+      {
+        type: 'function' as const,
+        function: { name: 'foo', description: 'desc', parameters: {} },
+      },
+    ];
+
+    await client.chatWithTools([{ role: 'user', content: 'oi' }], tools, {
+      temperature: 0.5,
+      maxTokens: 50,
+    });
+
+    expect(sdk.chat.completions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'gpt-4o-mini',
+        tools,
+        tool_choice: 'auto',
+        temperature: 0.5,
+        max_tokens: 50,
+      }),
+    );
+  });
+
+  it('returns the full assistant message when there are no tool calls', async () => {
+    const sdk = fakeSdkClient({
+      create: async () => ({
+        choices: [
+          { message: { role: 'assistant', content: 'resposta final' } },
+        ],
+      }),
+    });
+    const client = new OpenAiClient(sdk);
+
+    const result = await client.chatWithTools(
+      [{ role: 'user', content: 'oi' }],
+      [],
+      { temperature: 0.5, maxTokens: 50 },
+    );
+
+    expect(result.content).toBe('resposta final');
+    expect(result.tool_calls).toBeUndefined();
+  });
+
+  it('returns the full assistant message including tool_calls when present', async () => {
+    const toolCalls = [
+      {
+        id: 'call_1',
+        type: 'function' as const,
+        function: { name: 'list_directory', arguments: '{"path":"/repo"}' },
+      },
+    ];
+    const sdk = fakeSdkClient({
+      create: async () => ({
+        choices: [
+          {
+            message: {
+              role: 'assistant',
+              content: null,
+              tool_calls: toolCalls,
+            },
+          },
+        ],
+      }),
+    });
+    const client = new OpenAiClient(sdk);
+
+    const result = await client.chatWithTools(
+      [{ role: 'user', content: 'lista os arquivos' }],
+      [],
+      { temperature: 0.5, maxTokens: 50 },
+    );
+
+    expect(result.tool_calls).toEqual(toolCalls);
+  });
+
+  it('throws when the SDK returns no completion message', async () => {
+    const sdk = fakeSdkClient({ create: async () => ({ choices: [] }) });
+    const client = new OpenAiClient(sdk);
+
+    await expect(
+      client.chatWithTools([{ role: 'user', content: 'oi' }], [], {
+        temperature: 0.5,
+        maxTokens: 50,
+      }),
     ).rejects.toThrow();
   });
 });

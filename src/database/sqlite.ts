@@ -256,6 +256,34 @@ db.run(`
   )
 `);
 
+db.run(`
+  CREATE TABLE IF NOT EXISTS agent_sandbox_sessions (
+    user_id       TEXT    NOT NULL,
+    guild_id      TEXT    NOT NULL,
+    channel_id    TEXT    NOT NULL,
+    container_id  TEXT    NOT NULL,
+    status        TEXT    NOT NULL DEFAULT 'running',
+    created_at    INTEGER NOT NULL,
+    last_used_at  INTEGER NOT NULL,
+    PRIMARY KEY (user_id, channel_id)
+  )
+`);
+
+db.run(`
+  CREATE INDEX IF NOT EXISTS idx_agent_sandbox_sessions_status
+  ON agent_sandbox_sessions (status, last_used_at)
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS ai_agent_usage (
+    user_id    TEXT    NOT NULL,
+    guild_id   TEXT    NOT NULL,
+    usage_date TEXT    NOT NULL,
+    count      INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, guild_id, usage_date)
+  )
+`);
+
 const cleanupStmt = db.prepare(
   `DELETE FROM scrobbles_queue WHERE created_at < (unixepoch() - ${TTL_SECONDS})`,
 );

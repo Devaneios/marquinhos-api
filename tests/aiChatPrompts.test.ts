@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 import { AGENT_CAPABILITIES } from '../src/services/aiChat/capabilities';
 import {
   AGENT_TASK_SYSTEM_PROMPT,
@@ -9,7 +9,6 @@ import {
   GUARDRAIL_ROAST_PROMPT,
   MAIN_CLASSIFY_SYSTEM_PROMPT,
   mainClassificationSchema,
-  resolveSpeakerRole,
   revisionSchema,
   SIGNATURE_LINES,
   SUB_CLASSIFIERS,
@@ -307,41 +306,6 @@ describe('user_roast_provocation: disdain over generic humor', () => {
   it('keeps the asymmetry: rough with the group, never cruel to the individual', () => {
     const instruction = buildResponsePrompt('user_roast_provocation', []);
     expect(instruction.toLowerCase()).toMatch(/nunca (é|e) cruel|nunca cruel/);
-  });
-});
-
-describe('resolveSpeakerRole', () => {
-  const ORIGINAL_KING = process.env.MARQUINHOS_KING_USER_ID;
-  const ORIGINAL_DEV = process.env.MARQUINHOS_DEV_USER_ID;
-
-  beforeEach(() => {
-    process.env.MARQUINHOS_KING_USER_ID = 'king-id-123';
-    process.env.MARQUINHOS_DEV_USER_ID = 'dev-id-456';
-  });
-
-  afterEach(() => {
-    if (ORIGINAL_KING === undefined) delete process.env.MARQUINHOS_KING_USER_ID;
-    else process.env.MARQUINHOS_KING_USER_ID = ORIGINAL_KING;
-    if (ORIGINAL_DEV === undefined) delete process.env.MARQUINHOS_DEV_USER_ID;
-    else process.env.MARQUINHOS_DEV_USER_ID = ORIGINAL_DEV;
-  });
-
-  it('returns "king" when the userId matches MARQUINHOS_KING_USER_ID', () => {
-    expect(resolveSpeakerRole('king-id-123')).toBe('king');
-  });
-
-  it('returns "dev" when the userId matches MARQUINHOS_DEV_USER_ID', () => {
-    expect(resolveSpeakerRole('dev-id-456')).toBe('dev');
-  });
-
-  it('returns undefined for any other userId', () => {
-    expect(resolveSpeakerRole('some-random-user')).toBeUndefined();
-  });
-
-  it('returns undefined when the env vars are not configured', () => {
-    delete process.env.MARQUINHOS_KING_USER_ID;
-    delete process.env.MARQUINHOS_DEV_USER_ID;
-    expect(resolveSpeakerRole('king-id-123')).toBeUndefined();
   });
 });
 

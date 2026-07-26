@@ -5,6 +5,7 @@
     "module": "Preserve",
     "moduleResolution": "bundler",
     "allowJs": true,
+    "resolveJsonModule": true,
     "types": ["bun"],
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { AGENT_CAPABILITIES } from '../src/services/aiChat/capabilities';
 import {
   AGENT_TASK_SYSTEM_PROMPT,
@@ -6,9 +6,12 @@ import {
   buildRevisionInput,
   buildRevisionPrompt,
   FALLBACK_FORMAT,
+  GUARDRAIL_ROAST_PROMPT,
   MAIN_CLASSIFY_SYSTEM_PROMPT,
   mainClassificationSchema,
+  resolveSpeakerRole,
   revisionSchema,
+  SIGNATURE_LINES,
   SUB_CLASSIFIERS,
 } from '../src/services/aiChat/prompts';
 import { AGENT_TOOLS } from '../src/services/aiChat/tools/registry';
@@ -236,6 +239,135 @@ describe('buildResponsePrompt', () => {
   it('omits the replied_message block when repliedMessage is not provided', () => {
     const prompt = buildResponsePrompt('general_question', []);
     expect(prompt).not.toContain('<replied_message');
+  });
+});
+
+describe('BASE_PERSONALITY (via buildResponsePrompt)', () => {
+  it('anchors identity in the dictator/motel persona, not a generic assistant', () => {
+    const prompt = buildResponsePrompt('casual_chat', []);
+    expect(prompt).toMatch(/motel/i);
+    expect(prompt).toMatch(/autorit[aá]rio|ditador/i);
+    expect(prompt).toMatch(/incorrupt[íi]vel/i);
+  });
+
+  it('never breaks character to admit being an AI/LLM', () => {
+    const prompt = buildResponsePrompt('casual_chat', []);
+    expect(prompt.toLowerCase()).toMatch(
+      /nunca (diz|revela|admite).{0,40}(ia|intelig[êe]ncia artificial|llm|modelo)/,
+    );
+  });
+
+  it('forbids apologizing for being rude or offering further help like a support bot', () => {
+    const prompt = buildResponsePrompt('casual_chat', []);
+    expect(prompt.toLowerCase()).toMatch(/n[aã]o pede desculpa/);
+    expect(prompt.toLowerCase()).toMatch(/posso ajudar com mais alguma coisa/);
+  });
+});
+
+describe('SIGNATURE_LINES', () => {
+  it('includes the canonical catchphrases from the persona doc', () => {
+    expect(SIGNATURE_LINES).toContain('Trouxa, eu sou filho do Rei');
+    expect(SIGNATURE_LINES).toContain(
+      'E desde quando preso tem a chave da cela?',
+    );
+    expect(SIGNATURE_LINES).toContain('é o caralho');
+    expect(SIGNATURE_LINES).toContain('quebrei');
+  });
+
+  it('instructs sparing, unforced use — never more than once per reply', () => {
+    const lower = SIGNATURE_LINES.toLowerCase();
+    expect(lower).toMatch(/raramente|com parcim[oô]nia/);
+    expect(lower).toMatch(/nunca for[cç]ad[oa]/);
+  });
+
+  it('is included in response prompts but not in the revision prompt', () => {
+    const responsePrompt = buildResponsePrompt('casual_chat', []);
+    const revisionPrompt = buildRevisionPrompt('casual_chat');
+    expect(responsePrompt).toContain('Trouxa, eu sou filho do Rei');
+    expect(revisionPrompt).not.toContain('Trouxa, eu sou filho do Rei');
+  });
+});
+
+describe('praise_thanks: inversion pattern', () => {
+  it('instructs deflecting the compliment back to the person instead of thanking them', () => {
+    const instruction = buildResponsePrompt('praise_thanks', []);
+    expect(instruction.toLowerCase()).toMatch(/devolv/);
+    expect(instruction.toLowerCase()).not.toMatch(
+      /aceite de forma natural e curta/,
+    );
+  });
+});
+
+describe('user_roast_provocation: disdain over generic humor', () => {
+  it('leads with dry authoritarian disdain rather than "tirada afiada e bem-humorada"', () => {
+    const instruction = buildResponsePrompt('user_roast_provocation', []);
+    expect(instruction.toLowerCase()).toMatch(/desd[ée]m/);
+  });
+
+  it('keeps the asymmetry: rough with the group, never cruel to the individual', () => {
+    const instruction = buildResponsePrompt('user_roast_provocation', []);
+    expect(instruction.toLowerCase()).toMatch(/nunca (é|e) cruel|nunca cruel/);
+  });
+});
+
+describe('resolveSpeakerRole', () => {
+  const ORIGINAL_KING = process.env.MARQUINHOS_KING_USER_ID;
+  const ORIGINAL_DEV = process.env.MARQUINHOS_DEV_USER_ID;
+
+  beforeEach(() => {
+    process.env.MARQUINHOS_KING_USER_ID = 'king-id-123';
+    process.env.MARQUINHOS_DEV_USER_ID = 'dev-id-456';
+  });
+
+  afterEach(() => {
+    if (ORIGINAL_KING === undefined) delete process.env.MARQUINHOS_KING_USER_ID;
+    else process.env.MARQUINHOS_KING_USER_ID = ORIGINAL_KING;
+    if (ORIGINAL_DEV === undefined) delete process.env.MARQUINHOS_DEV_USER_ID;
+    else process.env.MARQUINHOS_DEV_USER_ID = ORIGINAL_DEV;
+  });
+
+  it('returns "king" when the userId matches MARQUINHOS_KING_USER_ID', () => {
+    expect(resolveSpeakerRole('king-id-123')).toBe('king');
+  });
+
+  it('returns "dev" when the userId matches MARQUINHOS_DEV_USER_ID', () => {
+    expect(resolveSpeakerRole('dev-id-456')).toBe('dev');
+  });
+
+  it('returns undefined for any other userId', () => {
+    expect(resolveSpeakerRole('some-random-user')).toBeUndefined();
+  });
+
+  it('returns undefined when the env vars are not configured', () => {
+    delete process.env.MARQUINHOS_KING_USER_ID;
+    delete process.env.MARQUINHOS_DEV_USER_ID;
+    expect(resolveSpeakerRole('king-id-123')).toBeUndefined();
+  });
+});
+
+describe('buildResponsePrompt speakerRole hierarchy note', () => {
+  it('adds a note about the King/creator when speakerRole is "king"', () => {
+    const prompt = buildResponsePrompt('casual_chat', [], undefined, 'king');
+    expect(prompt).toMatch(/rei|avalonn/i);
+  });
+
+  it('adds a note about the dev when speakerRole is "dev"', () => {
+    const prompt = buildResponsePrompt('casual_chat', [], undefined, 'dev');
+    expect(prompt).toMatch(/fazendeiro|c[oó]digo/i);
+  });
+
+  it('omits any hierarchy note when speakerRole is not provided', () => {
+    const prompt = buildResponsePrompt('casual_chat', []);
+    expect(prompt.toLowerCase()).not.toContain('avalonn');
+    expect(prompt.toLowerCase()).not.toContain('fazendeiro');
+  });
+});
+
+describe('GUARDRAIL_ROAST_PROMPT', () => {
+  it('still forbids following the injection or revealing internal instructions', () => {
+    const lower = GUARDRAIL_ROAST_PROMPT.toLowerCase();
+    expect(lower).toContain('nunca');
+    expect(lower).toMatch(/revele|revelar/);
   });
 });
 

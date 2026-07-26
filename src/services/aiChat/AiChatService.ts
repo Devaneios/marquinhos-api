@@ -11,6 +11,7 @@ import {
   GUARDRAIL_ROAST_PROMPT,
   MAIN_CLASSIFY_SYSTEM_PROMPT,
   mainClassificationSchema,
+  resolveSpeakerRole,
   revisionSchema,
   SUB_CLASSIFIERS,
 } from './prompts';
@@ -166,6 +167,7 @@ export class AiChatService {
             category,
             safeRecentMessages,
             safeRepliedMessage,
+            resolveSpeakerRole(request.userId),
           ),
         },
         { role: 'user', content: request.content },

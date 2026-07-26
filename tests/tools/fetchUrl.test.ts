@@ -317,6 +317,131 @@ describe('fetchUrlTool text mode', () => {
   });
 });
 
+describe('fetchUrlTool markdown conversion', () => {
+  it('renders headings as atx markdown', async () => {
+    const fetchFn = mock(async () =>
+      htmlResponse('<html><body><h1>Recife</h1></body></html>'),
+    );
+    const tool = createFetchUrlTool({ fetchFn, lookupFn: publicLookup() });
+
+    const result = await tool.execute({ url: 'https://example.com' }, ctx);
+
+    expect(result).toContain('# Recife');
+  });
+
+  it('renders lists as markdown bullets', async () => {
+    const fetchFn = mock(async () =>
+      htmlResponse('<html><body><ul><li>a</li><li>b</li></ul></body></html>'),
+    );
+    const tool = createFetchUrlTool({ fetchFn, lookupFn: publicLookup() });
+
+    const result = await tool.execute({ url: 'https://example.com' }, ctx);
+
+    expect(result).toMatch(/^-\s+a$/m);
+    expect(result).toMatch(/^-\s+b$/m);
+  });
+
+  it('renders tables as gfm pipe tables', async () => {
+    const html = `<html><body><table>
+      <tr><th>A</th><th>B</th></tr>
+      <tr><td>1</td><td>2</td></tr>
+    </table></body></html>`;
+    const fetchFn = mock(async () => htmlResponse(html));
+    const tool = createFetchUrlTool({ fetchFn, lookupFn: publicLookup() });
+
+    const result = await tool.execute({ url: 'https://example.com' }, ctx);
+
+    expect(result).toContain('| A | B |');
+    expect(result).toMatch(/\|\s*-+\s*\|\s*-+\s*\|/);
+    expect(result).toContain('| 1 | 2 |');
+  });
+
+  it('renders links as absolute markdown links in text mode', async () => {
+    const fetchFn = mock(async () =>
+      htmlResponse('<html><body><a href="/wiki/Roma">Roma</a></body></html>'),
+    );
+    const tool = createFetchUrlTool({ fetchFn, lookupFn: publicLookup() });
+
+    const result = await tool.execute(
+      { url: 'https://pt.wikipedia.org/wiki/Recife' },
+      ctx,
+    );
+
+    expect(result).toContain('[Roma](https://pt.wikipedia.org/wiki/Roma)');
+  });
+
+  it('drops images instead of emitting markdown image syntax', async () => {
+    const fetchFn = mock(async () =>
+      htmlResponse(
+        '<html><body><img src="https://example.com/x.png" alt="foto"></body></html>',
+      ),
+    );
+    const tool = createFetchUrlTool({ fetchFn, lookupFn: publicLookup() });
+
+    const result = await tool.execute({ url: 'https://example.com' }, ctx);
+
+    expect(result).not.toContain('![foto]');
+    expect(result).not.toContain('x.png');
+  });
+
+  it('keeps the language hint on fenced code blocks', async () => {
+    const fetchFn = mock(async () =>
+      htmlResponse(
+        '<html><body><pre><code class="language-js">const x = 1;</code></pre></body></html>',
+      ),
+    );
+    const tool = createFetchUrlTool({ fetchFn, lookupFn: publicLookup() });
+
+    const result = await tool.execute({ url: 'https://example.com' }, ctx);
+
+    expect(result).toContain('```js');
+    expect(result).toContain('const x = 1;');
+  });
+
+  it('still fences code blocks without a language class', async () => {
+    const fetchFn = mock(async () =>
+      htmlResponse('<html><body><pre><code>plain</code></pre></body></html>'),
+    );
+    const tool = createFetchUrlTool({ fetchFn, lookupFn: publicLookup() });
+
+    const result = await tool.execute({ url: 'https://example.com' }, ctx);
+
+    expect(result).toContain('```');
+    expect(result).toContain('plain');
+    expect(result).not.toContain('undefined');
+  });
+
+  it('strips navigation, header, and footer chrome but keeps the main content', async () => {
+    const html = `<html><body>
+      <nav><a href="/menu">Menu</a></nav>
+      <header>Site Header</header>
+      <main><p>conteudo real</p></main>
+      <footer>rodape</footer>
+    </body></html>`;
+    const fetchFn = mock(async () => htmlResponse(html));
+    const tool = createFetchUrlTool({ fetchFn, lookupFn: publicLookup() });
+
+    const result = await tool.execute({ url: 'https://example.com' }, ctx);
+
+    expect(result).toContain('conteudo real');
+    expect(result).not.toContain('Menu');
+    expect(result).not.toContain('Site Header');
+    expect(result).not.toContain('rodape');
+  });
+
+  it('tolerates malformed html without throwing', async () => {
+    const fetchFn = mock(async () =>
+      htmlResponse('<html><body><p>oi<div>sem fechar</html>'),
+    );
+    const tool = createFetchUrlTool({ fetchFn, lookupFn: publicLookup() });
+
+    const result = await tool.execute({ url: 'https://example.com' }, ctx);
+
+    expect(result).toContain('oi');
+    expect(result).toContain('sem fechar');
+  });
+});
+
 describe('fetchUrlTool links mode', () => {
   const wikiHtml = `<html><body>
     <a href="/wiki/Pernambuco">Pernambuco</a>

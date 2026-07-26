@@ -7,7 +7,10 @@
 // two. Closing it would mean connecting to the validated IP with a manual Host
 // header; that is disproportionate here, and it is the same pragmatic tradeoff
 // already accepted for mounting docker.sock.
+import * as cheerio from 'cheerio';
 import { lookup as dnsLookup } from 'node:dns/promises';
+import TurndownService from 'turndown';
+import { gfm } from 'turndown-plugin-gfm';
 import type { AgentTool } from './types';
 
 export const MAX_REDIRECTS = 3;
@@ -161,60 +164,88 @@ async function readCappedText(
   return { text, truncated: false };
 }
 
-// HTML attributes and text both arrive entity-encoded, so an href like
-// "?a=1&amp;b=2" has to be decoded before it is a usable URL. &amp; goes last so
-// that "&amp;lt;" decodes to "&lt;" instead of "<".
-function decodeEntities(value: string): string {
-  return value
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#0?39;|&apos;/g, "'")
-    .replace(/&amp;/g, '&');
+const turndownService = new TurndownService({
+  headingStyle: 'atx',
+  bulletListMarker: '-',
+  codeBlockStyle: 'fenced',
+  fence: '```',
+  linkStyle: 'inlined',
+  emDelimiter: '_',
+}).use(gfm);
+
+interface TurndownNode {
+  nodeName: string;
+  firstChild: TurndownNode | null;
+  textContent: string | null;
+  getAttribute(name: string): string | null;
 }
 
-function stripTags(html: string): string {
-  return decodeEntities(html.replace(/<[^>]*>/g, ' '))
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+// Turndown's built-in <pre><code> rule fences the block but drops any
+// language-xxx/lang-xxx class hint, which matters when the reader is a
+// coding-context bot.
+turndownService.addRule('fencedCodeLanguage', {
+  filter: (node) =>
+    node.nodeName === 'PRE' && node.firstChild?.nodeName === 'CODE',
+  replacement: (_content, node) => {
+    const codeEl = (node as unknown as TurndownNode).firstChild;
+    const className = codeEl?.getAttribute('class') ?? '';
+    const lang = /(?:language|lang)-(\S+)/.exec(className)?.[1] ?? '';
+    return `\n\n\`\`\`${lang}\n${codeEl?.textContent}\n\`\`\`\n\n`;
+  },
+});
 
-function htmlToText(html: string): string {
-  return stripTags(
-    html.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, ' '),
-  );
+const NOISE_SELECTOR =
+  'script, style, noscript, template, head, iframe, svg, form, nav, header, footer, aside';
+
+function htmlToMarkdown(html: string, base: URL): string {
+  const $ = cheerio.load(html);
+  $(NOISE_SELECTOR).remove();
+  $('img').remove();
+  $('a[href]').each((_, el) => {
+    const href = $(el).attr('href');
+    if (!href) return;
+    try {
+      $(el).attr('href', new URL(href, base).toString());
+    } catch {
+      $(el).removeAttr('href');
+    }
+  });
+  const bodyHtml = $('body').html() ?? $.html();
+  return turndownService.turndown(bodyHtml).trim();
 }
 
 function extractLinks(html: string, base: URL): string[] {
+  const $ = cheerio.load(html);
   const found = new Map<string, string>();
   const self = new URL(base.toString());
   self.hash = '';
   const selfKey = self.toString();
-  const anchors = html.matchAll(
-    /<a\b[^>]*\bhref\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi,
-  );
 
-  for (const [, href, inner] of anchors) {
-    if (!href) continue;
+  $('a[href]').each((_, el) => {
+    if (found.size >= MAX_LINKS) return false;
+    const href = $(el).attr('href');
+    if (!href) return;
     let target: URL;
     try {
-      target = new URL(decodeEntities(href), base);
+      target = new URL(href, base);
     } catch {
-      continue;
+      return;
     }
-    if (target.protocol !== 'https:' && target.protocol !== 'http:') continue;
-    if (target.hostname !== base.hostname) continue;
+    if (target.protocol !== 'https:' && target.protocol !== 'http:') return;
+    if (target.hostname !== base.hostname) return;
 
     target.hash = '';
     const key = target.toString();
     // In-page anchors collapse to the page itself once the fragment is gone;
     // offering the current page as a hop only invites the model to loop.
-    if (key === selfKey || found.has(key)) continue;
+    if (key === selfKey || found.has(key)) return;
 
-    found.set(key, stripTags(inner ?? '').slice(0, MAX_LABEL_CHARS));
-    if (found.size >= MAX_LINKS) break;
-  }
+    found.set(
+      key,
+      $(el).text().trim().replace(/\s+/g, ' ').slice(0, MAX_LABEL_CHARS),
+    );
+    return;
+  });
 
   return [...found].map(([url, label]) => (label ? `${label} → ${url}` : url));
 }
@@ -313,7 +344,7 @@ export function createFetchUrlTool(deps?: Partial<FetchUrlDeps>): AgentTool {
             return [header, ...links].join('\n');
           }
 
-          const body = isHtml ? htmlToText(text) : text.trim();
+          const body = isHtml ? htmlToMarkdown(text, current) : text.trim();
           const capped = capText(body);
           if (truncated && !capped.includes('truncado')) {
             return `${capped}\n\n[conteúdo truncado]`;

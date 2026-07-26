@@ -9,6 +9,7 @@ import {
   GUARDRAIL_ROAST_PROMPT,
   MAIN_CLASSIFY_SYSTEM_PROMPT,
   mainClassificationSchema,
+  resolveSpeakerRole,
   revisionSchema,
   SIGNATURE_LINES,
   SUB_CLASSIFIERS,
@@ -320,10 +321,67 @@ describe('buildResponsePrompt speakerRole hierarchy note', () => {
     expect(prompt).toMatch(/fazendeiro|c[oó]digo/i);
   });
 
+  it('adds a note about eriquinho when speakerRole is "eriquinho"', () => {
+    const prompt = buildResponsePrompt(
+      'casual_chat',
+      [],
+      undefined,
+      'eriquinho',
+    );
+    expect(prompt).toMatch(/eriquinho|vice-dono/i);
+  });
+
+  it('adds a note about chato when speakerRole is "chato"', () => {
+    const prompt = buildResponsePrompt('casual_chat', [], undefined, 'chato');
+    expect(prompt).toMatch(/chato|censura/i);
+  });
+
+  it('adds a note about vlpl when speakerRole is "vlpl"', () => {
+    const prompt = buildResponsePrompt('casual_chat', [], undefined, 'vlpl');
+    expect(prompt).toMatch(/vlpl|pastel/i);
+  });
+
+  it('adds a note about zegabr when speakerRole is "zegabr"', () => {
+    const prompt = buildResponsePrompt('casual_chat', [], undefined, 'zegabr');
+    expect(prompt).toMatch(/zegabr|neovim/i);
+  });
+
+  it('adds a note about tuto when speakerRole is "tuto"', () => {
+    const prompt = buildResponsePrompt('casual_chat', [], undefined, 'tuto');
+    expect(prompt).toMatch(/tuto|entidade/i);
+  });
+
+  it('adds a note about joyvixtor when speakerRole is "joyvixtor"', () => {
+    const prompt = buildResponsePrompt(
+      'casual_chat',
+      [],
+      undefined,
+      'joyvixtor',
+    );
+    expect(prompt).toMatch(/joyvixtor|last\.fm/i);
+  });
+
   it('omits any hierarchy note when speakerRole is not provided', () => {
     const prompt = buildResponsePrompt('casual_chat', []);
     expect(prompt.toLowerCase()).not.toContain('avalonn');
     expect(prompt.toLowerCase()).not.toContain('fazendeiro');
+  });
+});
+
+describe('resolveSpeakerRole', () => {
+  it('resolves each known Discord id to its hierarchy role', () => {
+    expect(resolveSpeakerRole('305838877866721280')).toBe('king');
+    expect(resolveSpeakerRole('214257187592077313')).toBe('dev');
+    expect(resolveSpeakerRole('306920588801343488')).toBe('eriquinho');
+    expect(resolveSpeakerRole('478389573563711503')).toBe('chato');
+    expect(resolveSpeakerRole('837413019620605974')).toBe('vlpl');
+    expect(resolveSpeakerRole('265558578910199808')).toBe('zegabr');
+    expect(resolveSpeakerRole('493573725430480897')).toBe('tuto');
+    expect(resolveSpeakerRole('388102426202472459')).toBe('joyvixtor');
+  });
+
+  it('returns undefined for an unknown id', () => {
+    expect(resolveSpeakerRole('unknown-id-123')).toBeUndefined();
   });
 });
 

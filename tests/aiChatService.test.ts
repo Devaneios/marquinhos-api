@@ -3,6 +3,10 @@ import { AgentToolLoopService } from '../src/services/aiChat/AgentToolLoopServic
 import { AiChatService } from '../src/services/aiChat/AiChatService';
 import type { AiTraceRecorder } from '../src/services/aiChat/AiTraceRecorder';
 import { GuardrailService } from '../src/services/aiChat/GuardrailService';
+import type {
+  KnowledgeBaseClient,
+  KnowledgeBaseSearchResult,
+} from '../src/services/aiChat/KnowledgeBaseClient';
 import type { OpenAiClient } from '../src/services/aiChat/OpenAiClient';
 import {
   MAIN_CLASSIFY_SYSTEM_PROMPT,
@@ -48,6 +52,18 @@ function fakeOpenAiClient(options: {
 function fakeAgentToolLoopService(result: AiChatResult): AgentToolLoopService {
   return { run: mock(async () => result) } as unknown as AgentToolLoopService;
 }
+
+function fakeKnowledgeBaseClient(
+  result: KnowledgeBaseSearchResult,
+): KnowledgeBaseClient {
+  return { search: mock(async () => result) } as unknown as KnowledgeBaseClient;
+}
+
+const KB_NOT_FOUND: KnowledgeBaseSearchResult = {
+  found: false,
+  context: '',
+  chunks: [],
+};
 
 function recordingTrace() {
   const trace = {
@@ -629,5 +645,132 @@ describe('AiChatService tracing', () => {
     await service.respond(baseRequest);
 
     expect(recorder.start).not.toHaveBeenCalled();
+  });
+});
+
+describe('AiChatService knowledge base integration', () => {
+  beforeAll(() => {
+    process.env.AI_TRACE_ENABLED = 'false';
+  });
+  afterAll(() => {
+    delete process.env.AI_TRACE_ENABLED;
+  });
+
+  function serviceWithKb(
+    kbResult: KnowledgeBaseSearchResult,
+    structuredResults: unknown[],
+    chatResponses: (string | Error)[] = ['rascunho'],
+  ) {
+    const client = fakeOpenAiClient({ structuredResults, chatResponses });
+    const knowledgeBaseClient = fakeKnowledgeBaseClient(kbResult);
+    const service = new AiChatService(
+      fakeRateLimitService(true),
+      fakeGuardrailService(false),
+      client,
+      undefined,
+      undefined,
+      knowledgeBaseClient,
+    );
+    return { service, client, knowledgeBaseClient };
+  }
+
+  it('includes the recovered context in the prompt for general_question when the KB finds something', async () => {
+    const { service, client } = serviceWithKb(
+      {
+        found: true,
+        context: '**PESSOAS-02 · fazendeiro** ...',
+        chunks: [],
+      },
+      [{ category: 'question' }, { category: 'general_question' }, REVISION_OK],
+    );
+
+    await service.respond(baseRequest);
+
+    const systemMessage = (
+      (client.chat as unknown as ReturnType<typeof mock>).mock.calls[0]![0] as {
+        messages: { role: string; content: string }[];
+      }
+    ).messages[0]?.content;
+    expect(systemMessage).toContain('<server_knowledge');
+    expect(systemMessage).toContain('PESSOAS-02 · fazendeiro');
+  });
+
+  it('also uses the KB context for bot_help_info', async () => {
+    const { service, client } = serviceWithKb(
+      { found: true, context: 'contexto relevante', chunks: [] },
+      [{ category: 'question' }, { category: 'bot_help_info' }, REVISION_OK],
+    );
+
+    await service.respond(baseRequest);
+
+    const systemMessage = (
+      (client.chat as unknown as ReturnType<typeof mock>).mock.calls[0]![0] as {
+        messages: { role: string; content: string }[];
+      }
+    ).messages[0]?.content;
+    expect(systemMessage).toContain('contexto relevante');
+  });
+
+  it('does not include KB context for subcategories other than general_question/bot_help_info', async () => {
+    const { service, client } = serviceWithKb(
+      { found: true, context: 'não deveria aparecer', chunks: [] },
+      [
+        { category: 'question' },
+        { category: 'code_technical_question' },
+        REVISION_OK,
+      ],
+    );
+
+    await service.respond(baseRequest);
+
+    const systemMessage = (
+      (client.chat as unknown as ReturnType<typeof mock>).mock.calls[0]![0] as {
+        messages: { role: string; content: string }[];
+      }
+    ).messages[0]?.content;
+    expect(systemMessage).not.toContain('não deveria aparecer');
+    expect(systemMessage).not.toContain('<server_knowledge');
+  });
+
+  it('does not call the knowledge base client when the main category is social', async () => {
+    const { service, knowledgeBaseClient } = serviceWithKb(KB_NOT_FOUND, [
+      { category: 'social' },
+      { category: 'casual_chat' },
+      REVISION_OK,
+    ]);
+
+    await service.respond(baseRequest);
+
+    expect(knowledgeBaseClient.search).not.toHaveBeenCalled();
+  });
+
+  it('does not call the knowledge base client when the main category is context_reaction', async () => {
+    const { service, knowledgeBaseClient } = serviceWithKb(KB_NOT_FOUND, [
+      { category: 'context_reaction' },
+      { category: 'opinion_reference' },
+      REVISION_OK,
+    ]);
+
+    await service.respond(baseRequest);
+
+    expect(knowledgeBaseClient.search).not.toHaveBeenCalled();
+  });
+
+  it('proceeds normally without a server_knowledge block when the KB finds nothing', async () => {
+    const { service, client } = serviceWithKb(KB_NOT_FOUND, [
+      { category: 'question' },
+      { category: 'general_question' },
+      REVISION_OK,
+    ]);
+
+    const result = await service.respond(baseRequest);
+
+    expect(result.status).toBe('ok');
+    const systemMessage = (
+      (client.chat as unknown as ReturnType<typeof mock>).mock.calls[0]![0] as {
+        messages: { role: string; content: string }[];
+      }
+    ).messages[0]?.content;
+    expect(systemMessage).not.toContain('<server_knowledge');
   });
 });

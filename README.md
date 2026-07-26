@@ -48,6 +48,8 @@ Required environment variables (`.env`):
 | `LASTFM_API_KEY` / `LASTFM_SHARED_SECRET` / `LASTFM_REDIRECT_URI` | Last.fm scrobbling OAuth |
 | `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` | Spotify metadata lookups |
 | `CORS_ORIGINS` | Comma-separated allowlist (defaults to `localhost:4200` + prod web app) |
+| `KNOWLEDGE_BASE_URL` | Base URL of the local devaneios-chats RAG service (e.g. `http://devaneios-rag:8420`), used by the bot to look up server lore/history. Optional — omit to run without it. |
+| `KNOWLEDGE_BASE_API_KEY` | Bearer token sent to `KNOWLEDGE_BASE_URL`. Must match that service's `RAG_API_KEY`. |
 
 Run the database migrations and start the dev server:
 

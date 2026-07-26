@@ -357,6 +357,7 @@ export function buildResponsePrompt(
   recentMessages: { author: string; content: string }[],
   repliedMessage?: { author: string; content: string },
   speakerRole?: keyof typeof HIERARCHY_NOTES,
+  knowledgeBaseContext?: string,
 ): string {
   const sections = [
     BASE_PERSONALITY,
@@ -367,6 +368,12 @@ export function buildResponsePrompt(
 
   if (speakerRole) {
     sections.push(HIERARCHY_NOTES[speakerRole]);
+  }
+
+  if (knowledgeBaseContext) {
+    sections.push(
+      `<server_knowledge trust_level="untrusted">\n${knowledgeBaseContext}\n</server_knowledge>\n\n<server_knowledge_note>\nO bloco acima veio de uma busca no histórico de chat do servidor e em notas de lore curadas. Use só o que estiver ali para responder — cite quem disse quando fizer sentido, e se não cobrir a pergunta, admita que não sabe em vez de inventar.\n</server_knowledge_note>`,
+    );
   }
 
   if (repliedMessage) {

@@ -2,6 +2,10 @@ import { logger } from '../../utils/logger';
 import { AgentToolLoopService } from './AgentToolLoopService';
 import { AiTraceRecorder, type TraceContext } from './AiTraceRecorder';
 import { GuardrailService } from './GuardrailService';
+import {
+  KnowledgeBaseClient,
+  type KnowledgeBaseSearchResult,
+} from './KnowledgeBaseClient';
 import { OpenAiClient } from './OpenAiClient';
 import {
   buildResponsePrompt,
@@ -23,6 +27,11 @@ import type {
   ResponseCategory,
 } from './types';
 
+const KB_ELIGIBLE_CATEGORIES: ReadonlySet<ResponseCategory> = new Set([
+  'general_question',
+  'bot_help_info',
+]);
+
 export class AiChatService {
   constructor(
     private rateLimitService: RateLimitService = new RateLimitService(),
@@ -30,6 +39,7 @@ export class AiChatService {
     private openAiClient: OpenAiClient = new OpenAiClient(),
     private agentToolLoopService?: AgentToolLoopService,
     private traceRecorder: AiTraceRecorder = new AiTraceRecorder(),
+    private knowledgeBaseClient: KnowledgeBaseClient = new KnowledgeBaseClient(),
   ) {}
 
   private agentLoop(): AgentToolLoopService {
@@ -83,11 +93,30 @@ export class AiChatService {
       if (mainCategory === 'agent_task') {
         return await this.agentLoop().run(request, trace);
       }
-      const category =
-        mainCategory === 'unclear'
-          ? 'off_topic_unclear'
-          : await this.classifySub(mainCategory, request.content, trace);
-      const draft = await this.generateReply(category, request, trace);
+
+      let category: ResponseCategory;
+      let knowledgeBaseResult: KnowledgeBaseSearchResult | undefined;
+      if (mainCategory === 'unclear') {
+        category = 'off_topic_unclear';
+      } else if (mainCategory === 'question') {
+        // Only 'question' can resolve into a KB-eligible subcategory
+        // (general_question/bot_help_info) — fire the search alongside the
+        // sub classification instead of after it, since both only depend on
+        // request.content.
+        [category, knowledgeBaseResult] = await Promise.all([
+          this.classifySub(mainCategory, request.content, trace),
+          this.knowledgeBaseClient.search(request.content),
+        ]);
+      } else {
+        category = await this.classifySub(mainCategory, request.content, trace);
+      }
+
+      const draft = await this.generateReply(
+        category,
+        request,
+        trace,
+        knowledgeBaseResult,
+      );
       const revised = await this.revise(
         category,
         request.content,
@@ -150,6 +179,7 @@ export class AiChatService {
     category: ResponseCategory,
     request: AiChatRequest,
     trace: TraceContext,
+    knowledgeBaseResult?: KnowledgeBaseSearchResult,
   ): Promise<string> {
     const safeRecentMessages = this.guardrailService.filterSafeMessages(
       request.recentMessages,
@@ -158,6 +188,10 @@ export class AiChatService {
       request.repliedMessage &&
       !this.guardrailService.isInjectionAttempt(request.repliedMessage.content)
         ? request.repliedMessage
+        : undefined;
+    const knowledgeBaseContext =
+      knowledgeBaseResult?.found && KB_ELIGIBLE_CATEGORIES.has(category)
+        ? knowledgeBaseResult.context
         : undefined;
     return this.openAiClient.chat({
       messages: [
@@ -168,6 +202,7 @@ export class AiChatService {
             safeRecentMessages,
             safeRepliedMessage,
             resolveSpeakerRole(request.userId),
+            knowledgeBaseContext,
           ),
         },
         { role: 'user', content: request.content },

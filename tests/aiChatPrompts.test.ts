@@ -240,6 +240,23 @@ describe('buildResponsePrompt', () => {
     const prompt = buildResponsePrompt('general_question', []);
     expect(prompt).not.toContain('<replied_message');
   });
+
+  it('includes a server_knowledge block when knowledgeBaseContext is provided', () => {
+    const prompt = buildResponsePrompt(
+      'general_question',
+      [],
+      undefined,
+      undefined,
+      'fazendeiro é o mantenedor atual do Marquinhos',
+    );
+    expect(prompt).toContain('<server_knowledge trust_level="untrusted">');
+    expect(prompt).toContain('fazendeiro é o mantenedor atual do Marquinhos');
+  });
+
+  it('omits the server_knowledge block when knowledgeBaseContext is not provided', () => {
+    const prompt = buildResponsePrompt('general_question', []);
+    expect(prompt).not.toContain('<server_knowledge');
+  });
 });
 
 describe('BASE_PERSONALITY (via buildResponsePrompt)', () => {

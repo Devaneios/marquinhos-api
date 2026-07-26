@@ -4,6 +4,7 @@ import { fetchUrlTool } from './fetchUrl';
 import { grepSearchTool } from './grepSearch';
 import { listDirectoryTool } from './listDirectory';
 import { readFileTool } from './readFile';
+import { searchKnowledgeBaseTool } from './searchKnowledgeBase';
 import type { AgentTool } from './types';
 
 export const AGENT_TOOLS: AgentTool[] = [
@@ -12,6 +13,7 @@ export const AGENT_TOOLS: AgentTool[] = [
   readFileTool,
   executeCodeTool,
   fetchUrlTool,
+  searchKnowledgeBaseTool,
 ];
 
 export function toOpenAiTools(): OpenAI.Chat.Completions.ChatCompletionFunctionTool[] {

@@ -325,6 +325,90 @@ db.run(`
 `);
 
 db.run(`
+  CREATE TABLE IF NOT EXISTS ai_thread_sessions (
+    thread_id      TEXT    NOT NULL PRIMARY KEY,
+    guild_id       TEXT    NOT NULL,
+    channel_id     TEXT    NOT NULL,
+    owner_user_id  TEXT    NOT NULL,
+    mode           TEXT    NOT NULL CHECK(mode IN ('ask','research')),
+    status         TEXT    NOT NULL DEFAULT 'active' CHECK(status IN ('active','closed')),
+    turn_count     INTEGER NOT NULL DEFAULT 0,
+    created_at     INTEGER NOT NULL,
+    last_used_at   INTEGER NOT NULL
+  )
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS ai_thread_items (
+    id         INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    thread_id  TEXT    NOT NULL,
+    seq        INTEGER NOT NULL,
+    item_json  TEXT    NOT NULL,
+    created_at INTEGER NOT NULL
+  )
+`);
+
+db.run(`
+  CREATE INDEX IF NOT EXISTS idx_ai_thread_items_thread
+  ON ai_thread_items (thread_id, seq)
+`);
+
+db.run(`
+  CREATE INDEX IF NOT EXISTS idx_ai_thread_sessions_last_used
+  ON ai_thread_sessions (last_used_at)
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS ai_research_jobs (
+    job_id          TEXT    NOT NULL PRIMARY KEY,
+    idempotency_key TEXT    NOT NULL UNIQUE,
+    thread_id       TEXT    NOT NULL,
+    user_id         TEXT    NOT NULL,
+    guild_id        TEXT    NOT NULL,
+    channel_id      TEXT    NOT NULL,
+    query           TEXT    NOT NULL,
+    status          TEXT    NOT NULL DEFAULT 'queued' CHECK(status IN ('queued','running','done','error')),
+    report          TEXT,
+    sources         TEXT,
+    stats           TEXT,
+    error           TEXT,
+    created_at      INTEGER NOT NULL,
+    finished_at     INTEGER
+  )
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS ai_research_events (
+    id         INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    job_id     TEXT    NOT NULL,
+    seq        INTEGER NOT NULL,
+    stage      TEXT    NOT NULL,
+    message    TEXT    NOT NULL,
+    created_at INTEGER NOT NULL
+  )
+`);
+
+db.run(`
+  CREATE INDEX IF NOT EXISTS idx_ai_research_events_job
+  ON ai_research_events (job_id, seq)
+`);
+
+db.run(`
+  CREATE INDEX IF NOT EXISTS idx_ai_research_jobs_created_at
+  ON ai_research_jobs (created_at)
+`);
+
+db.run(`
+  CREATE TABLE IF NOT EXISTS ai_research_usage (
+    user_id    TEXT    NOT NULL,
+    guild_id   TEXT    NOT NULL,
+    usage_date TEXT    NOT NULL,
+    count      INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, guild_id, usage_date)
+  )
+`);
+
+db.run(`
   CREATE INDEX IF NOT EXISTS idx_ai_trace_events_trace
   ON ai_trace_events (trace_id, seq)
 `);
@@ -348,10 +432,43 @@ const traceCleanupStmt = db.prepare(
   'DELETE FROM ai_traces WHERE created_at < $cutoff',
 );
 
+const researchRetentionDays = Number(
+  process.env.AI_RESEARCH_RETENTION_DAYS ?? 14,
+);
+const researchEventsCleanupStmt = db.prepare(
+  `DELETE FROM ai_research_events WHERE job_id IN (
+     SELECT job_id FROM ai_research_jobs WHERE created_at < $cutoff
+   )`,
+);
+const researchJobsCleanupStmt = db.prepare(
+  'DELETE FROM ai_research_jobs WHERE created_at < $cutoff',
+);
+
+const threadRetentionDays = Number(process.env.AI_THREAD_RETENTION_DAYS ?? 30);
+const threadItemsCleanupStmt = db.prepare(
+  `DELETE FROM ai_thread_items WHERE thread_id IN (
+     SELECT thread_id FROM ai_thread_sessions WHERE last_used_at < $cutoff
+   )`,
+);
+const threadSessionsCleanupStmt = db.prepare(
+  'DELETE FROM ai_thread_sessions WHERE last_used_at < $cutoff',
+);
+
 function cleanupAiTraces() {
   const cutoff = Date.now() - traceRetentionDays * 24 * 60 * 60 * 1000;
   traceEventsCleanupStmt.run({ $cutoff: cutoff });
   traceCleanupStmt.run({ $cutoff: cutoff });
+
+  const researchCutoff =
+    Date.now() - researchRetentionDays * 24 * 60 * 60 * 1000;
+  researchEventsCleanupStmt.run({ $cutoff: researchCutoff });
+  researchJobsCleanupStmt.run({ $cutoff: researchCutoff });
+
+  // A Discord thread auto-archives long before this; once nobody has spoken in
+  // it for a month its transcript is dead weight.
+  const threadCutoff = Date.now() - threadRetentionDays * 24 * 60 * 60 * 1000;
+  threadItemsCleanupStmt.run({ $cutoff: threadCutoff });
+  threadSessionsCleanupStmt.run({ $cutoff: threadCutoff });
 }
 
 setInterval(() => {

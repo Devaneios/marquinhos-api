@@ -4,6 +4,8 @@ import {
   GUARDRAIL_ROAST_PROMPT,
   MAIN_CLASSIFY_SYSTEM_PROMPT,
   SUB_CLASSIFIERS,
+  THREAD_ASK_SYSTEM_PROMPT,
+  THREAD_COMPACTION_PROMPT,
 } from './prompts';
 
 export interface PromptRef {
@@ -16,6 +18,8 @@ const STATIC_PROMPTS: Record<string, string> = {
   MAIN_CLASSIFY_SYSTEM_PROMPT,
   GUARDRAIL_ROAST_PROMPT,
   AGENT_TASK_SYSTEM_PROMPT,
+  THREAD_ASK_SYSTEM_PROMPT,
+  THREAD_COMPACTION_PROMPT,
   ...Object.fromEntries(
     Object.entries(SUB_CLASSIFIERS).map(([category, config]) => [
       `SUB_CLASSIFY_${category.toUpperCase()}`,

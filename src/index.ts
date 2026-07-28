@@ -18,6 +18,8 @@ import wordleRouter from './routes/wordle.route';
 import { AgentRateLimitService } from './services/aiChat/AgentRateLimitService';
 import { describeStaticPrompts } from './services/aiChat/promptRegistry';
 import { RateLimitService } from './services/aiChat/RateLimitService';
+import { ResearchOrchestrator } from './services/aiChat/research/ResearchOrchestrator';
+import { ResearchRateLimitService } from './services/aiChat/research/ResearchRateLimitService';
 import { DockerodeSandboxClient } from './services/aiChat/sandbox/DockerodeSandboxClient';
 import { SandboxManager } from './services/aiChat/sandbox/SandboxManager';
 import { GamificationService } from './services/gamification';
@@ -131,6 +133,11 @@ try {
   new GamificationService().initializeDefaults();
   new RateLimitService().seedDefaults();
   new AgentRateLimitService().seedDefaults();
+  new ResearchRateLimitService().seedDefaults();
+  // A research job lives in this process, so a restart orphans anything still
+  // queued or running. Fail those now instead of leaving the bot polling a job
+  // that will never move.
+  new ResearchOrchestrator().reapStaleJobs();
 } catch (err) {
   console.error('Fatal: gamification initialization failed', err);
   process.exit(1);

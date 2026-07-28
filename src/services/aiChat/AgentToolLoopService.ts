@@ -1,5 +1,6 @@
 import type OpenAI from 'openai';
 import { logger } from '../../utils/logger';
+import { ToolDispatcher } from './agent/ToolDispatcher';
 import { AgentRateLimitService } from './AgentRateLimitService';
 import { NOOP_TRACE, type TraceContext } from './AiTraceRecorder';
 import { GuardrailService } from './GuardrailService';
@@ -7,7 +8,7 @@ import { OpenAiClient, type OpenAiToolMessage } from './OpenAiClient';
 import { AGENT_TASK_SYSTEM_PROMPT } from './prompts';
 import { DockerodeSandboxClient } from './sandbox/DockerodeSandboxClient';
 import { SandboxCapacityError, SandboxManager } from './sandbox/SandboxManager';
-import { findTool, toOpenAiTools } from './tools/registry';
+import { toOpenAiTools } from './tools/registry';
 import type { AiChatRequest, AiChatResult } from './types';
 
 export const MAX_ITERATIONS = 15;
@@ -15,7 +16,6 @@ export const MAX_TOOL_CALLS_TOTAL = 30;
 // The bot's HTTP client gives respondToTag 120s. Stopping the loop well before
 // that lets us send back what we found instead of the caller timing out.
 export const AGENT_DEADLINE_MS = 90_000;
-const TOOL_RESULT_MAX_CHARS = 4000;
 const EMBED_THRESHOLD_CHARS = 1800;
 const EMBED_TITLE = '🛠️ Resultado';
 const WRAP_UP_INSTRUCTION = `Seu orçamento de ferramentas acabou, então não chame mais nenhuma ferramenta. Responda agora ao pedido original resumindo o que você já descobriu até aqui, incluindo o caminho ou os passos que você percorreu. Se não terminou a tarefa, diga onde parou e o que faltou.`;
@@ -31,6 +31,7 @@ export class AgentToolLoopService {
     ),
     private openAiClient: OpenAiClient = new OpenAiClient(),
     private now: () => number = Date.now,
+    private toolDispatcher: ToolDispatcher = new ToolDispatcher(sandboxManager),
   ) {}
 
   async run(
@@ -128,18 +129,14 @@ export class AgentToolLoopService {
 
       for (const toolCall of message.tool_calls) {
         if (toolCallsUsed >= MAX_TOOL_CALLS_TOTAL) {
-          logger.warn('ai.tool.budget_exhausted', {
-            traceId: trace.traceId,
-            iteration,
-            toolCallsUsed,
-          });
           messages.push({
             role: 'tool',
             tool_call_id: toolCall.id,
-            content: JSON.stringify({
-              status: 'error',
-              message: 'Orçamento de chamadas de ferramentas esgotado.',
-            }),
+            content: this.toolDispatcher.budgetExhausted(
+              trace,
+              iteration,
+              toolCallsUsed,
+            ),
           });
           continue;
         }
@@ -209,7 +206,7 @@ export class AgentToolLoopService {
     iteration: number,
   ): Promise<string> {
     if (toolCall.type !== 'function') {
-      return this.toolError(
+      return this.toolDispatcher.failure(
         trace,
         iteration,
         toolCall.type,
@@ -218,111 +215,15 @@ export class AgentToolLoopService {
       );
     }
 
-    const tool = findTool(toolCall.function.name);
-    if (!tool) {
-      return this.toolError(
-        trace,
-        iteration,
-        toolCall.function.name,
-        toolCall.function.arguments,
-        `Ferramenta "${toolCall.function.name}" não encontrada.`,
-      );
-    }
-
-    let args: Record<string, unknown>;
-    try {
-      args = JSON.parse(toolCall.function.arguments);
-    } catch {
-      return this.toolError(
-        trace,
-        iteration,
-        tool.name,
-        toolCall.function.arguments,
-        'Argumentos inválidos (JSON malformado). Corrija e tente novamente.',
-      );
-    }
-
-    const startedAt = Date.now();
-    try {
-      const result = await tool.execute(args, {
-        containerId,
-        exec: (id, argv) => this.tracedExec(trace, id, argv),
-      });
-      const truncated = result.slice(0, TOOL_RESULT_MAX_CHARS);
-      trace.tool({
-        name: tool.name,
-        iteration,
+    return this.toolDispatcher.dispatch(
+      {
+        name: toolCall.function.name,
         rawArguments: toolCall.function.arguments,
-        args,
-        result,
-        status: 'success',
-        durationMs: Date.now() - startedAt,
-      });
-      return JSON.stringify({ status: 'success', result: truncated });
-    } catch (error) {
-      const message = `Erro ao executar ${tool.name}: ${(error as Error).message}`;
-      trace.tool({
-        name: tool.name,
-        iteration,
-        rawArguments: toolCall.function.arguments,
-        args,
-        status: 'error',
-        error: message,
-        durationMs: Date.now() - startedAt,
-      });
-      return JSON.stringify({
-        status: 'error',
-        message: message.slice(0, TOOL_RESULT_MAX_CHARS),
-      });
-    }
-  }
-
-  private toolError(
-    trace: TraceContext,
-    iteration: number,
-    name: string,
-    rawArguments: string,
-    message: string,
-  ): string {
-    trace.tool({
-      name,
+      },
+      containerId,
+      trace,
       iteration,
-      rawArguments,
-      status: 'error',
-      error: message,
-      durationMs: 0,
-    });
-    return JSON.stringify({ status: 'error', message });
-  }
-
-  private async tracedExec(
-    trace: TraceContext,
-    containerId: string,
-    argv: string[],
-  ) {
-    const startedAt = Date.now();
-    try {
-      const result = await this.sandboxManager.exec(containerId, argv);
-      trace.exec({
-        containerId,
-        argv,
-        stdout: result.stdout,
-        stderr: result.stderr,
-        exitCode: result.exitCode,
-        durationMs: Date.now() - startedAt,
-      });
-      return result;
-    } catch (error) {
-      trace.exec({
-        containerId,
-        argv,
-        stdout: '',
-        stderr: (error as Error).message,
-        exitCode: -1,
-        durationMs: Date.now() - startedAt,
-      });
-      throw error;
-    }
+    );
   }
 
   private buildContextMessages(

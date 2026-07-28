@@ -4,6 +4,7 @@ import { fetchUrlTool } from './fetchUrl';
 import { grepSearchTool } from './grepSearch';
 import { listDirectoryTool } from './listDirectory';
 import { readFileTool } from './readFile';
+import { searchWebTool } from './searchWeb';
 import type { AgentTool } from './types';
 
 export const AGENT_TOOLS: AgentTool[] = [
@@ -11,6 +12,7 @@ export const AGENT_TOOLS: AgentTool[] = [
   grepSearchTool,
   readFileTool,
   executeCodeTool,
+  searchWebTool,
   fetchUrlTool,
 ];
 

@@ -50,6 +50,17 @@ Required environment variables (`.env`):
 | `CORS_ORIGINS` | Comma-separated allowlist (defaults to `localhost:4200` + prod web app) |
 | `KNOWLEDGE_BASE_URL` | Base URL of the local devaneios-chats RAG service (e.g. `http://devaneios-rag:8420`), used by the bot to look up server lore/history. Optional — omit to run without it. |
 | `KNOWLEDGE_BASE_API_KEY` | Bearer token sent to `KNOWLEDGE_BASE_URL`. Must match that service's `RAG_API_KEY`. |
+| `OPENAI_API_KEY` | OpenAI credentials for every AI feature |
+| `OPENAI_MODEL` | Model id (defaults to `gpt-5.4-mini`) |
+| `OPENAI_REASONING_EFFORT` | Reasoning effort for thread calls (defaults to `medium`); the research pipeline sets its own per phase |
+| `SEARXNG_URL` | SearXNG instance used by `search_web` and deep research (defaults to `https://searxng.frois.net.br`) |
+| `AI_THREAD_TOKEN_BUDGET` | Transcript size that triggers thread compaction (defaults to `120000`) |
+| `AI_THREAD_RETENTION_DAYS` | How long an idle thread transcript is kept (defaults to `30`) |
+| `AI_RESEARCH_MAX_ROUNDS` | Search rounds per research job (defaults to `5`) |
+| `AI_RESEARCH_MAX_SEARCHES` | Total searches per research job (defaults to `30`) |
+| `AI_RESEARCH_MAX_FETCHES` | Total pages read per research job (defaults to `40`) |
+| `AI_RESEARCH_DEADLINE_MS` | Wall-clock deadline per research job (defaults to `900000`; the last 3 min are reserved for analysis and writing) |
+| `AI_RESEARCH_RETENTION_DAYS` | How long research jobs and their events are kept (defaults to `14`) |
 
 Run the database migrations and start the dev server:
 
@@ -105,6 +116,18 @@ curl http://localhost:3000/api/gamification/level/123/456 \
 | `/api/evolutive-achievements` | `evolutiveAchievements.route.ts` | Tiered achievement progression |
 | `/api/games/maze` | `maze.route.ts` | Maze minigame sessions |
 | `/api/wordle` | `wordle.route.ts` | Wordle guesses and word list review |
+| `/api/ai-chat` | `aiChat.route.ts` | Tag replies, `/ia` threads, deep research jobs, traces |
+
+### AI endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/ai-chat/respond` | The `@Marquinhos` tag flow: classify, answer in persona, revise |
+| `POST` | `/api/ai-chat/thread/ask` | One turn of an `/ia perguntar` thread — skips classification, keeps the transcript |
+| `POST` | `/api/ai-chat/research` | Starts a deep research job; returns `202` with a `jobId` |
+| `GET` | `/api/ai-chat/research/:jobId` | Job status, progress events, and the finished report |
+| `GET` | `/api/ai-chat/traces` | Recent AI traces |
+| `GET` | `/api/ai-chat/traces/:traceId` | One trace with every LLM call, tool call and exec |
 
 ## Architecture / How it Works
 
@@ -115,7 +138,12 @@ curl http://localhost:3000/api/gamification/level/123/456 \
 - **Persistence**: `bun:sqlite`, single file DB at `SQLITE_PATH`. Schema is created idempotently in `database/sqlite.ts` (`CREATE TABLE IF NOT EXISTS`), with incremental changes applied via numbered SQL files in `database/migrations/` and run through `database/migrate.ts` at boot.
 - **Gamification**: `services/gamification.ts` handles XP awards, level-up detection, and cooldowns; `services/evolutiveAchievements.ts` tracks per-user stat counters and auto-evolves tiered achievements when thresholds are crossed. Both are wired into the same `addXP` call path.
 - **Wordle**: valid-guess word list is pre-generated at Docker build time (`scripts/build-valid-guesses.ts`) from `wordlist.txt` + an external word frequency list, then loaded into memory once on boot (`getValidationSet()`) to avoid disk I/O per request.
-- **Rate limiting**: `express-rate-limit` is wired into `index.ts` but currently commented out — re-enable before exposing sensitive endpoints publicly.
+- **AI features**: three separate paths share one set of tools and one trace recorder.
+  - *Tag flow* (`AiChatService`): two-layer intent classification, persona response per category, then a revision pass. Runs on Chat Completions. Unchanged by the `/ia` work.
+  - *Threads* (`thread/AiThreadService`): one turn of an `/ia perguntar` conversation. No classification — it goes straight to an agentic loop with the full tool set. Runs on the **Responses API** so the model's own `reasoning` items (with `encrypted_content`) can be stored and replayed on later turns; `reasoning.context: 'all_turns'` is what carries the reasoning forward. Reasoning is never posted to Discord, only kept in context and in the trace. Transcripts live in `ai_thread_items` as raw API items, and are compacted into a summary once they pass `AI_THREAD_TOKEN_BUDGET`.
+  - *Deep research* (`research/DeepResearchService`): a frontier search with a reflection loop — plan facets and 8-16 sub-queries, search SearXNG in parallel, rank and dedupe hits, let an LLM triage step pick which results are worth reading, compress each page to the claims it serves plus the follow-up queries it opens, push those follow-ups back onto the frontier (up to 3 levels deep), and keep going until an evidence floor is met (2 rounds, 12 relevant sources, 2 sources per facet) — the reflection step can say what to chase next but cannot end the job early. Then a dedicated analysis pass cross-reads every source before the report is written. The per-source compression is what keeps the synthesis call inside the context window. Jobs run detached in-process (`research/ResearchOrchestrator`) because a pass takes minutes; the bot polls. `POST /research` is idempotent on `idempotencyKey` since the bot's HTTP client retries.
+- **Agent tools** (`services/aiChat/tools/`): `list_directory`, `grep_search`, `read_file` and `execute_code` run inside a Docker sandbox on `NetworkMode: none`; `search_web` and `fetch_url` run in the API process instead, which is what keeps arbitrary model-written code off the network. `web/fetchPage.ts` holds the SSRF screening, body cap and HTML→markdown conversion shared by `fetch_url` and the research reader.
+- **Rate limiting**: `express-rate-limit` is wired into `index.ts` but currently commented out — re-enable before exposing sensitive endpoints publicly. AI usage has its own daily limits in `ai_chat_config`: `user_daily_limit`, `global_daily_limit`, `agent_daily_limit`, and `research_daily_limit` (much lower — one research job spends dozens of LLM calls).
 - **Error handling**: a 404 catch-all and a 4-arg Express error handler sit at the bottom of the middleware stack; error details are only returned in the response body outside of `production`.
 
 ## Contributing

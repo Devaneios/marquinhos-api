@@ -196,3 +196,55 @@ describe('SearxngClient.search', () => {
     expect(fetchFn).toHaveBeenCalled();
   });
 });
+
+describe('SearxngClient.searchDetailed', () => {
+  it('returns the same hits search() does, under a hits key', async () => {
+    const fetchFn = mock(async () => jsonResponse(twoResults));
+    const client = new SearxngClient({ fetchFn, baseUrl: 'https://s.example' });
+
+    const detailed = await client.searchDetailed('recife');
+
+    expect(detailed.hits.map((entry) => entry.url)).toEqual([
+      'https://pt.wikipedia.org/wiki/Recife',
+      'https://recife.pe.gov.br/',
+    ]);
+  });
+
+  it('reports the engines that did not answer', async () => {
+    // An instance whose engines all timed out answers 200 with results: [],
+    // which is otherwise indistinguishable from a topic nobody wrote about.
+    const fetchFn = mock(async () =>
+      jsonResponse({
+        results: [],
+        unresponsive_engines: [
+          ['google', 'CAPTCHA'],
+          ['duckduckgo', 'timeout'],
+        ],
+      }),
+    );
+    const client = new SearxngClient({ fetchFn, baseUrl: 'https://s.example' });
+
+    const detailed = await client.searchDetailed('recife');
+
+    expect(detailed.hits).toEqual([]);
+    expect(detailed.unresponsiveEngines).toEqual(['google', 'duckduckgo']);
+  });
+
+  it('handles a flat unresponsive_engines list and a missing one alike', async () => {
+    const flat = new SearxngClient({
+      fetchFn: mock(async () =>
+        jsonResponse({ results: [], unresponsive_engines: ['brave'] }),
+      ),
+      baseUrl: 'https://s.example',
+    });
+    const absent = new SearxngClient({
+      fetchFn: mock(async () => jsonResponse({ results: [] })),
+      baseUrl: 'https://s.example',
+    });
+
+    expect((await flat.searchDetailed('x')).unresponsiveEngines).toEqual([
+      'brave',
+    ]);
+    expect((await absent.searchDetailed('x')).unresponsiveEngines).toEqual([]);
+  });
+});

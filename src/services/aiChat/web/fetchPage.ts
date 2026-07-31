@@ -14,7 +14,11 @@ import TurndownService from 'turndown';
 import { gfm } from 'turndown-plugin-gfm';
 
 export const MAX_REDIRECTS = 3;
-export const MAX_BODY_BYTES = 512 * 1024;
+// 512 KB used to be the cap, and it silently destroyed exactly the pages worth
+// reading: a class reference or a gov portal spends more than that on nav and
+// inline script before the article starts, so the cap landed inside markup that
+// the noise filter then removed, leaving an empty string.
+export const MAX_BODY_BYTES = 4 * 1024 * 1024;
 export const MAX_LINKS = 150;
 export const FETCH_TIMEOUT_MS = 8000;
 const MAX_LABEL_CHARS = 80;
@@ -25,7 +29,16 @@ const ALLOWED_CONTENT_TYPES = [
   'text/plain',
   'application/json',
   'application/xhtml+xml',
+  'application/pdf',
 ];
+
+/**
+ * Text extraction runs in this process with no worker, so it is CPU the API
+ * cannot serve requests during. A 48-page report costs ~8s; capping pages keeps
+ * a 500-page document from freezing everything, and the callers slice the text
+ * down to a fraction of this anyway.
+ */
+export const MAX_PDF_PAGES = 20;
 
 interface LookupResult {
   address: string;
@@ -42,9 +55,55 @@ export type FetchFn = (
   init?: RequestInit,
 ) => Promise<Response>;
 
+export interface PdfText {
+  text: string;
+  /** Title from the document metadata, empty when the pdf carries none. */
+  title: string;
+}
+
+export type PdfTextExtractor = (bytes: Uint8Array) => Promise<PdfText>;
+
 export interface FetchPageDeps {
   fetchFn: FetchFn;
   lookupFn: LookupFn;
+  extractPdfText?: PdfTextExtractor;
+}
+
+/**
+ * Pulls text out of a pdf, first `MAX_PDF_PAGES` pages only.
+ *
+ * unpdf is imported on demand because it bundles pdf.js: loading it costs real
+ * startup time, and most of this process never touches a pdf. Note that pdf.js
+ * detaches the buffer it is handed, so `bytes` must not be read afterwards.
+ */
+async function extractPdfTextWithUnpdf(bytes: Uint8Array): Promise<PdfText> {
+  const { getDocumentProxy } = await import('unpdf');
+  const pdf = await getDocumentProxy(bytes);
+
+  let title = '';
+  try {
+    const metadata = await pdf.getMetadata();
+    const raw = (metadata.info as { Title?: unknown } | undefined)?.Title;
+    if (typeof raw === 'string') title = raw.trim();
+  } catch {
+    // Metadata is a nicety; the search hit's title already covers us.
+  }
+
+  const pages: string[] = [];
+  const limit = Math.min(pdf.numPages, MAX_PDF_PAGES);
+  for (let pageNumber = 1; pageNumber <= limit; pageNumber++) {
+    const page = await pdf.getPage(pageNumber);
+    const content = await page.getTextContent();
+    pages.push(
+      content.items
+        .map((item) => ('str' in item ? item.str : ''))
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    );
+  }
+
+  return { text: pages.filter(Boolean).join('\n\n'), title };
 }
 
 export type FetchPageMode = 'text' | 'links';
@@ -161,15 +220,20 @@ export async function assertUrlIsSafe(
   return url;
 }
 
-async function readCappedText(
+/**
+ * Reads at most `MAX_BODY_BYTES`, keeping the raw bytes: a pdf decoded as text
+ * is destroyed, so the decision of how to interpret the body belongs to the
+ * caller that knows the content type.
+ */
+async function readCappedBody(
   response: Response,
-): Promise<{ text: string; truncated: boolean }> {
-  if (!response.body) return { text: '', truncated: false };
+): Promise<{ bytes: Uint8Array; truncated: boolean }> {
+  if (!response.body) return { bytes: new Uint8Array(), truncated: false };
 
   const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let text = '';
+  const chunks: Uint8Array[] = [];
   let total = 0;
+  let truncated = false;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -178,16 +242,24 @@ async function readCappedText(
 
     const remaining = MAX_BODY_BYTES - total;
     if (value.byteLength >= remaining) {
-      text += decoder.decode(value.slice(0, remaining));
+      chunks.push(value.slice(0, remaining));
+      total += remaining;
+      truncated = true;
       await reader.cancel().catch(() => undefined);
-      return { text, truncated: true };
+      break;
     }
 
+    chunks.push(value);
     total += value.byteLength;
-    text += decoder.decode(value, { stream: true });
   }
 
-  return { text, truncated: false };
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { bytes, truncated };
 }
 
 const turndownService = new TurndownService({
@@ -302,6 +374,7 @@ export function createPageFetcher(
 ): PageFetcher {
   const fetchFn = deps.fetchFn ?? fetch;
   const lookupFn = deps.lookupFn ?? (dnsLookup as unknown as LookupFn);
+  const extractPdfText = deps.extractPdfText ?? extractPdfTextWithUnpdf;
 
   return async function fetchPage(
     rawUrl: string,
@@ -321,7 +394,11 @@ export function createPageFetcher(
           credentials: 'omit',
           headers: {
             'user-agent': USER_AGENT,
-            accept: 'text/html,text/plain',
+            // Stating a preference without refusing the rest: an Accept of
+            // "text/html,text/plain" makes servers that negotiate content
+            // answer 406 rather than serve the page (nvlpubs.nist.gov does).
+            accept:
+              'text/html,application/xhtml+xml,text/plain;q=0.9,application/json;q=0.8,*/*;q=0.7',
           },
           signal: AbortSignal.timeout(timeoutMs),
         });
@@ -369,13 +446,75 @@ export function createPageFetcher(
         );
       }
 
-      const { text, truncated } = await readCappedText(response);
+      const { bytes, truncated } = await readCappedBody(response);
       const isHtml =
         contentType.includes('html') || contentType.includes('xhtml');
+      const isPdf = contentType.includes('pdf');
+
+      if (isPdf) {
+        if (mode === 'links') {
+          fail(
+            `"${current.toString()}" é um PDF, então não tem links para extrair.`,
+          );
+        }
+        // A pdf keeps its cross-reference table at the end of the file, so a
+        // body we cut short is not a shorter pdf — it is an unparseable one.
+        if (truncated) {
+          fail(
+            `"${current.toString()}" é um PDF maior que ${Math.round(
+              MAX_BODY_BYTES / 1024,
+            )}KB e um PDF cortado não abre.`,
+          );
+        }
+
+        let pdf: PdfText;
+        try {
+          pdf = await extractPdfText(bytes);
+        } catch (error) {
+          fail(
+            `Não consegui ler o PDF "${current.toString()}": ${(error as Error).message}`,
+          );
+        }
+        if (!pdf.text.trim()) {
+          fail(
+            `O PDF "${current.toString()}" não tem texto extraível — provavelmente é digitalizado como imagem.`,
+          );
+        }
+
+        return {
+          finalUrl: current.toString(),
+          contentType,
+          isHtml: false,
+          truncated,
+          title: pdf.title,
+          content: pdf.text,
+          links: [],
+        };
+      }
+
+      const text = new TextDecoder().decode(bytes);
 
       if (mode === 'links' && !isHtml) {
         fail(
           `"${current.toString()}" não é HTML (${contentType}), então não tem links para extrair.`,
+        );
+      }
+
+      const content =
+        mode === 'links'
+          ? ''
+          : isHtml
+            ? htmlToMarkdown(text, current)
+            : text.trim();
+
+      // An empty result on a body we cut short is a page we failed to read, not
+      // a page with nothing on it. Saying so is what lets the caller log it and
+      // the user see it, instead of the source vanishing.
+      if (mode === 'text' && truncated && !content) {
+        fail(
+          `"${current.toString()}" é grande demais: o corpo passou de ${Math.round(
+            MAX_BODY_BYTES / 1024,
+          )}KB e foi cortado antes de qualquer conteúdo legível.`,
         );
       }
 
@@ -385,12 +524,7 @@ export function createPageFetcher(
         isHtml,
         truncated,
         title: isHtml ? extractTitle(text) : '',
-        content:
-          mode === 'links'
-            ? ''
-            : isHtml
-              ? htmlToMarkdown(text, current)
-              : text.trim(),
+        content,
         links: mode === 'links' ? extractLinks(text, current) : [],
       };
     }

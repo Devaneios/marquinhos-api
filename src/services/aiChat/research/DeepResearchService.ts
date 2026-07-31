@@ -94,6 +94,19 @@ export interface DeepResearchResult {
 
 type QueryOrigin = 'plan' | 'source' | 'reflection';
 
+/** Why a selected page produced no source, so the thread can say it out loud. */
+type ReadOutcome =
+  | { ok: true; source: Omit<NumberedExtraction, 'index'> }
+  | { ok: false; url: string; reason: string };
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
+
 interface FrontierEntry {
   query: string;
   depth: number;
@@ -120,6 +133,124 @@ async function mapWithConcurrency<T, R>(
   );
   await Promise.all(runners);
   return results;
+}
+
+/** Terms per query above which SearXNG's AND semantics start matching nothing. */
+const MAX_QUERY_TERMS = 6;
+/** File types the reader cannot parse. PDF is absent on purpose: it reads those. */
+const UNREADABLE_EXTENSIONS =
+  /\.(docx?|pptx?|xlsx?|zip|rar|tar|gz|epub|mp[34]|avi|mkv)($|\?)/i;
+
+/**
+ * Removes engine operators the models keep inventing. SearXNG passes them
+ * through to engines that mostly ignore them, so a query carrying `site:` comes
+ * back either empty or full of results that match nothing but the operator.
+ *
+ * Quotes get the same treatment for a harsher reason: the engines honour them,
+ * so a follow-up phrased as `"Semi-Adjusting BSP-tree" 4250 moving objects`
+ * asks for an exact phrase plus four more terms and reliably finds nothing.
+ */
+export function sanitizeQuery(query: string): string {
+  return (
+    query
+      .replace(/https?:\/\/\S+/gi, ' ')
+      .replace(
+        /\b(?:site|filetype|ext|inurl|intitle|intext|related):\S+/gi,
+        ' ',
+      )
+      .replace(/\b(?:OR|AND)\b/g, ' ')
+      .replace(/["«»“”()[\]{}]/g, ' ')
+      // Only the quoting apostrophes, so "Godot's" survives intact.
+      .replace(/(?<![\p{L}\p{N}])['‘’]|['‘’](?![\p{L}\p{N}])/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+}
+
+/** Words that cost a term against the engines' AND without narrowing anything. */
+const QUERY_STOPWORDS = new Set([
+  'a',
+  'ao',
+  'aos',
+  'as',
+  'às',
+  'com',
+  'como',
+  'da',
+  'das',
+  'de',
+  'do',
+  'dos',
+  'e',
+  'em',
+  'na',
+  'nas',
+  'no',
+  'nos',
+  'o',
+  'os',
+  'ou',
+  'para',
+  'pelo',
+  'por',
+  'qual',
+  'quais',
+  'que',
+  'se',
+  'sobre',
+  'um',
+  'uma',
+  'é',
+  'an',
+  'and',
+  'are',
+  'for',
+  'from',
+  'how',
+  'in',
+  'is',
+  'of',
+  'on',
+  'or',
+  'the',
+  'to',
+  'vs',
+  'what',
+  'why',
+  'with',
+]);
+
+/**
+ * A proper noun, an API name or a version number is what makes a query find the
+ * page the model had in mind; a generic verb is what it can afford to lose.
+ */
+function isDistinctive(term: string): boolean {
+  return /[\p{Lu}]/u.test(term) || /[0-9_]/.test(term);
+}
+
+/**
+ * Rewrites a query that came back empty into the shortest version still worth
+ * searching. Slicing off the head instead — which is what this used to do —
+ * keeps the stopwords a query opens with and throws away the proper noun it
+ * ends with, so the retry misses for the same reason the original did.
+ */
+export function relaxQuery(query: string): string {
+  const kept = query
+    .split(/\s+/)
+    .filter((term) => term && !QUERY_STOPWORDS.has(term.toLowerCase()));
+  if (kept.length <= MAX_QUERY_TERMS) return kept.join(' ');
+
+  return kept
+    .map((term, index) => ({ term, index }))
+    .sort(
+      (a, b) =>
+        Number(isDistinctive(b.term)) - Number(isDistinctive(a.term)) ||
+        a.index - b.index,
+    )
+    .slice(0, MAX_QUERY_TERMS)
+    .sort((a, b) => a.index - b.index)
+    .map((entry) => entry.term)
+    .join(' ');
 }
 
 /** Loose enough that a reworded repeat of a query still counts as the same one. */
@@ -152,7 +283,9 @@ class Frontier {
   push(queries: string[], depth: number, origin: QueryOrigin): FrontierEntry[] {
     if (depth > MAX_FRONTIER_DEPTH) return [];
     const added: FrontierEntry[] = [];
-    for (const query of queries) {
+    for (const raw of queries) {
+      const query = sanitizeQuery(raw);
+      if (!query) continue;
       const key = queryKey(query);
       // Never search the same ground twice, whoever proposed it.
       if (!key || this.seen.has(key)) continue;
@@ -220,6 +353,7 @@ export class DeepResearchService {
     let searchesUsed = 0;
     let fetchesUsed = 0;
     let maxDepth = 0;
+    let searchErrors = 0;
     let truncatedByBudget = false;
 
     while (round < MAX_ROUNDS && frontier.size > 0) {
@@ -268,17 +402,27 @@ export class DeepResearchService {
           .map((entry) => `- ${entry.query}`)
           .join('\n')}`,
       );
-      const hitsByQuery = await this.search(
+      const { hitsByQuery, errors } = await this.search(
         entries.map((entry) => entry.query),
         trace,
       );
       searchesUsed += entries.length;
+      if (errors.length > 0) {
+        searchErrors += errors.length;
+        report(
+          'search_failed',
+          `${errors.length} de ${entries.length} busca(s) falharam: ${errors[0]}`,
+        );
+      }
 
       const candidates = rankHits(hitsByQuery, {
         maxPerDomain: MAX_PER_DOMAIN,
         limit: TRIAGE_POOL + visited.size,
       })
         .filter((hit) => !visited.has(normalizeUrl(hit.url)))
+        // Dropped before triage rather than inside its prompt, because a model
+        // told to prefer official sources will pick the PDF every time.
+        .filter((hit) => !UNREADABLE_EXTENSIONS.test(hit.url))
         .slice(0, TRIAGE_POOL);
 
       const selected = candidates.length
@@ -306,7 +450,7 @@ export class DeepResearchService {
         );
 
         const round_ = round;
-        const newExtractions = await mapWithConcurrency(
+        const outcomes = await mapWithConcurrency(
           selected,
           FETCH_CONCURRENCY,
           (hit) => this.readAndExtract(plan, hit, trace, round_),
@@ -314,12 +458,33 @@ export class DeepResearchService {
         fetchesUsed += selected.length;
 
         const followUps: string[] = [];
-        for (const extraction of newExtractions) {
-          if (!extraction) continue;
-          extractions.push({ ...extraction, index: extractions.length + 1 });
-          if (extraction.extraction.relevant) {
-            followUps.push(...extraction.extraction.followUpQueries);
+        const failures: { url: string; reason: string }[] = [];
+        for (const outcome of outcomes) {
+          if (!outcome.ok) {
+            failures.push({ url: outcome.url, reason: outcome.reason });
+            continue;
           }
+          extractions.push({
+            ...outcome.source,
+            index: extractions.length + 1,
+          });
+          if (outcome.source.extraction.relevant) {
+            followUps.push(...outcome.source.extraction.followUpQueries);
+          }
+        }
+
+        // A page that never opened used to vanish without a word, which made a
+        // report built on two of ten sources look like a report built on ten.
+        if (failures.length > 0) {
+          report(
+            'read_failed',
+            `${failures.length} de ${selected.length} página(s) não abriram:\n${failures
+              .map(
+                (failure) =>
+                  `- ${hostOf(failure.url)}: ${failure.reason.slice(0, 160)}`,
+              )
+              .join('\n')}`,
+          );
         }
 
         const relevant = extractions.filter(
@@ -395,6 +560,7 @@ export class DeepResearchService {
       numbered,
       analysis,
       truncatedByBudget,
+      searchErrors,
       trace,
     );
 
@@ -475,24 +641,50 @@ export class DeepResearchService {
   private async search(
     queries: string[],
     trace: TraceContext,
-  ): Promise<SearchHit[][]> {
-    return mapWithConcurrency(queries, SEARCH_CONCURRENCY, async (query) => {
-      try {
-        return await this.searxng.search(query, {
-          limit: HITS_PER_QUERY,
-          language: 'pt-BR',
-        });
-      } catch (error) {
-        // One dead sub-query must not kill the round; the other angles still
-        // produce a report.
-        logger.warn('ai.research.search_failed', {
-          traceId: trace.traceId,
-          query,
-          error: (error as Error).message,
-        });
-        return [];
-      }
-    });
+  ): Promise<{ hitsByQuery: SearchHit[][]; errors: string[] }> {
+    const errors: string[] = [];
+    const hitsByQuery = await mapWithConcurrency(
+      queries,
+      SEARCH_CONCURRENCY,
+      async (query) => {
+        try {
+          const hits = await this.searxng.search(query, {
+            limit: HITS_PER_QUERY,
+            language: 'pt-BR',
+          });
+          if (hits.length > 0) return hits;
+
+          // Every term is ANDed by the engines behind SearXNG, so a long
+          // keyword string narrows itself down to nothing. A relaxed version
+          // usually matches plenty, and one extra search is cheap next to a
+          // dead round.
+          const shortened = relaxQuery(query);
+          if (!shortened || shortened === query) return hits;
+          logger.info('ai.research.search_shortened', {
+            traceId: trace.traceId,
+            query,
+            shortened,
+          });
+          return await this.searxng.search(shortened, {
+            limit: HITS_PER_QUERY,
+            language: 'pt-BR',
+          });
+        } catch (error) {
+          // One dead sub-query must not kill the round; the other angles still
+          // produce a report. But a search that errored is not a search that
+          // found nothing, and the difference has to reach the user.
+          const message = (error as Error).message;
+          errors.push(message);
+          logger.warn('ai.research.search_failed', {
+            traceId: trace.traceId,
+            query,
+            error: message,
+          });
+          return [];
+        }
+      },
+    );
+    return { hitsByQuery, errors };
   }
 
   /**
@@ -567,7 +759,7 @@ export class DeepResearchService {
     hit: SearchHit,
     trace: TraceContext,
     round: number,
-  ): Promise<Omit<NumberedExtraction, 'index'> | null> {
+  ): Promise<ReadOutcome> {
     let content: string;
     let title = hit.title;
     try {
@@ -577,7 +769,9 @@ export class DeepResearchService {
       });
       content = page.content.slice(0, SOURCE_CONTENT_CHARS);
       if (page.title) title = page.title;
-      if (!content.trim()) return null;
+      if (!content.trim()) {
+        return { ok: false, url: hit.url, reason: 'página sem texto algum' };
+      }
     } catch (error) {
       if (!(error instanceof FetchPageError)) throw error;
       logger.info('ai.research.fetch_skipped', {
@@ -585,7 +779,7 @@ export class DeepResearchService {
         url: hit.url,
         reason: error.message,
       });
-      return null;
+      return { ok: false, url: hit.url, reason: error.message };
     }
 
     try {
@@ -608,14 +802,18 @@ export class DeepResearchService {
         trace,
         phase: `research_extract[round=${round}]`,
       });
-      return { url: hit.url, title, extraction };
+      return { ok: true, source: { url: hit.url, title, extraction } };
     } catch (error) {
       logger.warn('ai.research.extract_failed', {
         traceId: trace.traceId,
         url: hit.url,
         error: (error as Error).message,
       });
-      return null;
+      return {
+        ok: false,
+        url: hit.url,
+        reason: `falha ao interpretar a página: ${(error as Error).message}`,
+      };
     }
   }
 
@@ -703,10 +901,16 @@ export class DeepResearchService {
     sources: NumberedExtraction[],
     analysis: ResearchAnalysis | undefined,
     truncatedByBudget: boolean,
+    searchErrors: number,
     trace: TraceContext,
   ): Promise<string> {
     if (sources.length === 0) {
-      return `## Resumo\n\nNão achei fonte utilizável para "${originalQuery}". As buscas não devolveram página que respondesse ao objetivo, ou as que devolveram não abriram.\n\n## Divergências e limites\n\nSem fonte não tem relatório. Tenta reformular o tema com termos mais específicos.`;
+      // Blaming the user's topic when it was our search backend that fell over
+      // sends them off to reword a question that was never the problem.
+      if (searchErrors > 0) {
+        return `## Resumo\n\nNão consegui pesquisar "${originalQuery}": ${searchErrors} busca(s) falharam no motor de busca, então não teve material para ler. Isso é problema do meu lado, não do teu tema.\n\n## Divergências e limites\n\nSem busca não tem fonte, e sem fonte não tem relatório. Tenta de novo em alguns minutos.`;
+      }
+      return `## Resumo\n\nNão achei fonte utilizável para "${originalQuery}". As buscas responderam, mas não devolveram página que servisse ao objetivo, ou as que devolveram não abriram.\n\n## Divergências e limites\n\nSem fonte não tem relatório. Tenta reformular o tema com termos mais específicos.`;
     }
 
     const budgetNote = truncatedByBudget

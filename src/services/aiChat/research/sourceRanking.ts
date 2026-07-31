@@ -43,6 +43,13 @@ export interface RankedHit extends SearchHit {
 export interface RankOptions {
   maxPerDomain?: number;
   limit?: number;
+  /**
+   * Normalized urls to leave out. Excluding here rather than filtering the
+   * result is what keeps a page already read from spending its domain's share
+   * of `maxPerDomain` — the way a later round ends up with no candidates at all
+   * while the searches behind it returned plenty.
+   */
+  exclude?: Set<string>;
 }
 
 /**
@@ -60,12 +67,14 @@ export function rankHits(
 ): RankedHit[] {
   const maxPerDomain = options.maxPerDomain ?? 2;
   const limit = options.limit ?? 12;
+  const exclude = options.exclude;
 
   const merged = new Map<string, RankedHit>();
   for (const hits of hitsByQuery) {
     const seenInThisQuery = new Set<string>();
     for (const hit of hits) {
       const key = normalizeUrl(hit.url);
+      if (exclude?.has(key)) continue;
       if (seenInThisQuery.has(key)) continue;
       seenInThisQuery.add(key);
 

@@ -137,3 +137,51 @@ describe('rankHits', () => {
     expect(ranked[0]?.url).toBe('https://www.a.com/p?utm_source=x');
   });
 });
+
+describe('rankHits exclude', () => {
+  it('lets an excluded url free up the domain slot it used to occupy', () => {
+    // Three pages of one domain plus a fourth already read. Without exclude the
+    // read one eats a slot of the cap and the fresh third page never surfaces,
+    // which is how a later round ends up with zero candidates.
+    const hits = [
+      [
+        hit('https://godot.org/lido', { score: 9 }),
+        hit('https://godot.org/a', { score: 3 }),
+        hit('https://godot.org/b', { score: 2 }),
+        hit('https://godot.org/c', { score: 1 }),
+      ],
+    ];
+
+    const ranked = rankHits(hits, {
+      maxPerDomain: 3,
+      exclude: new Set([normalizeUrl('https://godot.org/lido')]),
+    });
+
+    expect(ranked.map((entry) => entry.url)).toEqual([
+      'https://godot.org/a',
+      'https://godot.org/b',
+      'https://godot.org/c',
+    ]);
+  });
+
+  it('matches the exclude set on the normalized url, not the raw one', () => {
+    const hits = [
+      [hit('https://WWW.Godot.org/p/?utm_source=x'), hit('https://b.com/1')],
+    ];
+
+    const ranked = rankHits(hits, {
+      exclude: new Set([normalizeUrl('https://godot.org/p')]),
+    });
+
+    expect(ranked.map((entry) => entry.url)).toEqual(['https://b.com/1']);
+  });
+
+  it('ranks exactly as before when no exclude set is given', () => {
+    const hits = [[hit('https://a.com/1'), hit('https://b.com/2')]];
+
+    expect(rankHits(hits).map((entry) => entry.url)).toEqual([
+      'https://a.com/1',
+      'https://b.com/2',
+    ]);
+  });
+});

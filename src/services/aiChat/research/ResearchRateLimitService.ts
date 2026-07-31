@@ -10,7 +10,7 @@ interface AiChatConfigRow {
  * Much lower than the chat and agent limits on purpose: one deep research job
  * spends dozens of LLM calls and up to two dozen page fetches.
  */
-const DEFAULT_RESEARCH_DAILY_LIMIT = 5;
+const DEFAULT_RESEARCH_DAILY_LIMIT = 50;
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -35,10 +35,7 @@ export class ResearchRateLimitService {
     guildId: string,
     date: string = today(),
   ): boolean {
-    const limit = this.getConfigValue(
-      'research_daily_limit',
-      DEFAULT_RESEARCH_DAILY_LIMIT,
-    );
+    const limit = DEFAULT_RESEARCH_DAILY_LIMIT;
 
     const row = this.db
       .query<

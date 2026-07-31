@@ -4,15 +4,18 @@ import {
   DeepResearchService,
   MAX_FRONTIER_DEPTH,
   MIN_RELEVANT_SOURCES,
+  relaxQuery,
+  sanitizeQuery,
 } from '../../src/services/aiChat/research/DeepResearchService';
 import {
   FetchPageError,
   type FetchedPage,
   type PageFetcher,
 } from '../../src/services/aiChat/web/fetchPage';
-import type {
-  SearchHit,
-  SearxngClient,
+import {
+  SearxngError,
+  type SearchHit,
+  type SearxngClient,
 } from '../../src/services/aiChat/web/SearxngClient';
 
 function hit(url: string, title = url): SearchHit {
@@ -160,12 +163,26 @@ function fakeClient(
 
 function fakeSearxng(
   results: SearchHit[][] | ((query: string) => SearchHit[]),
+  unresponsiveEngines: string[] = [],
 ): SearxngClient {
   let call = 0;
   return {
-    search: mock(async (query: string) =>
-      typeof results === 'function' ? results(query) : (results[call++] ?? []),
-    ),
+    searchDetailed: mock(async (query: string) => ({
+      hits:
+        typeof results === 'function'
+          ? results(query)
+          : (results[call++] ?? []),
+      unresponsiveEngines,
+    })),
+  } as unknown as SearxngClient;
+}
+
+/** A backend where every query throws, e.g. the instance being down. */
+function brokenSearxng(message: string): SearxngClient {
+  return {
+    searchDetailed: mock(async () => {
+      throw new SearxngError(message);
+    }),
   } as unknown as SearxngClient;
 }
 
@@ -194,9 +211,12 @@ function service(
 }
 
 function searchedQueries(searxng: SearxngClient): string[] {
-  return (searxng.search as unknown as ReturnType<typeof mock>).mock.calls.map(
-    (call) => call[0] as string,
-  );
+  return searchCalls(searxng).map((call) => call[0] as string);
+}
+
+function searchCalls(searxng: SearxngClient): unknown[][] {
+  return (searxng.searchDetailed as unknown as ReturnType<typeof mock>).mock
+    .calls;
 }
 
 function fetchedUrls(fetcher: PageFetcher): string[] {
@@ -312,6 +332,46 @@ describe('DeepResearchService triage', () => {
     expect(fetchedUrls(fetcher)).toEqual(['https://c.com/3']);
   });
 
+  it('tells the next round which gaps the last reflection found', async () => {
+    // The gaps used to be printed in the thread and dropped, so triage kept
+    // picking pages that reinforced what was already covered.
+    const triageInputs: string[] = [];
+    const searxng = fakeSearxng(hitsPerQuery(2));
+    const client = fakeClient({
+      reflection: [
+        {
+          sufficient: false,
+          gaps: ['nenhuma fonte sobre spawn de Brotato'],
+          followUpQueries: ['Brotato spawn waves'],
+        },
+      ],
+      triage: (urls: any[]) => {
+        return {
+          picks: urls.map((url: any) => ({
+            url,
+            priority: 'media',
+            reason: 'serve',
+          })),
+        };
+      },
+    });
+    const spy = client.structured as unknown as ReturnType<typeof mock>;
+
+    await service({ client, searxng }).run({ query: 'x' });
+
+    for (const call of spy.mock.calls) {
+      const options = call[0] as {
+        phase?: string;
+        input: { content: string }[];
+      };
+      if (options.phase?.startsWith('research_triage')) {
+        triageInputs.push(options.input[0]!.content);
+      }
+    }
+    expect(triageInputs[0]).not.toContain('Brotato');
+    expect(triageInputs[1]).toContain('nenhuma fonte sobre spawn de Brotato');
+  });
+
   it('reads the high priority picks before the merely useful ones', async () => {
     const searxng = fakeSearxng([
       [hit('https://a.com/1'), hit('https://b.com/2')],
@@ -361,6 +421,226 @@ describe('DeepResearchService triage', () => {
 
     expect(fetchedUrls(fetcher)).toEqual(['https://a.com/1']);
     expect(result.sources).toHaveLength(1);
+  });
+});
+
+describe('DeepResearchService degraded search backend', () => {
+  it('says the search engine is failing instead of staying quiet about it', async () => {
+    const events: [string, string][] = [];
+    const searxng = brokenSearxng('O SearXNG respondeu 429 Too Many Requests');
+
+    await service({ searxng }).run({
+      query: 'x',
+      onProgress: (stage, message) => events.push([stage, message]),
+    });
+
+    const failure = events.find(([stage]) => stage === 'search_failed');
+    expect(failure?.[1]).toContain('429');
+  });
+
+  it('blames the search engine, not the topic, when every search errored', async () => {
+    const searxng = brokenSearxng('SearXNG fora do ar');
+
+    const result = await service({ searxng }).run({ query: 'tema legítimo' });
+
+    expect(result.report).toMatch(/busca/i);
+    expect(result.report).not.toMatch(/reformular o tema/i);
+  });
+
+  it('still blames the topic when the searches worked and found nothing', async () => {
+    const result = await service({ searxng: fakeSearxng(() => []) }).run({
+      query: 'assunto obscuro',
+    });
+
+    expect(result.report).toMatch(/reformular o tema/i);
+  });
+});
+
+describe('sanitizeQuery', () => {
+  it('strips the quotes the prompt promises are stripped', () => {
+    expect(sanitizeQuery('"Semi-Adjusting BSP-tree" 4250 moving objects')).toBe(
+      'Semi-Adjusting BSP-tree 4250 moving objects',
+    );
+    expect(sanitizeQuery('«Brotato» (wave scaling) [2026]')).toBe(
+      'Brotato wave scaling 2026',
+    );
+  });
+
+  it('keeps an apostrophe inside a word but drops a quoting one', () => {
+    expect(sanitizeQuery("Godot's collision layers")).toBe(
+      "Godot's collision layers",
+    );
+    expect(sanitizeQuery("'bullet heaven' scaling")).toBe(
+      'bullet heaven scaling',
+    );
+  });
+
+  it('drops a url pasted into a query', () => {
+    expect(
+      sanitizeQuery('MultiMeshInstance2D docs https://docs.godotengine.org/pt'),
+    ).toBe('MultiMeshInstance2D docs');
+  });
+
+  it('still strips the engine operators it always did', () => {
+    expect(
+      sanitizeQuery('open weights site:opensource.org OR filetype:pdf'),
+    ).toBe('open weights');
+  });
+});
+
+describe('relaxQuery', () => {
+  it('drops stopwords before anything that carries meaning', () => {
+    expect(
+      relaxQuery('qual o impacto do escalonamento de ondas em Brotato'),
+    ).toBe('impacto escalonamento ondas Brotato');
+  });
+
+  it('keeps the proper nouns when it has to cut down to the ceiling', () => {
+    // The old head-slice kept "Godot PhysicsServer2D performance direct usage
+    // vs" — six words, two of them dead weight, and the anchor "2D" gone.
+    expect(
+      relaxQuery(
+        'Godot PhysicsServer2D performance direct usage vs nodes benchmark 2D',
+      ),
+    ).toBe('Godot PhysicsServer2D performance direct usage 2D');
+  });
+
+  it('preserves the original word order of whatever it kept', () => {
+    expect(
+      relaxQuery('spawn pacing waves enemy Brotato Halls Torment director'),
+    ).toBe('spawn pacing waves Brotato Halls Torment');
+  });
+
+  it('gives back nothing when the query was only stopwords', () => {
+    expect(relaxQuery('o que é o de a')).toBe('');
+  });
+});
+
+describe('DeepResearchService query hygiene', () => {
+  it('strips search operators the model keeps inventing', async () => {
+    const searxng = fakeSearxng(hitsPerQuery(1));
+    const client = fakeClient({
+      plan: {
+        ...plan,
+        subQueries: [
+          {
+            query:
+              'definição open weights site:opensource.org OR site:linuxfoundation.org',
+            facetId: 'base',
+            angle: 'definicao',
+            rationale: 'base',
+          },
+        ],
+      },
+    });
+
+    await service({ client, searxng }).run({ query: 'x' });
+
+    const queries = searchedQueries(searxng);
+    expect(queries).toEqual(['definição open weights']);
+  });
+
+  it('retries a query that came back empty with fewer terms', async () => {
+    // SearXNG ANDs every term, so a nine-word keyword string matches nothing
+    // while its head does.
+    const long =
+      'Vampire Survivors spawn director wave table enemy density scaling';
+    const searxng = fakeSearxng((query) =>
+      query === long ? [] : [hit('https://a.com/1')],
+    );
+    const client = fakeClient({
+      plan: {
+        ...plan,
+        subQueries: [
+          {
+            query: long,
+            facetId: 'base',
+            angle: 'dados',
+            rationale: 'dados',
+          },
+        ],
+      },
+    });
+
+    const result = await service({ client, searxng }).run({ query: 'x' });
+
+    const queries = searchedQueries(searxng);
+    expect(queries[0]).toBe(long);
+    expect(queries[1]).toBe('Vampire Survivors spawn director wave table');
+    expect(result.sources).toHaveLength(1);
+  });
+
+  it('does not retry a short query that legitimately found nothing', async () => {
+    const searxng = fakeSearxng(() => []);
+    const client = fakeClient({
+      plan: {
+        ...plan,
+        subQueries: [
+          {
+            query: 'assunto obscuro',
+            facetId: 'base',
+            angle: 'definicao',
+            rationale: 'base',
+          },
+        ],
+      },
+    });
+
+    await service({ client, searxng }).run({ query: 'x' });
+
+    expect(searchedQueries(searxng)).toEqual(['assunto obscuro']);
+  });
+
+  it('does not narrow the search to one language', async () => {
+    // The planner is told to write English queries for topics whose literature
+    // is in English; filtering those to pt-BR is how they came back empty.
+    const searxng = fakeSearxng(hitsPerQuery(1));
+
+    await service({ searxng }).run({ query: 'x' });
+
+    for (const call of searchCalls(searxng)) {
+      expect(
+        (call[1] as { language?: string } | undefined)?.language,
+      ).toBeUndefined();
+    }
+  });
+
+  it('charges the retry to the search budget instead of running it for free', async () => {
+    const long = 'Godot bullet heaven wave scaling director benchmark 2026';
+    const searxng = fakeSearxng((query) =>
+      query === long ? [] : [hit('https://a.com/1')],
+    );
+    const client = fakeClient({
+      plan: {
+        ...plan,
+        subQueries: [
+          { query: long, facetId: 'base', angle: 'dados', rationale: 'dados' },
+        ],
+      },
+    });
+
+    const result = await service({ client, searxng }).run({ query: 'x' });
+
+    expect(searchedQueries(searxng)).toHaveLength(2);
+    expect(result.stats.searches).toBe(2);
+  });
+
+  it('never fetches a url the reader cannot parse, but keeps pdfs', async () => {
+    const searxng = fakeSearxng([
+      [
+        hit('https://gov.br/planilha.xlsx'),
+        hit('https://nist.gov/report.pdf'),
+        hit('https://a.com/artigo'),
+      ],
+    ]);
+    const fetcher = fakeFetcher();
+
+    await service({ searxng, fetcher }).run({ query: 'x' });
+
+    expect(fetchedUrls(fetcher)).toEqual([
+      'https://nist.gov/report.pdf',
+      'https://a.com/artigo',
+    ]);
   });
 });
 
@@ -706,11 +986,80 @@ describe('DeepResearchService progress', () => {
 
     expect(stages).toContain('plan');
     expect(stages).toContain('search');
+    expect(stages).toContain('sift');
     expect(stages).toContain('triage');
     expect(stages).toContain('read');
     expect(stages).toContain('extract');
     expect(stages).toContain('analyze');
     expect(stages).toContain('synthesize');
+  });
+
+  it('says which pages it failed to read and why', async () => {
+    const events: [string, string][] = [];
+    const searxng = fakeSearxng([
+      [hit('https://ok.com/1'), hit('https://bad.com/2')],
+    ]);
+    const fetcher = fakeFetcher(async (url) => {
+      if (url.includes('bad')) throw new FetchPageError('respondeu 401');
+      return page('conteudo bom');
+    });
+
+    await service({ searxng, fetcher }).run({
+      query: 'x',
+      onProgress: (stage, message) => events.push([stage, message]),
+    });
+
+    const failure = events.find(([stage]) => stage === 'read_failed');
+    expect(failure?.[1]).toContain('bad.com');
+    expect(failure?.[1]).toContain('401');
+  });
+
+  it('separates "found nothing" from "already read it all" before triage', async () => {
+    // A round showing "0 de 0" used to be unreadable: engines down, everything
+    // already visited and a topic with no coverage all looked the same.
+    const events: [string, string][] = [];
+    const searxng = fakeSearxng(() => [hit('https://same.com/p')]);
+    const client = fakeClient({
+      reflection: [{ sufficient: false, gaps: [], followUpQueries: ['pista'] }],
+    });
+
+    await service({ client, searxng }).run({
+      query: 'x',
+      onProgress: (stage, message) => events.push([stage, message]),
+    });
+
+    const sifts = events.filter(([stage]) => stage === 'sift');
+    expect(sifts.at(-1)?.[1]).toMatch(/j[áa] lid[ao]/i);
+  });
+
+  it('names the engines that were down instead of blaming the topic', async () => {
+    const events: [string, string][] = [];
+    const searxng = fakeSearxng(() => [], ['google', 'duckduckgo']);
+
+    await service({ searxng }).run({
+      query: 'x',
+      onProgress: (stage, message) => events.push([stage, message]),
+    });
+
+    const sift = events.find(([stage]) => stage === 'sift');
+    expect(sift?.[1]).toContain('google');
+    expect(sift?.[1]).toContain('duckduckgo');
+  });
+
+  it('says when a lead was dropped for being past the depth limit', async () => {
+    const events: [string, string][] = [];
+    const client = fakeClient({
+      extraction: extractionWithFollowUps(),
+      reflection: [{ sufficient: false, gaps: [], followUpQueries: [] }],
+    });
+
+    await service({ client, searxng: fakeSearxng(hitsPerQuery(1)) }).run({
+      query: 'x',
+      onProgress: (stage, message) => events.push([stage, message]),
+    });
+
+    const follow = events.filter(([stage]) => stage === 'follow');
+    expect(follow.at(-1)?.[1]).toMatch(/profundidade/i);
   });
 
   it('announces the new threads a source opened', async () => {

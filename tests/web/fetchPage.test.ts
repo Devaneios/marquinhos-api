@@ -113,6 +113,109 @@ describe('fetchPage result shape', () => {
     expect(page.truncated).toBe(true);
   });
 
+  it('fails loudly when the cap cut the body before any readable content', async () => {
+    // A real shape: a huge nav sidebar eats the cap, the nav is stripped as
+    // noise, and what is left is nothing. Silently reporting an empty page here
+    // is what made research sources disappear without a trace.
+    const navHeavy = `<html><body><nav>${'<a href="/x">link</a>'.repeat(
+      Math.ceil(MAX_BODY_BYTES / 20),
+    )}</nav><main><p>o conteúdo de verdade</p></main></body></html>`;
+
+    await expect(
+      fetcherFor(navHeavy)('https://example.com/docs'),
+    ).rejects.toThrow(/grande|cap|truncad/i);
+  });
+
+  it('reads a pdf by extracting its text', async () => {
+    const fetchFn = mock(
+      async () =>
+        new Response(new Uint8Array([37, 80, 68, 70]), {
+          status: 200,
+          headers: { 'content-type': 'application/pdf' },
+        }),
+    );
+    const extractPdfText = mock(async () => ({
+      text: 'Artificial Intelligence Risk Management Framework',
+      title: 'NIST AI 100-1',
+    }));
+
+    const page = await createPageFetcher({
+      fetchFn,
+      lookupFn: publicLookup(),
+      extractPdfText,
+    })('https://nist.gov/report.pdf');
+
+    expect(page.content).toContain('Risk Management Framework');
+    expect(page.title).toBe('NIST AI 100-1');
+    expect(page.isHtml).toBe(false);
+    expect(extractPdfText).toHaveBeenCalled();
+  });
+
+  it('refuses a pdf the byte cap cut, since a partial pdf cannot be parsed', async () => {
+    const fetchFn = mock(
+      async () =>
+        new Response(new Uint8Array(MAX_BODY_BYTES + 1024), {
+          status: 200,
+          headers: { 'content-type': 'application/pdf' },
+        }),
+    );
+    const extractPdfText = mock(async () => ({ text: 'x', title: '' }));
+
+    await expect(
+      createPageFetcher({
+        fetchFn,
+        lookupFn: publicLookup(),
+        extractPdfText,
+      })('https://example.com/huge.pdf'),
+    ).rejects.toThrow(/pdf/i);
+    expect(extractPdfText).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a pdf it could not parse as a skippable failure', async () => {
+    const fetchFn = mock(
+      async () =>
+        new Response(new Uint8Array([37, 80, 68, 70]), {
+          status: 200,
+          headers: { 'content-type': 'application/pdf' },
+        }),
+    );
+    const extractPdfText = mock(async () => {
+      throw new Error('Invalid PDF structure.');
+    });
+
+    const promise = createPageFetcher({
+      fetchFn,
+      lookupFn: publicLookup(),
+      extractPdfText,
+    })('https://example.com/broken.pdf');
+
+    await expect(promise).rejects.toBeInstanceOf(FetchPageError);
+  });
+
+  it('asks for html first but accepts anything, so servers do not answer 406', async () => {
+    const fetchFn = mock(async () =>
+      htmlResponse('<html><body><p>ok</p></body></html>'),
+    );
+    await createPageFetcher({ fetchFn, lookupFn: publicLookup() })(
+      'https://example.com',
+    );
+
+    const init = (
+      fetchFn.mock.calls as unknown as [URL | string, RequestInit][]
+    )[0]![1] as { headers: Record<string, string> };
+    expect(init.headers.accept).toMatch(/^text\/html/);
+    expect(init.headers.accept).toContain('*/*');
+  });
+
+  it('still reports an empty page as empty when nothing was truncated', async () => {
+    const page = await fetcherFor('<html><body><nav>menu</nav></body></html>')(
+      'https://example.com',
+    );
+
+    expect(page.content).toBe('');
+    expect(page.truncated).toBe(false);
+  });
+
   it('returns no links in text mode and no content in links mode', async () => {
     const html = '<html><body><a href="/a">A</a><p>texto</p></body></html>';
 

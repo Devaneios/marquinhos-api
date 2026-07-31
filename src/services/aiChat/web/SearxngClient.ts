@@ -22,6 +22,12 @@ export interface SearchOptions {
   limit?: number;
 }
 
+export interface SearchResponse {
+  hits: SearchHit[];
+  /** Engines that failed the query — captcha, timeout, rate limit. */
+  unresponsiveEngines: string[];
+}
+
 export type SearxngFetchFn = (
   input: URL | string,
   init?: RequestInit,
@@ -54,6 +60,24 @@ function isHttpUrl(raw: string): boolean {
   }
 }
 
+/**
+ * SearXNG reports failures as `[engine, reason]` pairs, but older versions and
+ * some instances send a flat list of names. Only the name is worth surfacing.
+ */
+function parseUnresponsive(payload: {
+  unresponsive_engines?: unknown;
+}): string[] {
+  if (!Array.isArray(payload.unresponsive_engines)) return [];
+  const names: string[] = [];
+  for (const entry of payload.unresponsive_engines) {
+    const name = Array.isArray(entry) ? entry[0] : entry;
+    if (typeof name === 'string' && name && !names.includes(name)) {
+      names.push(name);
+    }
+  }
+  return names;
+}
+
 export class SearxngClient {
   private fetchFn: SearxngFetchFn;
   private baseUrl: string;
@@ -67,6 +91,18 @@ export class SearxngClient {
     query: string,
     options: SearchOptions = {},
   ): Promise<SearchHit[]> {
+    return (await this.searchDetailed(query, options)).hits;
+  }
+
+  /**
+   * The same search, plus the engines that failed it. An instance whose engines
+   * all got captcha'd answers 200 with an empty result list, so without this a
+   * broken backend is indistinguishable from a topic nobody wrote about.
+   */
+  async searchDetailed(
+    query: string,
+    options: SearchOptions = {},
+  ): Promise<SearchResponse> {
     const params = new URLSearchParams({ q: query, format: 'json' });
     if (options.language) params.set('language', options.language);
     if (options.categories) params.set('categories', options.categories);
@@ -99,9 +135,12 @@ export class SearxngClient {
       );
     }
 
-    let payload: { results?: unknown };
+    let payload: { results?: unknown; unresponsive_engines?: unknown };
     try {
-      payload = (await response.json()) as { results?: unknown };
+      payload = (await response.json()) as {
+        results?: unknown;
+        unresponsive_engines?: unknown;
+      };
     } catch {
       throw new SearxngError(
         `O SearXNG devolveu uma resposta que não é JSON para "${query}".`,
@@ -136,6 +175,6 @@ export class SearxngClient {
       });
     }
 
-    return hits;
+    return { hits, unresponsiveEngines: parseUnresponsive(payload) };
   }
 }

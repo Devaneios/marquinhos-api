@@ -48,8 +48,11 @@ Regras para as consultas:
 - Pelo menos uma consulta deve mirar fonte primária ou oficial (lei, norma, paper, relatório, documentação, dado bruto) e pelo menos uma deve mirar críticas, riscos ou contrapontos.
 - Cada faceta precisa de no mínimo duas consultas atacando-a por caminhos diferentes.
 - Use termos que apareceriam nas páginas que você quer achar, não a pergunta em linguagem natural. Varie o vocabulário entre consultas: sinônimos, jargão da área, nomes próprios prováveis.
+- **De 2 a 6 palavras por consulta.** O buscador exige TODAS as palavras na mesma página, então cada palavra a mais estreita o resultado. Precisão vem de escolher a palavra certa, não de empilhar qualificadores. Se o assunto precisa de mais recortes, faça duas consultas curtas em vez de uma longa.
+  - Ruim: "Vampire Survivors spawn director wave table enemy density scaling".
+  - Bom: "Vampire Survivors spawn algorithm" e "bullet heaven wave scaling".
 - Se o tema é sobre o Brasil ou tem literatura em português, escreva consultas em português; se tem literatura relevante em inglês, escreva também versões em inglês. Cobrir os dois idiomas conta como ângulos diferentes.
-- Nunca inclua operadores de site: ou filetype: — a busca é genérica.
+- Nunca inclua operador de busca: nada de site:, filetype:, inurl:, OR, AND ou parênteses. Eles são removidos antes da busca e só desperdiçam a consulta.
 - Não economize consultas. Um plano estreito produz um relatório raso.
 </instructions>
 
@@ -83,6 +86,9 @@ Critérios, em ordem:
 - Prefira o que cobre faceta ainda descoberta ao que reforça o que já está coberto.
 - Prefira uma página que contradiz o consenso encontrado até agora a mais uma que o repete: divergência vale leitura.
 - Descarte agregador sem conteúdo próprio, lista de links, portal de notícias repetindo release, conteúdo promocional, página de categoria e o que for claramente duplicata de algo já lido.
+O leitor abre HTML, texto, JSON e PDF — então lei, norma, paper e relatório em PDF são bem-vindos. Ele não passa por login nem assinatura, e não lê PDF digitalizado como imagem (sem texto embutido). Então:
+- Descarte veículo que sabidamente exige assinatura ou bloqueia leitor automático para mostrar o texto.
+- Descarte .doc, .ppt, .xls e .zip, que o leitor não abre.
 Marque "alta" só para o que parece decisivo para o objetivo. Se poucos candidatos prestam, devolva poucos — encher a lista com lixo gasta orçamento de leitura à toa.
 </instructions>
 

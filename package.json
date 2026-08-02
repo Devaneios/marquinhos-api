@@ -20,6 +20,7 @@
     "turndown": "^7.2.4",
     "turndown-plugin-gfm": "^1.0.2",
     "unpdf": "^1.8.0",
+    "ws": "^8.21.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -36,6 +37,7 @@
     "@types/node": "^26.1.1",
     "@types/spotify-web-api-node": "^5.0.11",
     "@types/turndown": "^5.0.6",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.63.0",
     "@typescript-eslint/parser": "^8.63.0",
     "autocannon": "^8.0.0",

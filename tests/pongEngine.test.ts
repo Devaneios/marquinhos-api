@@ -1,0 +1,183 @@
+import { describe, expect, it } from 'bun:test';
+import { PongEngine } from '../src/services/activity/pong/PongEngine';
+
+const CONFIG = {
+  width: 800,
+  height: 480,
+  paddleHeight: 80,
+  paddleWidth: 12,
+  paddleSpeed: 400,
+  ballRadius: 8,
+  ballSpeed: 300,
+  winningScore: 5,
+};
+
+describe('PongEngine', () => {
+  it('starts centered with the ball serving toward one side', () => {
+    const engine = new PongEngine(CONFIG);
+    const state = engine.getState();
+
+    expect(state.ball.x).toBe(400);
+    expect(state.ball.y).toBe(240);
+    expect(Math.abs(state.ball.vx)).toBe(300);
+    expect(state.ball.vy).toBe(0);
+    expect(state.paddles.left).toBe((480 - 80) / 2);
+    expect(state.paddles.right).toBe((480 - 80) / 2);
+    expect(state.score).toEqual({ left: 0, right: 0 });
+    expect(state.winner).toBeNull();
+  });
+
+  it('advances the ball position by velocity * dt on tick', () => {
+    const engine = new PongEngine(CONFIG);
+    const before = engine.getState();
+    engine.tick(100); // 100ms
+    const after = engine.getState();
+
+    expect(after.ball.x).toBeCloseTo(before.ball.x + before.ball.vx * 0.1, 5);
+    expect(after.ball.y).toBeCloseTo(before.ball.y + before.ball.vy * 0.1, 5);
+  });
+
+  it('bounces off the top wall and reflects vy', () => {
+    const engine = new PongEngine(CONFIG);
+    (engine as any).state.ball = { x: 400, y: 5, vx: 0, vy: -100 };
+
+    engine.tick(100);
+
+    const state = engine.getState();
+    expect(state.ball.vy).toBeGreaterThan(0);
+    expect(state.ball.y).toBeGreaterThanOrEqual(CONFIG.ballRadius);
+  });
+
+  it('bounces off the bottom wall and reflects vy', () => {
+    const engine = new PongEngine(CONFIG);
+    (engine as any).state.ball = { x: 400, y: 475, vx: 0, vy: 100 };
+
+    engine.tick(100);
+
+    const state = engine.getState();
+    expect(state.ball.vy).toBeLessThan(0);
+    expect(state.ball.y).toBeLessThanOrEqual(CONFIG.height - CONFIG.ballRadius);
+  });
+
+  it('reflects the ball off the left paddle when moving toward it', () => {
+    const engine = new PongEngine(CONFIG);
+    (engine as any).state.paddles.left = 200;
+    (engine as any).state.ball = { x: 20, y: 240, vx: -100, vy: 0 };
+
+    engine.tick(100);
+
+    expect(engine.getState().ball.vx).toBeGreaterThan(0);
+  });
+
+  it('reflects the ball off the right paddle when moving toward it', () => {
+    const engine = new PongEngine(CONFIG);
+    (engine as any).state.paddles.right = 200;
+    (engine as any).state.ball = { x: 780, y: 240, vx: 100, vy: 0 };
+
+    engine.tick(100);
+
+    expect(engine.getState().ball.vx).toBeLessThan(0);
+  });
+
+  it('does not reflect off a paddle when the ball misses its y-range', () => {
+    const engine = new PongEngine(CONFIG);
+    (engine as any).state.paddles.left = 0;
+    (engine as any).state.ball = { x: 20, y: 400, vx: -100, vy: 0 };
+
+    engine.tick(100);
+
+    expect(engine.getState().ball.vx).toBeLessThan(0);
+  });
+
+  it('scores for the right side and re-centers the ball when it passes the left edge', () => {
+    const engine = new PongEngine(CONFIG);
+    (engine as any).state.paddles.left = 400; // out of the ball's y-range
+    (engine as any).state.ball = { x: 5, y: 240, vx: -100, vy: 0 };
+
+    engine.tick(100);
+
+    const state = engine.getState();
+    expect(state.score).toEqual({ left: 0, right: 1 });
+    expect(state.ball.x).toBe(400);
+    expect(state.ball.y).toBe(240);
+    expect(state.winner).toBeNull();
+  });
+
+  it('scores for the left side when the ball passes the right edge', () => {
+    const engine = new PongEngine(CONFIG);
+    (engine as any).state.paddles.right = 400; // out of the ball's y-range
+    (engine as any).state.ball = { x: 795, y: 240, vx: 100, vy: 0 };
+
+    engine.tick(100);
+
+    expect(engine.getState().score).toEqual({ left: 1, right: 0 });
+  });
+
+  it('declares a winner once a side reaches the winning score and freezes the match', () => {
+    const engine = new PongEngine(CONFIG);
+    (engine as any).state.paddles.left = 400; // out of the ball's y-range
+    (engine as any).state.score = { left: 0, right: 4 };
+    (engine as any).state.ball = { x: 5, y: 240, vx: -100, vy: 0 };
+
+    engine.tick(100);
+
+    const state = engine.getState();
+    expect(state.score.right).toBe(5);
+    expect(state.winner).toBe('right');
+
+    const ballAtWin = engine.getState().ball;
+    engine.tick(1000);
+    expect(engine.getState().ball).toEqual(ballAtWin);
+  });
+
+  it('moves a paddle according to its input direction, clamped to the field', () => {
+    const engine = new PongEngine(CONFIG);
+    engine.setInput('left', -1);
+
+    engine.tick(1000); // 1s, would move 400px up (more than half the field)
+
+    expect(engine.getState().paddles.left).toBe(0);
+  });
+
+  it('does not move a paddle with no input', () => {
+    const engine = new PongEngine(CONFIG);
+    const before = engine.getState().paddles.right;
+
+    engine.setInput('right', 0);
+    engine.tick(1000);
+
+    expect(engine.getState().paddles.right).toBe(before);
+  });
+
+  it('reset() restores a fresh game after ticks and a scored point', () => {
+    const engine = new PongEngine(CONFIG);
+    (engine as any).state.paddles.left = 400; // out of the ball's y-range
+    (engine as any).state.ball = { x: 5, y: 240, vx: -100, vy: 0 };
+    engine.tick(100); // right scores, ball re-centers but score/paddles changed
+    engine.setInput('left', 1);
+    engine.tick(50);
+
+    engine.reset();
+    const state = engine.getState();
+
+    expect(state.score).toEqual({ left: 0, right: 0 });
+    expect(state.winner).toBeNull();
+    expect(state.paddles.left).toBe((480 - 80) / 2);
+    expect(state.paddles.right).toBe((480 - 80) / 2);
+    expect(state.ball.x).toBe(400);
+    expect(state.ball.y).toBe(240);
+    const speed = Math.sqrt(state.ball.vx ** 2 + state.ball.vy ** 2);
+    expect(speed).toBeCloseTo(300, 1);
+  });
+
+  it('reset() clears held paddle input so the paddle stops moving', () => {
+    const engine = new PongEngine(CONFIG);
+    engine.setInput('left', -1);
+    engine.reset();
+
+    const before = engine.getState().paddles.left;
+    engine.tick(1000);
+
+    expect(engine.getState().paddles.left).toBe(before);
+  });
+});

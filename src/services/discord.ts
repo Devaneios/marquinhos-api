@@ -13,6 +13,22 @@ interface DiscordGuildMember {
   [key: string]: unknown;
 }
 
+export interface ActivityTokenExchangeResult {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  scope: string;
+}
+
+export function buildActivityTokenExchangeBody(code: string): URLSearchParams {
+  return new URLSearchParams({
+    client_id: process.env.DISCORD_CLIENT_ID ?? '',
+    client_secret: process.env.DISCORD_CLIENT_SECRET ?? '',
+    grant_type: 'authorization_code',
+    code,
+  });
+}
+
 export class DiscordService {
   getDiscordUser = async (token: string): Promise<DiscordUser> => {
     const response = await fetch('https://discord.com/api/users/@me', {
@@ -88,6 +104,24 @@ export class DiscordService {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         withCredentials: true,
+      },
+    );
+
+    return response.data;
+  };
+
+  exchangeActivityCode = async (
+    code: string,
+  ): Promise<ActivityTokenExchangeResult> => {
+    const body = buildActivityTokenExchangeBody(code);
+
+    const response = await axios.post(
+      'https://discord.com/api/oauth2/token',
+      body,
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
       },
     );
 

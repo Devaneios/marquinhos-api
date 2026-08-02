@@ -5,6 +5,8 @@ import express from 'express';
 import http from 'http';
 import morgan from 'morgan';
 import './database/sqlite';
+import { ActivityRealtimeServer } from './realtime/ActivityRealtimeServer';
+import activityRouter from './routes/activity.route';
 import aiChatRouter from './routes/aiChat.route';
 import * as auth from './routes/auth.route';
 import emojiReactionRouter from './routes/emojiReaction.route';
@@ -15,6 +17,7 @@ import * as privacyPolicy from './routes/privacyPolicy.route';
 import * as scrobble from './routes/scrobble.route';
 import * as user from './routes/user.route';
 import wordleRouter from './routes/wordle.route';
+import { wirePongActivity } from './services/activity/pong/PongActivityManager';
 import { AgentRateLimitService } from './services/aiChat/AgentRateLimitService';
 import { describeStaticPrompts } from './services/aiChat/promptRegistry';
 import { RateLimitService } from './services/aiChat/RateLimitService';
@@ -29,6 +32,11 @@ import { logger } from './utils/logger';
 dotenv.config();
 
 const app: Express = express();
+
+// Requests arrive through a single reverse-proxy hop (tunnel) in front of
+// this process, which sets X-Forwarded-For — trust exactly that one hop so
+// express-rate-limit keys off the real client IP instead of the tunnel's.
+app.set('trust proxy', 1);
 
 const allowlist = (
   process.env.CORS_ORIGINS ??
@@ -97,6 +105,7 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
+app.use('/api/activities', activityRouter);
 app.use('/api/auth', auth.default);
 app.use('/api/user', user.default);
 app.use('/api/scrobble', scrobble.default);
@@ -164,4 +173,11 @@ try {
 }
 
 const httpServer = http.createServer(app);
+
+const activityRealtimeServer = new ActivityRealtimeServer({
+  server: httpServer,
+  path: '/ws/activity',
+});
+wirePongActivity(activityRealtimeServer);
+
 httpServer.listen(process.env.HTTP_PORT || 3000);

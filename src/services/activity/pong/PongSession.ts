@@ -29,6 +29,7 @@ export class PongSession {
   private interval: ReturnType<typeof setInterval> | null = null;
   private resultRecorded = false;
   private hasBot = false;
+  private botSide: PaddleSide = 'right';
   private botTargetY: number | null = null;
   private botReactionElapsedMs = 0;
   private restartVotes = new Set<string>();
@@ -81,8 +82,16 @@ export class PongSession {
     );
   }
 
-  enableBot() {
+  // The bot must never fight a real player for the same paddle — if the
+  // sole human ended up on 'right' (e.g. a stale slot occupied 'left'), the
+  // bot has to drive 'left' instead, not hardcode 'right'. The caller
+  // (PongActivityManager) always knows the joining human's side, so it's
+  // passed in rather than guessed from player order.
+  enableBot(humanSide?: PaddleSide) {
     this.hasBot = true;
+    if (humanSide) {
+      this.botSide = humanSide === 'left' ? 'right' : 'left';
+    }
   }
 
   getPublicConfig() {
@@ -186,7 +195,8 @@ export class PongSession {
     const config = this.engine.getConfig();
 
     this.botReactionElapsedMs += FIXED_DT_MS;
-    const ballIncoming = state.ball.vx > 0;
+    const ballIncoming =
+      this.botSide === 'right' ? state.ball.vx > 0 : state.ball.vx < 0;
     if (
       this.botTargetY === null ||
       this.botReactionElapsedMs >= PongSession.BOT_REACTION_MS
@@ -196,14 +206,14 @@ export class PongSession {
       this.botTargetY = ballIncoming ? state.ball.y + error : config.height / 2;
     }
 
-    const paddleCenter = state.paddles.right + config.paddleHeight / 2;
+    const paddleCenter = state.paddles[this.botSide] + config.paddleHeight / 2;
     const deadZone = PongSession.BOT_DEAD_ZONE;
     if (this.botTargetY < paddleCenter - deadZone) {
-      this.engine.setInput('right', -1);
+      this.engine.setInput(this.botSide, -1);
     } else if (this.botTargetY > paddleCenter + deadZone) {
-      this.engine.setInput('right', 1);
+      this.engine.setInput(this.botSide, 1);
     } else {
-      this.engine.setInput('right', 0);
+      this.engine.setInput(this.botSide, 0);
     }
   }
 

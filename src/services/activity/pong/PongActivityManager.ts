@@ -18,7 +18,7 @@ export function wirePongActivity(realtime: ActivityRealtimeServer) {
       });
     }
     if (mode === 'single') {
-      session.enableBot();
+      session.enableBot(side ?? undefined);
       if (side) session.start();
     } else if (side && session.playerCount === 2) {
       session.start();

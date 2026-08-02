@@ -160,6 +160,42 @@ describe('PongSession', () => {
     expect(paddles.right).toBeGreaterThan(0);
   });
 
+  it('drives whichever side is not the sole human player, not always right', () => {
+    const broadcaster = fakeBroadcaster();
+    const session = new PongSession('inst-1', 'guild-1', broadcaster);
+    // A stale player already occupies 'left' (e.g. an abandoned earlier
+    // attempt that never disconnected), so the real single-player joiner
+    // lands on 'right' instead of the usual 'left'.
+    session.addPlayer('ghost-left'); // occupies 'left' and never leaves
+    session.addPlayer('user-a'); // the real human ends up on 'right'
+    session.enableBot('right');
+
+    (session as any).engine.state.paddles.left = 0;
+    (session as any).engine.state.ball = { x: 100, y: 400, vx: -100, vy: 0 };
+    session.tick();
+
+    const { paddles } = broadcaster.snapshots[0]!.snapshot;
+    expect(paddles.left).toBeGreaterThan(0);
+  });
+
+  it("never overrides the human player's own paddle input when the human is on the right", () => {
+    const broadcaster = fakeBroadcaster();
+    const session = new PongSession('inst-1', 'guild-1', broadcaster);
+    session.addPlayer('ghost-left');
+    session.addPlayer('user-a'); // human ends up on 'right'
+    session.enableBot('right');
+
+    session.handleInput('user-a', -1); // human wants to move up
+    (session as any).engine.state.paddles.right = 200;
+    // Ball moving away from the human's own paddle — bot logic (if it were
+    // still driving 'right') would try to recenter it, fighting the input.
+    (session as any).engine.state.ball = { x: 100, y: 400, vx: -100, vy: 0 };
+    session.tick();
+
+    const { paddles } = broadcaster.snapshots[0]!.snapshot;
+    expect(paddles.right).toBeLessThan(200);
+  });
+
   it('starts and reaches a winner in a solo bot game without a second player', () => {
     const broadcaster = fakeBroadcaster();
     const session = new PongSession(

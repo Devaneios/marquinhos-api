@@ -1,5 +1,6 @@
 import type { Server as HttpServer } from 'http';
 import { WebSocket, WebSocketServer } from 'ws';
+import type { GameId } from '../services/activity/gameId';
 import { verifyWsSessionToken } from '../services/activity/wsSessionToken';
 
 export interface ActivityMessage {
@@ -12,6 +13,17 @@ interface ClientIdentity {
   userId: string;
   guildId: string;
   mode: 'single' | 'multi';
+  game: GameId;
+}
+
+// Rooms are keyed by instanceId alone at the transport layer's option, but a
+// Discord Activity instance can in principle host more than one game at
+// once (e.g. two different users in the same voice channel each picking a
+// different game from the hub) — so every join/broadcast has to be scoped
+// to (instanceId, game), not instanceId alone, or two games would leak
+// messages into each other's clients.
+export function roomKey(instanceId: string, game: GameId): string {
+  return `${instanceId}:${game}`;
 }
 
 type MessageHandler = (
@@ -63,10 +75,10 @@ export class ActivityRealtimeServer {
       return;
     }
 
-    const { userId, instanceId, guildId, mode } = session;
-    this.joinRoom(instanceId, ws);
+    const { userId, instanceId, guildId, mode, game } = session;
+    this.joinRoom(roomKey(instanceId, game), ws);
     this.joinHandlers.forEach((handler) =>
-      handler({ instanceId, userId, guildId, mode, ws }),
+      handler({ instanceId, userId, guildId, mode, game, ws }),
     );
 
     ws.on('message', (raw) => {
@@ -77,14 +89,14 @@ export class ActivityRealtimeServer {
         return;
       }
       this.messageHandlers.forEach((handler) =>
-        handler({ instanceId, userId, guildId, mode, message }),
+        handler({ instanceId, userId, guildId, mode, game, message }),
       );
     });
 
     ws.on('close', () => {
-      this.leaveRoom(instanceId, ws);
+      this.leaveRoom(roomKey(instanceId, game), ws);
       this.leaveHandlers.forEach((handler) =>
-        handler({ instanceId, userId, guildId, mode }),
+        handler({ instanceId, userId, guildId, mode, game }),
       );
     });
   }

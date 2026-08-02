@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import WebSocket from 'ws';
-import { ActivityRealtimeServer } from '../src/realtime/ActivityRealtimeServer';
+import {
+  ActivityRealtimeServer,
+  roomKey,
+} from '../src/realtime/ActivityRealtimeServer';
 import { mintWsSessionToken } from '../src/services/activity/wsSessionToken';
 
 function waitForOpen(ws: WebSocket): Promise<void> {
@@ -68,11 +71,12 @@ describe('ActivityRealtimeServer', () => {
       instanceId: 'inst-1',
       guildId: 'guild-1',
       mode: 'multi',
+      game: 'pong',
     });
     const ws = connect(token);
     await waitForOpen(ws);
 
-    expect(server.getRoomSize('inst-1')).toBe(1);
+    expect(server.getRoomSize(roomKey('inst-1', 'pong'))).toBe(1);
   });
 
   it('broadcasts a message to other clients in the same instance room', async () => {
@@ -83,19 +87,24 @@ describe('ActivityRealtimeServer', () => {
       instanceId: 'inst-1',
       guildId: 'guild-1',
       mode: 'multi',
+      game: 'pong',
     });
     const tokenB = mintWsSessionToken({
       userId: 'user-b',
       instanceId: 'inst-1',
       guildId: 'guild-1',
       mode: 'multi',
+      game: 'pong',
     });
     const wsA = connect(tokenA);
     const wsB = connect(tokenB);
     await Promise.all([waitForOpen(wsA), waitForOpen(wsB)]);
 
     const received = waitForMessage(wsB);
-    server.broadcast('inst-1', { type: 'state', payload: { x: 1 } });
+    server.broadcast(roomKey('inst-1', 'pong'), {
+      type: 'state',
+      payload: { x: 1 },
+    });
 
     expect(await received).toEqual({ type: 'state', payload: { x: 1 } });
   });
@@ -108,12 +117,14 @@ describe('ActivityRealtimeServer', () => {
       instanceId: 'inst-1',
       guildId: 'guild-1',
       mode: 'multi',
+      game: 'pong',
     });
     const tokenB = mintWsSessionToken({
       userId: 'user-b',
       instanceId: 'inst-2',
       guildId: 'guild-1',
       mode: 'multi',
+      game: 'pong',
     });
     const wsA = connect(tokenA);
     const wsB = connect(tokenB);
@@ -123,7 +134,32 @@ describe('ActivityRealtimeServer', () => {
     wsB.once('message', () => {
       gotMessage = true;
     });
-    server.broadcast('inst-1', { type: 'state', payload: {} });
+    server.broadcast(roomKey('inst-1', 'pong'), { type: 'state', payload: {} });
+
+    await wait(50);
+    expect(gotMessage).toBe(false);
+  });
+
+  it('does not broadcast across different games in the same instance room', async () => {
+    await startServer();
+
+    const tokenPong = mintWsSessionToken({
+      userId: 'user-a',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'multi',
+      game: 'pong',
+    });
+    const wsPong = connect(tokenPong);
+    await waitForOpen(wsPong);
+
+    let gotMessage = false;
+    wsPong.once('message', () => {
+      gotMessage = true;
+    });
+    // Simulates a second, not-yet-existing game sharing the same instanceId —
+    // its room must be isolated even though only 'pong' is a real GameId today.
+    server.broadcast('inst-1:other-game', { type: 'state', payload: {} });
 
     await wait(50);
     expect(gotMessage).toBe(false);
@@ -137,14 +173,15 @@ describe('ActivityRealtimeServer', () => {
       instanceId: 'inst-1',
       guildId: 'guild-1',
       mode: 'multi',
+      game: 'pong',
     });
     const ws = connect(token);
     await waitForOpen(ws);
-    expect(server.getRoomSize('inst-1')).toBe(1);
+    expect(server.getRoomSize(roomKey('inst-1', 'pong'))).toBe(1);
 
     ws.close();
     await wait(50);
-    expect(server.getRoomSize('inst-1')).toBe(0);
+    expect(server.getRoomSize(roomKey('inst-1', 'pong'))).toBe(0);
   });
 
   it('invokes onMessage handlers with the parsed message and sender identity', async () => {
@@ -158,6 +195,7 @@ describe('ActivityRealtimeServer', () => {
       instanceId: 'inst-1',
       guildId: 'guild-1',
       mode: 'multi',
+      game: 'pong',
     });
     const ws = connect(token);
     await waitForOpen(ws);
@@ -170,6 +208,7 @@ describe('ActivityRealtimeServer', () => {
         userId: 'user-1',
         guildId: 'guild-1',
         mode: 'multi',
+        game: 'pong',
         message: { type: 'input', payload: { dir: 1 } },
       },
     ]);
@@ -188,6 +227,7 @@ describe('ActivityRealtimeServer', () => {
       instanceId: 'inst-1',
       guildId: 'guild-1',
       mode: 'multi',
+      game: 'pong',
     });
     const ws = connect(token);
     await waitForOpen(ws);
@@ -197,6 +237,7 @@ describe('ActivityRealtimeServer', () => {
       userId: 'user-1',
       guildId: 'guild-1',
       mode: 'multi',
+      game: 'pong',
     });
 
     ws.close();
@@ -207,6 +248,7 @@ describe('ActivityRealtimeServer', () => {
         userId: 'user-1',
         guildId: 'guild-1',
         mode: 'multi',
+        game: 'pong',
       },
     ]);
   });

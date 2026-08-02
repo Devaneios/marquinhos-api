@@ -130,6 +130,23 @@ describe('PongEngine', () => {
     expect(engine.getState().ball).toEqual(ballAtWin);
   });
 
+  it('forceWinner sets the winner directly, bypassing normal scoring', () => {
+    const engine = new PongEngine(CONFIG);
+
+    engine.forceWinner('left');
+
+    expect(engine.getState().winner).toBe('left');
+  });
+
+  it('forceWinner is a no-op once a winner is already set', () => {
+    const engine = new PongEngine(CONFIG);
+    engine.forceWinner('left');
+
+    engine.forceWinner('right');
+
+    expect(engine.getState().winner).toBe('left');
+  });
+
   it('moves a paddle according to its input direction, clamped to the field', () => {
     const engine = new PongEngine(CONFIG);
     engine.setInput('left', -1);

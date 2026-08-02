@@ -75,6 +75,7 @@ describe('ActivityController.getWsSessionToken', () => {
       instanceId: 'inst-1',
       guildId: 'guild-1',
       mode: 'single',
+      game: 'pong',
     });
     const res = makeRes();
 
@@ -87,6 +88,7 @@ describe('ActivityController.getWsSessionToken', () => {
       instanceId: 'inst-1',
       guildId: 'guild-1',
       mode: 'single',
+      game: 'pong',
     });
   });
 

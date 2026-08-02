@@ -1,3 +1,4 @@
+import { roomKey } from '../../../realtime/ActivityRealtimeServer';
 import { GamificationService } from '../../gamification';
 import {
   PongEngine,
@@ -18,10 +19,17 @@ export interface ActivityBroadcaster {
 interface PongPlayer {
   userId: string;
   side: PaddleSide;
+  connected: boolean;
+}
+
+export interface PongSessionOptions {
+  onSessionEnded?: () => void;
+  disconnectGraceMs?: number;
 }
 
 const FIXED_DT_MS = 8;
 const MAX_CATCHUP_MS = 250;
+const DEFAULT_DISCONNECT_GRACE_MS = 30_000;
 
 export class PongSession {
   private engine: PongEngine;
@@ -40,9 +48,12 @@ export class PongSession {
   };
   private lastLoopHr: bigint | null = null;
   private accumulatorMs = 0;
+  private disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private onSessionEnded?: () => void;
+  private disconnectGraceMs: number;
 
   private static readonly BOT_REACTION_MS = 250;
-  private static readonly BOT_AIM_ERROR = 40;
+  private static readonly BOT_AIM_ERROR = 0;
   private static readonly BOT_DEAD_ZONE = 14;
 
   constructor(
@@ -51,25 +62,112 @@ export class PongSession {
     private broadcaster: ActivityBroadcaster,
     private gamification: GamificationService = new GamificationService(),
     engineConfig: PongEngineConfig = {},
+    options: PongSessionOptions = {},
   ) {
     this.engine = new PongEngine(engineConfig);
+    this.onSessionEnded = options.onSessionEnded;
+    this.disconnectGraceMs =
+      options.disconnectGraceMs ?? DEFAULT_DISCONNECT_GRACE_MS;
   }
 
   get playerCount(): number {
     return this.players.length;
   }
 
+  private get roomKey(): string {
+    return roomKey(this.instanceId, 'pong');
+  }
+
   addPlayer(userId: string): PaddleSide | null {
     const existing = this.players.find((p) => p.userId === userId);
-    if (existing) return existing.side;
+    if (existing) {
+      if (!existing.connected) this.resumeExisting(existing);
+      return existing.side;
+    }
     if (this.players.length >= 2) return null;
     const side: PaddleSide = this.players.length === 0 ? 'left' : 'right';
-    this.players.push({ userId, side });
+    this.players.push({ userId, side, connected: true });
     return side;
   }
 
-  removePlayer(userId: string) {
+  private resumeExisting(player: PongPlayer) {
+    player.connected = true;
+    const timer = this.disconnectTimers.get(player.userId);
+    if (timer) {
+      clearTimeout(timer);
+      this.disconnectTimers.delete(player.userId);
+    }
+    if (this.players.every((p) => p.connected)) this.start();
+    this.broadcaster.broadcast(this.roomKey, {
+      type: 'opponent_reconnected',
+      payload: { side: player.side },
+    });
+  }
+
+  // Called when the underlying WebSocket drops without an explicit `leave`
+  // message first — a real network blip, not a deliberate exit. If the
+  // match already ended there is nothing to pause, so this degrades to a
+  // plain leave. Otherwise the loop freezes entirely (not just the
+  // departed paddle) and the player's slot is held open for
+  // `disconnectGraceMs` so a reconnect can resume the same match.
+  pauseForDisconnect(userId: string) {
+    if (this.engine.getState().winner) {
+      this.leave(userId);
+      return;
+    }
+    const player = this.players.find((p) => p.userId === userId && p.connected);
+    if (!player) return; // already handled via an explicit leave
+
+    player.connected = false;
+    this.stop();
+    this.broadcaster.broadcast(this.roomKey, {
+      type: 'opponent_disconnected',
+      payload: { side: player.side, timeoutMs: this.disconnectGraceMs },
+    });
+    const timer = setTimeout(
+      () => this.forfeitDisconnected(userId),
+      this.disconnectGraceMs,
+    );
+    this.disconnectTimers.set(userId, timer);
+  }
+
+  private forfeitDisconnected(userId: string) {
+    this.disconnectTimers.delete(userId);
+    const player = this.players.find((p) => p.userId === userId);
+    if (!player || player.connected) return; // reconnected in the meantime
+
+    const remaining = this.players.find(
+      (p) => p.userId !== userId && p.connected,
+    );
+    if (remaining && !this.engine.getState().winner) {
+      this.engine.forceWinner(remaining.side);
+      const state = this.broadcastSnapshot();
+      if (!this.resultRecorded) {
+        this.resultRecorded = true;
+        this.recordResult(state.winner!);
+      }
+    }
+
     this.players = this.players.filter((p) => p.userId !== userId);
+    this.stop();
+    if (this.players.length === 0) this.onSessionEnded?.();
+  }
+
+  // Explicit, deliberate exit (the client sent `{type:'leave'}`, or the
+  // grace period for a disconnected player lapsed) — the opposite of
+  // pauseForDisconnect: no grace period, the player's slot is freed
+  // immediately.
+  leave(userId: string) {
+    const timer = this.disconnectTimers.get(userId);
+    if (timer) {
+      clearTimeout(timer);
+      this.disconnectTimers.delete(userId);
+    }
+    this.players = this.players.filter((p) => p.userId !== userId);
+    if (this.players.length === 0) {
+      this.stop();
+      this.onSessionEnded?.();
+    }
   }
 
   handleInput(userId: string, direction: -1 | 0 | 1, seq = 0) {
@@ -115,7 +213,7 @@ export class PongSession {
     const required = this.hasBot ? 1 : this.players.length;
 
     if (this.restartVotes.size < required) {
-      this.broadcaster.broadcast(this.instanceId, {
+      this.broadcaster.broadcast(this.roomKey, {
         type: 'restart_status',
         payload: { votes: this.restartVotes.size, required },
       });
@@ -126,16 +224,7 @@ export class PongSession {
     this.resultRecorded = false;
     this.engine.reset();
     this.start();
-    this.snapshotSeq += 1;
-    this.broadcaster.broadcastBinary(
-      this.instanceId,
-      encodeStateSnapshot(
-        this.snapshotSeq,
-        this.lastInputSeq.left,
-        this.lastInputSeq.right,
-        this.engine.getState(),
-      ),
-    );
+    this.broadcastSnapshot();
   }
 
   start() {
@@ -171,10 +260,20 @@ export class PongSession {
   tick() {
     this.updateBot(this.engine.getState());
     this.engine.tick(FIXED_DT_MS);
+    const state = this.broadcastSnapshot();
+
+    if (state.winner && !this.resultRecorded) {
+      this.resultRecorded = true;
+      this.recordResult(state.winner);
+      this.stop();
+    }
+  }
+
+  private broadcastSnapshot(): PongState {
     const state = this.engine.getState();
     this.snapshotSeq += 1;
     this.broadcaster.broadcastBinary(
-      this.instanceId,
+      this.roomKey,
       encodeStateSnapshot(
         this.snapshotSeq,
         this.lastInputSeq.left,
@@ -182,12 +281,7 @@ export class PongSession {
         state,
       ),
     );
-
-    if (state.winner && !this.resultRecorded) {
-      this.resultRecorded = true;
-      this.recordResult(state.winner);
-      this.stop();
-    }
+    return state;
   }
 
   private updateBot(state: PongState) {

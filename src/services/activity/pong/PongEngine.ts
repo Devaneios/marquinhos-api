@@ -65,6 +65,11 @@ export class PongEngine {
     this.state = this.initState();
   }
 
+  forceWinner(side: PaddleSide) {
+    if (this.state.winner) return;
+    this.state.winner = side;
+  }
+
   private initState(): PongState {
     return {
       width: this.config.width,
@@ -186,7 +191,7 @@ export class PongEngine {
   }
 
   private servingBall(servingTo: PaddleSide): Ball {
-    const maxAngle = Math.PI / 6;
+    const maxAngle = 0;
     const angle = (Math.random() * 2 - 1) * maxAngle;
     const direction = servingTo === 'right' ? 1 : -1;
     return {

@@ -1,10 +1,12 @@
 import { decryptTokenFull, encryptToken } from '../../utils/crypto';
+import { isGameId, type GameId } from './gameId';
 
 export interface WsSessionPayload {
   userId: string;
   instanceId: string;
   guildId: string;
   mode: 'single' | 'multi';
+  game: GameId;
 }
 
 const WS_SESSION_TTL_MS = 5 * 60_000;
@@ -30,13 +32,15 @@ export function verifyWsSessionToken(token: string): WsSessionPayload | null {
       typeof parsed?.userId === 'string' &&
       typeof parsed?.instanceId === 'string' &&
       typeof parsed?.guildId === 'string' &&
-      (parsed?.mode === 'single' || parsed?.mode === 'multi')
+      (parsed?.mode === 'single' || parsed?.mode === 'multi') &&
+      isGameId(parsed?.game)
     ) {
       return {
         userId: parsed.userId,
         instanceId: parsed.instanceId,
         guildId: parsed.guildId,
         mode: parsed.mode,
+        game: parsed.game,
       };
     }
   } catch {

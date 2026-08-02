@@ -37,7 +37,7 @@ describe('activityTokenExchangeSchema', () => {
 });
 
 describe('activityWsSessionSchema', () => {
-  it('accepts a payload with accessToken, instanceId, guildId and mode', async () => {
+  it('accepts a payload with accessToken, instanceId, guildId, mode and game', async () => {
     await expect(
       activityWsSessionSchema.parseAsync({
         body: {
@@ -45,6 +45,7 @@ describe('activityWsSessionSchema', () => {
           instanceId: 'inst-1',
           guildId: 'guild-1',
           mode: 'multi',
+          game: 'pong',
         },
         query: {},
         params: {},
@@ -60,6 +61,7 @@ describe('activityWsSessionSchema', () => {
           instanceId: 'inst-1',
           guildId: 'guild-1',
           mode: 'single',
+          game: 'pong',
         },
         query: {},
         params: {},
@@ -70,7 +72,12 @@ describe('activityWsSessionSchema', () => {
   it('rejects a payload missing instanceId', async () => {
     await expect(
       activityWsSessionSchema.parseAsync({
-        body: { accessToken: 'tok_abc', guildId: 'guild-1', mode: 'multi' },
+        body: {
+          accessToken: 'tok_abc',
+          guildId: 'guild-1',
+          mode: 'multi',
+          game: 'pong',
+        },
         query: {},
         params: {},
       }),
@@ -80,7 +87,12 @@ describe('activityWsSessionSchema', () => {
   it('rejects a payload missing accessToken', async () => {
     await expect(
       activityWsSessionSchema.parseAsync({
-        body: { instanceId: 'inst-1', guildId: 'guild-1', mode: 'multi' },
+        body: {
+          instanceId: 'inst-1',
+          guildId: 'guild-1',
+          mode: 'multi',
+          game: 'pong',
+        },
         query: {},
         params: {},
       }),
@@ -90,7 +102,12 @@ describe('activityWsSessionSchema', () => {
   it('rejects a payload missing guildId', async () => {
     await expect(
       activityWsSessionSchema.parseAsync({
-        body: { accessToken: 'tok_abc', instanceId: 'inst-1', mode: 'multi' },
+        body: {
+          accessToken: 'tok_abc',
+          instanceId: 'inst-1',
+          mode: 'multi',
+          game: 'pong',
+        },
         query: {},
         params: {},
       }),
@@ -104,6 +121,7 @@ describe('activityWsSessionSchema', () => {
           accessToken: 'tok_abc',
           instanceId: 'inst-1',
           guildId: 'guild-1',
+          game: 'pong',
         },
         query: {},
         params: {},
@@ -119,6 +137,38 @@ describe('activityWsSessionSchema', () => {
           instanceId: 'inst-1',
           guildId: 'guild-1',
           mode: 'coop',
+          game: 'pong',
+        },
+        query: {},
+        params: {},
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('rejects a payload missing game', async () => {
+    await expect(
+      activityWsSessionSchema.parseAsync({
+        body: {
+          accessToken: 'tok_abc',
+          instanceId: 'inst-1',
+          guildId: 'guild-1',
+          mode: 'multi',
+        },
+        query: {},
+        params: {},
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('rejects an invalid game value', async () => {
+    await expect(
+      activityWsSessionSchema.parseAsync({
+        body: {
+          accessToken: 'tok_abc',
+          instanceId: 'inst-1',
+          guildId: 'guild-1',
+          mode: 'multi',
+          game: 'chess',
         },
         query: {},
         params: {},

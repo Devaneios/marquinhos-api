@@ -2,6 +2,10 @@ import { describe, expect, it } from 'bun:test';
 import { PongSession } from '../src/services/activity/pong/PongSession';
 import type { GamificationService } from '../src/services/gamification';
 
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 interface DecodedSnapshot {
   seq: number;
   ackLeft: number;
@@ -85,7 +89,7 @@ describe('PongSession', () => {
     session.tick();
 
     expect(broadcaster.snapshots.length).toBe(1);
-    expect(broadcaster.snapshots[0]!.instanceId).toBe('inst-1');
+    expect(broadcaster.snapshots[0]!.instanceId).toBe('inst-1:pong');
   });
 
   it("routes input to the player's own paddle", () => {
@@ -230,7 +234,7 @@ describe('PongSession', () => {
       { winningScore: 1 },
     );
     session.addPlayer('user-a');
-    session.removePlayer('user-a');
+    session.leave('user-a');
 
     (session as any).engine.state.paddles.right = 400;
     (session as any).engine.state.ball = { x: 900, y: 240, vx: 100, vy: 0 };
@@ -351,5 +355,235 @@ describe('PongSession', () => {
     session.stop();
 
     expect(recorded.length).toBe(2);
+  });
+
+  describe('disconnect pause/resume/forfeit', () => {
+    it('pauseForDisconnect stops the loop and broadcasts opponent_disconnected with the departed side', () => {
+      const broadcaster = fakeBroadcaster();
+      const session = new PongSession('inst-1', 'guild-1', broadcaster);
+      session.addPlayer('user-a'); // left
+      session.addPlayer('user-b'); // right
+      session.start();
+
+      session.pauseForDisconnect('user-a');
+
+      expect((session as any).interval).toBeNull();
+      const last = broadcaster.messages[broadcaster.messages.length - 1]!
+        .message as {
+        type: string;
+        payload: { side: string; timeoutMs: number };
+      };
+      expect(last.type).toBe('opponent_disconnected');
+      expect(last.payload.side).toBe('left');
+      expect(last.payload.timeoutMs).toBeGreaterThan(0);
+    });
+
+    it('pauseForDisconnect for a userId that already left is a no-op', () => {
+      const broadcaster = fakeBroadcaster();
+      const session = new PongSession('inst-1', 'guild-1', broadcaster);
+      session.addPlayer('user-a');
+      session.leave('user-a');
+
+      expect(() => session.pauseForDisconnect('user-a')).not.toThrow();
+      expect(broadcaster.messages).toEqual([]);
+    });
+
+    it('a disconnect after the match has already ended is treated as a plain leave, not a pause', () => {
+      const broadcaster = fakeBroadcaster();
+      const session = new PongSession(
+        'inst-1',
+        'guild-1',
+        broadcaster,
+        undefined,
+        { winningScore: 1 },
+      );
+      session.addPlayer('user-a'); // left
+      session.addPlayer('user-b'); // right
+      (session as any).engine.state.paddles.right = 400;
+      (session as any).engine.state.ball = { x: 900, y: 240, vx: 100, vy: 0 };
+      session.tick(); // left wins, match now over
+      const messagesBefore = broadcaster.messages.length;
+
+      session.pauseForDisconnect('user-a');
+
+      expect(broadcaster.messages.length).toBe(messagesBefore);
+      expect(
+        (session as any).players.some((p: any) => p.userId === 'user-a'),
+      ).toBe(false);
+    });
+
+    it('reconnecting via addPlayer before the grace period lapses resumes the loop and broadcasts opponent_reconnected', () => {
+      const broadcaster = fakeBroadcaster();
+      const session = new PongSession('inst-1', 'guild-1', broadcaster);
+      session.addPlayer('user-a'); // left
+      session.addPlayer('user-b'); // right
+      session.start();
+      session.pauseForDisconnect('user-a');
+
+      const side = session.addPlayer('user-a');
+
+      expect(side).toBe('left');
+      expect((session as any).interval).not.toBeNull();
+      const last = broadcaster.messages[broadcaster.messages.length - 1]!
+        .message as { type: string; payload: { side: string } };
+      expect(last.type).toBe('opponent_reconnected');
+      expect(last.payload.side).toBe('left');
+    });
+
+    it('does not resume the loop on reconnect while another player is still disconnected', () => {
+      const broadcaster = fakeBroadcaster();
+      const session = new PongSession('inst-1', 'guild-1', broadcaster);
+      session.addPlayer('user-a'); // left
+      session.addPlayer('user-b'); // right
+      session.start();
+      session.pauseForDisconnect('user-a');
+      session.pauseForDisconnect('user-b');
+
+      session.addPlayer('user-a');
+
+      expect((session as any).interval).toBeNull();
+    });
+
+    it('forfeits the disconnected player to the remaining player once the grace period lapses', async () => {
+      const broadcaster = fakeBroadcaster();
+      const recorded: unknown[] = [];
+      const fakeGamification = {
+        recordGameResult: (input: unknown) => recorded.push(input),
+      } as unknown as GamificationService;
+      let ended = false;
+      const session = new PongSession(
+        'inst-1',
+        'guild-1',
+        broadcaster,
+        fakeGamification,
+        undefined,
+        { disconnectGraceMs: 10, onSessionEnded: () => (ended = true) },
+      );
+      session.addPlayer('user-a'); // left
+      session.addPlayer('user-b'); // right
+      session.start();
+
+      session.pauseForDisconnect('user-a');
+      await wait(40);
+
+      const last =
+        broadcaster.snapshots[broadcaster.snapshots.length - 1]!.snapshot;
+      expect(last.winner).toBe('right');
+      expect(recorded).toEqual([
+        {
+          sessionId: 'inst-1',
+          guildId: 'guild-1',
+          gameType: 'pong',
+          results: [
+            { userId: 'user-a', position: 2 },
+            { userId: 'user-b', position: 1 },
+          ],
+        },
+      ]);
+      expect((session as any).interval).toBeNull();
+      // user-b (the winner) is still present — the session stays alive for
+      // them to see the result / request a rematch / leave via the menu.
+      expect(ended).toBe(false);
+    });
+
+    it('reconnecting cancels the pending forfeit timer', async () => {
+      const broadcaster = fakeBroadcaster();
+      const recorded: unknown[] = [];
+      const fakeGamification = {
+        recordGameResult: (input: unknown) => recorded.push(input),
+      } as unknown as GamificationService;
+      const session = new PongSession(
+        'inst-1',
+        'guild-1',
+        broadcaster,
+        fakeGamification,
+        undefined,
+        { disconnectGraceMs: 10 },
+      );
+      session.addPlayer('user-a'); // left
+      session.addPlayer('user-b'); // right
+      session.start();
+
+      session.pauseForDisconnect('user-a');
+      session.addPlayer('user-a');
+      await wait(40);
+
+      expect(recorded).toEqual([]);
+      expect((session as any).engine.getState().winner).toBeNull();
+    });
+
+    it('solo/bot-mode disconnect that times out tears down without recording a result', async () => {
+      const broadcaster = fakeBroadcaster();
+      const recorded: unknown[] = [];
+      const fakeGamification = {
+        recordGameResult: (input: unknown) => recorded.push(input),
+      } as unknown as GamificationService;
+      let ended = false;
+      const session = new PongSession(
+        'inst-1',
+        'guild-1',
+        broadcaster,
+        fakeGamification,
+        undefined,
+        { disconnectGraceMs: 10, onSessionEnded: () => (ended = true) },
+      );
+      session.addPlayer('user-a'); // left
+      session.enableBot();
+      session.start();
+
+      session.pauseForDisconnect('user-a');
+      await wait(40);
+
+      expect(recorded).toEqual([]);
+      expect(ended).toBe(true);
+    });
+  });
+
+  describe('leave', () => {
+    it('removes the player and clears any pending disconnect timer', async () => {
+      const broadcaster = fakeBroadcaster();
+      const recorded: unknown[] = [];
+      const fakeGamification = {
+        recordGameResult: (input: unknown) => recorded.push(input),
+      } as unknown as GamificationService;
+      const session = new PongSession(
+        'inst-1',
+        'guild-1',
+        broadcaster,
+        fakeGamification,
+        undefined,
+        { disconnectGraceMs: 10 },
+      );
+      session.addPlayer('user-a'); // left
+      session.addPlayer('user-b'); // right
+      session.start();
+      session.pauseForDisconnect('user-a');
+
+      session.leave('user-a');
+      await wait(40);
+
+      expect(recorded).toEqual([]);
+      expect(
+        (session as any).players.some((p: any) => p.userId === 'user-a'),
+      ).toBe(false);
+    });
+
+    it('calls onSessionEnded once the last player leaves', () => {
+      const broadcaster = fakeBroadcaster();
+      let ended = false;
+      const session = new PongSession(
+        'inst-1',
+        'guild-1',
+        broadcaster,
+        undefined,
+        undefined,
+        { onSessionEnded: () => (ended = true) },
+      );
+      session.addPlayer('user-a');
+
+      session.leave('user-a');
+
+      expect(ended).toBe(true);
+    });
   });
 });

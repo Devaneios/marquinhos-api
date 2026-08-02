@@ -12,5 +12,6 @@ export const activityWsSessionSchema = z.object({
     instanceId: z.string().min(1),
     guildId: z.string().min(1),
     mode: z.enum(['single', 'multi']),
+    game: z.enum(['pong']),
   }),
 });

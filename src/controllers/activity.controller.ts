@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import type { GameId } from '../services/activity/gameId';
 import { mintWsSessionToken } from '../services/activity/wsSessionToken';
 import { DiscordService } from '../services/discord';
 import { logger } from '../utils/logger';
@@ -25,11 +26,12 @@ class ActivityController {
 
   getWsSessionToken = async (req: Request, res: Response) => {
     try {
-      const { accessToken, instanceId, guildId, mode } = req.body as {
+      const { accessToken, instanceId, guildId, mode, game } = req.body as {
         accessToken: string;
         instanceId: string;
         guildId: string;
         mode: 'single' | 'multi';
+        game: GameId;
       };
       const user = await this.discordService.getDiscordUser(accessToken);
       if (!user?.id) {
@@ -40,6 +42,7 @@ class ActivityController {
         instanceId,
         guildId,
         mode,
+        game,
       });
       return res.status(200).json({ data: { token } });
     } catch (error) {

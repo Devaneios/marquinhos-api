@@ -12,6 +12,7 @@ export interface PongEngineConfig {
   winningScore?: number;
   paddleHitAcceleration?: number;
   paddleSpinFactor?: number;
+  maxBallSpeed?: number;
 }
 
 interface Ball {
@@ -45,6 +46,7 @@ export class PongEngine {
   };
 
   constructor(config: PongEngineConfig = {}) {
+    const ballSpeed = config.ballSpeed ?? 300;
     this.config = {
       width: config.width ?? 800,
       height: config.height ?? 480,
@@ -52,10 +54,14 @@ export class PongEngine {
       paddleWidth: config.paddleWidth ?? 12,
       paddleSpeed: config.paddleSpeed ?? 400,
       ballRadius: config.ballRadius ?? 8,
-      ballSpeed: config.ballSpeed ?? 300,
+      ballSpeed,
       winningScore: config.winningScore ?? 5,
       paddleHitAcceleration: config.paddleHitAcceleration ?? 1.05,
       paddleSpinFactor: config.paddleSpinFactor ?? 0.3,
+      // Otherwise paddleHitAcceleration compounds every hit with nothing to
+      // stop it: a long rally eventually moves the ball further in one tick
+      // than the paddle is wide, which the collision check can't see past.
+      maxBallSpeed: config.maxBallSpeed ?? ballSpeed * 2.5,
     };
     this.state = this.initState();
   }
@@ -108,10 +114,11 @@ export class PongEngine {
     const dt = dtMs / 1000;
 
     this.movePaddles(dt);
+    const ballOrigin = { x: this.state.ball.x, y: this.state.ball.y };
     this.moveBall(dt);
     this.handleWallBounce();
-    this.handlePaddleCollision('left');
-    this.handlePaddleCollision('right');
+    this.handlePaddleCollision('left', ballOrigin);
+    this.handlePaddleCollision('right', ballOrigin);
     this.handleScoring();
   }
 
@@ -144,7 +151,10 @@ export class PongEngine {
     }
   }
 
-  private handlePaddleCollision(side: PaddleSide) {
+  private handlePaddleCollision(
+    side: PaddleSide,
+    ballOrigin: { x: number; y: number },
+  ) {
     const r = this.config.ballRadius;
     const paddleY = this.state.paddles[side];
     const paddleX =
@@ -156,21 +166,41 @@ export class PongEngine {
       side === 'left'
         ? this.state.ball.x - r <= paddleX
         : this.state.ball.x + r >= paddleX;
-    const withinY =
-      this.state.ball.y >= paddleY &&
-      this.state.ball.y <= paddleY + this.config.paddleHeight;
     const movingToward =
       side === 'left' ? this.state.ball.vx < 0 : this.state.ball.vx > 0;
+    if (!withinX || !movingToward) return;
 
-    if (withinX && withinY && movingToward) {
-      this.state.ball.vx =
-        -this.state.ball.vx * this.config.paddleHitAcceleration;
-      this.state.ball.vy *= this.config.paddleHitAcceleration;
-      this.state.ball.x = side === 'left' ? paddleX + r : paddleX - r;
+    // A fast-enough ball can cross the paddle's whole plane within one
+    // tick, so checking the y-range at wherever the tick left the ball can
+    // miss a real hit (or register one that never happened). Interpolate
+    // the y it actually had at the moment its path crossed the paddle's
+    // x-plane instead.
+    const dx = this.state.ball.x - ballOrigin.x;
+    const crossT = dx !== 0 ? clamp((paddleX - ballOrigin.x) / dx, 0, 1) : 1;
+    const impactY = ballOrigin.y + (this.state.ball.y - ballOrigin.y) * crossT;
 
-      const paddleVelocity = this.input[side] * this.config.paddleSpeed;
-      this.state.ball.vy += paddleVelocity * this.config.paddleSpinFactor;
-    }
+    const withinY =
+      impactY >= paddleY && impactY <= paddleY + this.config.paddleHeight;
+    if (!withinY) return;
+
+    this.state.ball.vx =
+      -this.state.ball.vx * this.config.paddleHitAcceleration;
+    this.state.ball.vy *= this.config.paddleHitAcceleration;
+    this.state.ball.x = side === 'left' ? paddleX + r : paddleX - r;
+    this.state.ball.y = impactY;
+
+    const paddleVelocity = this.input[side] * this.config.paddleSpeed;
+    this.state.ball.vy += paddleVelocity * this.config.paddleSpinFactor;
+
+    this.clampBallSpeed();
+  }
+
+  private clampBallSpeed() {
+    const speed = Math.hypot(this.state.ball.vx, this.state.ball.vy);
+    if (speed <= this.config.maxBallSpeed) return;
+    const scale = this.config.maxBallSpeed / speed;
+    this.state.ball.vx *= scale;
+    this.state.ball.vy *= scale;
   }
 
   private handleScoring() {

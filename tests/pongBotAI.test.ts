@@ -20,6 +20,7 @@ const CONFIG: Required<PongEngineConfig> = {
   winningScore: 5,
   paddleHitAcceleration: 1.05,
   paddleSpinFactor: 0.3,
+  maxBallSpeed: 750,
 };
 
 function state(overrides: Partial<PongState> = {}): PongState {

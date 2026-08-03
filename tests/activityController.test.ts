@@ -67,6 +67,7 @@ describe('ActivityController.getWsSessionToken', () => {
   it('mints a WS session token bound to the resolved Discord user and instance', async () => {
     const fakeService = {
       getDiscordUser: async () => ({ id: 'user-1' }),
+      isGuildMember: async () => true,
     } as unknown as DiscordService;
     const controller = new ActivityController(fakeService);
 
@@ -95,6 +96,7 @@ describe('ActivityController.getWsSessionToken', () => {
   it('includes an optional difficulty in the minted token', async () => {
     const fakeService = {
       getDiscordUser: async () => ({ id: 'user-1' }),
+      isGuildMember: async () => true,
     } as unknown as DiscordService;
     const controller = new ActivityController(fakeService);
 
@@ -124,6 +126,7 @@ describe('ActivityController.getWsSessionToken', () => {
   it('returns 401 when the access token does not resolve to a Discord user', async () => {
     const fakeService = {
       getDiscordUser: async () => ({}),
+      isGuildMember: async () => true,
     } as unknown as DiscordService;
     const controller = new ActivityController(fakeService);
 
@@ -140,9 +143,128 @@ describe('ActivityController.getWsSessionToken', () => {
     expect(res.getStatus()).toBe(401);
   });
 
+  it('returns 403 when the resolved user is not a member of the claimed guild', async () => {
+    const fakeService = {
+      getDiscordUser: async () => ({ id: 'user-1' }),
+      isGuildMember: async () => false,
+    } as unknown as DiscordService;
+    const controller = new ActivityController(fakeService);
+
+    const req = makeReq({
+      accessToken: 'tok_abc',
+      instanceId: 'inst-1',
+      guildId: 'guild-not-mine',
+      mode: 'multi',
+    });
+    const res = makeRes();
+
+    await controller.getWsSessionToken(req, res as any);
+
+    expect(res.getStatus()).toBe(403);
+  });
+
+  it('does not require guild membership for a solo (vs. bot) session', async () => {
+    let called = false;
+    const fakeService = {
+      getDiscordUser: async () => ({ id: 'user-1' }),
+      isGuildMember: async () => {
+        called = true;
+        return false; // even a "no" must not block a mode that never reads guildId
+      },
+    } as unknown as DiscordService;
+    const controller = new ActivityController(fakeService);
+
+    const req = makeReq({
+      accessToken: 'tok_abc',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'single',
+      game: 'pong',
+    });
+    const res = makeRes();
+
+    await controller.getWsSessionToken(req, res as any);
+
+    expect(called).toBe(false);
+    expect(res.getStatus()).toBe(200);
+  });
+
+  it('does not require guild membership for a local hot-seat session', async () => {
+    let called = false;
+    const fakeService = {
+      getDiscordUser: async () => ({ id: 'user-1' }),
+      isGuildMember: async () => {
+        called = true;
+        return false;
+      },
+    } as unknown as DiscordService;
+    const controller = new ActivityController(fakeService);
+
+    const req = makeReq({
+      accessToken: 'tok_abc',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'local',
+      game: 'pong',
+    });
+    const res = makeRes();
+
+    await controller.getWsSessionToken(req, res as any);
+
+    expect(called).toBe(false);
+    expect(res.getStatus()).toBe(200);
+  });
+
+  it('checks membership against the guild claimed in the request, for the resolved user', async () => {
+    const seen: { guildId: string; userId: string }[] = [];
+    const fakeService = {
+      getDiscordUser: async () => ({ id: 'user-1' }),
+      isGuildMember: async (guildId: string, userId: string) => {
+        seen.push({ guildId, userId });
+        return true;
+      },
+    } as unknown as DiscordService;
+    const controller = new ActivityController(fakeService);
+
+    const req = makeReq({
+      accessToken: 'tok_abc',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'multi',
+    });
+    const res = makeRes();
+
+    await controller.getWsSessionToken(req, res as any);
+
+    expect(seen).toEqual([{ guildId: 'guild-1', userId: 'user-1' }]);
+  });
+
   it('returns 500 when DiscordService throws', async () => {
     const fakeService = {
       getDiscordUser: async () => {
+        throw new Error('discord down');
+      },
+      isGuildMember: async () => true,
+    } as unknown as DiscordService;
+    const controller = new ActivityController(fakeService);
+
+    const req = makeReq({
+      accessToken: 'tok_abc',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'multi',
+    });
+    const res = makeRes();
+
+    await controller.getWsSessionToken(req, res as any);
+
+    expect(res.getStatus()).toBe(500);
+  });
+
+  it('returns 500 when the guild membership check throws', async () => {
+    const fakeService = {
+      getDiscordUser: async () => ({ id: 'user-1' }),
+      isGuildMember: async () => {
         throw new Error('discord down');
       },
     } as unknown as DiscordService;

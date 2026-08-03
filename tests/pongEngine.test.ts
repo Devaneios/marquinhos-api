@@ -89,6 +89,36 @@ describe('PongEngine', () => {
     expect(engine.getState().ball.vx).toBeLessThan(0);
   });
 
+  it('still registers a paddle hit when a fast ball would cross the whole paddle plane within one tick', () => {
+    const engine = new PongEngine(CONFIG);
+    (engine as any).state.paddles.left = 200; // spans y in [200, 280]
+    // Starts just in front of the paddle and moving fast enough (with a
+    // steep vy) that by the end of this tick it has travelled well past
+    // the paddle's x-plane and drifted far outside its y-range — a check
+    // against the ball's final position alone would see a miss, even
+    // though its actual path crossed right through the paddle.
+    (engine as any).state.ball = { x: 20, y: 240, vx: -3000, vy: 2000 };
+
+    engine.tick(50);
+
+    const state = engine.getState();
+    expect(state.ball.vx).toBeGreaterThan(0);
+    expect(state.score).toEqual({ left: 0, right: 0 });
+  });
+
+  it('caps ball speed after a paddle hit instead of letting it grow without bound', () => {
+    const engine = new PongEngine(CONFIG);
+    (engine as any).state.paddles.left = 200;
+    (engine as any).state.ball = { x: 20, y: 240, vx: -700, vy: 200 };
+    engine.setInput('left', 1);
+
+    engine.tick(1);
+
+    const { vx, vy } = engine.getState().ball;
+    const maxBallSpeed = engine.getConfig().maxBallSpeed;
+    expect(Math.hypot(vx, vy)).toBeLessThanOrEqual(maxBallSpeed + 1e-6);
+  });
+
   it('scores for the right side and re-centers the ball when it passes the left edge', () => {
     const engine = new PongEngine(CONFIG);
     (engine as any).state.paddles.left = 400; // out of the ball's y-range

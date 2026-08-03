@@ -42,6 +42,40 @@ export class DiscordService {
     return data;
   };
 
+  // Client-supplied guildId can't be trusted on its own (it's a plain iframe
+  // URL param the SDK relays, not something Discord binds to the access
+  // token), so callers who need to act on a specific guild must confirm the
+  // token's user is actually a member of it. Uses the bot token, like
+  // getDiscordGuildUserHighestRole, since the user's own token is only
+  // granted the `identify` scope and can't query guild membership itself.
+  isGuildMember = async (guildId: string, userId: string): Promise<boolean> => {
+    try {
+      const response = await axios.get(
+        `https://discord.com/api/guilds/${guildId}/members/${userId}`,
+        {
+          headers: {
+            'User-Agent': 'DiscordBot',
+            Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`,
+          },
+          validateStatus: (status) =>
+            status === 200 || status === 403 || status === 404,
+        },
+      );
+      return response.status === 200;
+    } catch (error) {
+      // Never let the raw error escape: axios attaches the full request
+      // config to it, headers (including the bot token) and all, and
+      // callers log caught errors wholesale.
+      const status = axios.isAxiosError(error)
+        ? error.response?.status
+        : undefined;
+      // eslint-disable-next-line preserve-caught-error -- cause would leak the bot token via error.config.headers
+      throw new Error(
+        `Discord guild membership check failed${status ? ` (status ${status})` : ''}`,
+      );
+    }
+  };
+
   getDiscordGuildUserHighestRole = async (token: string) => {
     const guildUserResponse = await fetch(
       'https://discord.com/api/users/@me/guilds/305861924648779779/member',

@@ -7,6 +7,7 @@ export function wirePongActivity(realtime: ActivityRealtimeServer) {
   function getOrCreateSession(
     instanceId: string,
     guildId: string,
+    winningScore?: number,
   ): PongSession {
     let session = sessions.get(instanceId);
     if (!session) {
@@ -15,7 +16,7 @@ export function wirePongActivity(realtime: ActivityRealtimeServer) {
         guildId,
         realtime,
         undefined,
-        undefined,
+        winningScore !== undefined ? { winningScore } : undefined,
         {
           onSessionEnded: () => sessions.delete(instanceId),
         },
@@ -26,9 +27,18 @@ export function wirePongActivity(realtime: ActivityRealtimeServer) {
   }
 
   realtime.onJoin(
-    ({ instanceId, guildId, userId, mode, game, difficulty, ws }) => {
+    ({
+      instanceId,
+      guildId,
+      userId,
+      mode,
+      game,
+      difficulty,
+      winningScore,
+      ws,
+    }) => {
       if (game !== 'pong') return;
-      const session = getOrCreateSession(instanceId, guildId);
+      const session = getOrCreateSession(instanceId, guildId, winningScore);
       const side = session.addPlayer(userId);
       if (side) {
         realtime.send(ws, {
@@ -39,6 +49,11 @@ export function wirePongActivity(realtime: ActivityRealtimeServer) {
       if (mode === 'single') {
         session.enableBot(side ?? undefined, difficulty);
         if (side) session.start();
+      } else if (mode === 'local') {
+        if (side) {
+          session.enableLocalTwoPlayer();
+          session.start();
+        }
       } else if (side && session.playerCount === 2) {
         session.start();
       }
@@ -54,8 +69,14 @@ export function wirePongActivity(realtime: ActivityRealtimeServer) {
       const payload = message.payload as {
         direction?: -1 | 0 | 1;
         seq?: number;
+        side?: 'left' | 'right';
       };
-      session.handleInput(userId, payload?.direction ?? 0, payload?.seq ?? 0);
+      session.handleInput(
+        userId,
+        payload?.direction ?? 0,
+        payload?.seq ?? 0,
+        payload?.side,
+      );
     } else if (message.type === 'restart') {
       session.requestRestart(userId);
     } else if (message.type === 'leave') {

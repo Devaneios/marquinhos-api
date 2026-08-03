@@ -4,12 +4,17 @@ import { wirePongActivity } from '../src/services/activity/pong/PongActivityMana
 
 type Handler = (params: any) => void;
 
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function fakeRealtime() {
   const joinHandlers: Handler[] = [];
   const messageHandlers: Handler[] = [];
   const leaveHandlers: Handler[] = [];
   const sent: { ws: unknown; message: any }[] = [];
   const broadcasts: { key: string; message: any }[] = [];
+  let binaryBroadcastCount = 0;
 
   const realtime = {
     onJoin: (h: Handler) => joinHandlers.push(h),
@@ -18,7 +23,9 @@ function fakeRealtime() {
     send: (ws: unknown, message: unknown) => sent.push({ ws, message }),
     broadcast: (key: string, message: unknown) =>
       broadcasts.push({ key, message }),
-    broadcastBinary: () => {},
+    broadcastBinary: () => {
+      binaryBroadcastCount += 1;
+    },
   };
 
   return {
@@ -28,6 +35,7 @@ function fakeRealtime() {
     leave: (params: any) => leaveHandlers.forEach((h) => h(params)),
     sent,
     broadcasts,
+    binaryBroadcastCount: () => binaryBroadcastCount,
   };
 }
 
@@ -89,6 +97,60 @@ describe('wirePongActivity', () => {
       userId: 'user-a',
       mode: 'single',
       difficulty: 'hard',
+      game: 'pong',
+      ws: 'ws-a',
+    });
+
+    expect(sent.length).toBe(1);
+    expect((sent[0]!.message as { type: string }).type).toBe('init');
+  });
+
+  it('starts immediately on a local hot-seat join, needing no second player', async () => {
+    const { realtime, join, sent, binaryBroadcastCount } = fakeRealtime();
+    wirePongActivity(realtime);
+
+    join({
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      userId: 'user-a',
+      mode: 'local',
+      game: 'pong',
+      ws: 'ws-a',
+    });
+
+    expect(sent.length).toBe(1);
+    expect((sent[0]!.message as { type: string }).type).toBe('init');
+    await wait(30);
+    expect(binaryBroadcastCount()).toBeGreaterThan(0);
+  });
+
+  it('does not start a plain multi-mode session on a single join (control for the local-mode test above)', async () => {
+    const { realtime, join, binaryBroadcastCount } = fakeRealtime();
+    wirePongActivity(realtime);
+
+    join({
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      userId: 'user-a',
+      mode: 'multi',
+      game: 'pong',
+      ws: 'ws-a',
+    });
+
+    await wait(30);
+    expect(binaryBroadcastCount()).toBe(0);
+  });
+
+  it('accepts a single-player join carrying a winningScore without erroring', () => {
+    const { realtime, join, sent } = fakeRealtime();
+    wirePongActivity(realtime);
+
+    join({
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      userId: 'user-a',
+      mode: 'single',
+      winningScore: 21,
       game: 'pong',
       ws: 'ws-a',
     });

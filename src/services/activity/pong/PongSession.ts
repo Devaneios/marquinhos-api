@@ -39,6 +39,7 @@ export class PongSession {
   private resultRecorded = false;
   private botSide: PaddleSide = 'right';
   private bot: PongBot | null = null;
+  private localTwoPlayer = false;
   private restartVotes = new Set<string>();
   private snapshotSeq = 0;
   private lastInputSeq: { left: number; right: number } = {
@@ -165,14 +166,32 @@ export class PongSession {
     }
   }
 
-  handleInput(userId: string, direction: -1 | 0 | 1, seq = 0) {
+  // `side` is only honored in local hot-seat mode, where a single connection
+  // legitimately drives both paddles (W/S + arrows on one keyboard). In a
+  // normal session it's ignored and the sender's own registered side wins,
+  // so a networked opponent can't spoof control of the other paddle.
+  handleInput(
+    userId: string,
+    direction: -1 | 0 | 1,
+    seq = 0,
+    side?: PaddleSide,
+  ) {
     const player = this.players.find((p) => p.userId === userId);
     if (!player) return;
-    this.engine.setInput(player.side, direction);
-    this.lastInputSeq[player.side] = Math.max(
-      this.lastInputSeq[player.side],
+    const targetSide =
+      this.localTwoPlayer && side !== undefined ? side : player.side;
+    this.engine.setInput(targetSide, direction);
+    this.lastInputSeq[targetSide] = Math.max(
+      this.lastInputSeq[targetSide],
       seq,
     );
+  }
+
+  // Marks the session as single-connection hot-seat play: one human owns
+  // both paddles locally, so it should start as soon as that one player
+  // joins (no bot, no second joiner to wait for).
+  enableLocalTwoPlayer() {
+    this.localTwoPlayer = true;
   }
 
   // The bot must never fight a real player for the same paddle — if the

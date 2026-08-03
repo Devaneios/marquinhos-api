@@ -42,6 +42,56 @@ describe('mintWsSessionToken / verifyWsSessionToken', () => {
     });
   });
 
+  it('round-trips an optional winningScore', () => {
+    const token = mintWsSessionToken({
+      userId: 'user-1',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'single',
+      game: 'pong',
+      winningScore: 21,
+    });
+    expect(verifyWsSessionToken(token)).toEqual({
+      userId: 'user-1',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'single',
+      game: 'pong',
+      winningScore: 21,
+    });
+  });
+
+  it('round-trips mode "local"', () => {
+    const token = mintWsSessionToken({
+      userId: 'user-1',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'local',
+      game: 'pong',
+    });
+    expect(verifyWsSessionToken(token)).toEqual({
+      userId: 'user-1',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'local',
+      game: 'pong',
+    });
+  });
+
+  it('rejects a payload with an invalid winningScore', () => {
+    const malformed = encryptToken(
+      JSON.stringify({
+        userId: 'user-1',
+        instanceId: 'inst-1',
+        guildId: 'guild-1',
+        mode: 'single',
+        game: 'pong',
+        winningScore: 0,
+      }),
+    )!;
+    expect(verifyWsSessionToken(malformed)).toBeNull();
+  });
+
   it('rejects a payload with an invalid difficulty', () => {
     const malformed = encryptToken(
       JSON.stringify({

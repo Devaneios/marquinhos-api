@@ -27,15 +27,23 @@ class ActivityController {
 
   getWsSessionToken = async (req: Request, res: Response) => {
     try {
-      const { accessToken, instanceId, guildId, mode, game, difficulty } =
-        req.body as {
-          accessToken: string;
-          instanceId: string;
-          guildId: string;
-          mode: 'single' | 'multi';
-          game: GameId;
-          difficulty?: BotDifficulty;
-        };
+      const {
+        accessToken,
+        instanceId,
+        guildId,
+        mode,
+        game,
+        difficulty,
+        winningScore,
+      } = req.body as {
+        accessToken: string;
+        instanceId: string;
+        guildId: string;
+        mode: 'single' | 'multi' | 'local';
+        game: GameId;
+        difficulty?: BotDifficulty;
+        winningScore?: number;
+      };
       const user = await this.discordService.getDiscordUser(accessToken);
       if (!user?.id) {
         return res.status(401).json({ message: 'Invalid access token' });
@@ -47,6 +55,7 @@ class ActivityController {
         mode,
         game,
         ...(difficulty !== undefined ? { difficulty } : {}),
+        ...(winningScore !== undefined ? { winningScore } : {}),
       });
       return res.status(200).json({ data: { token } });
     } catch (error) {

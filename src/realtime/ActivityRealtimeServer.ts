@@ -13,9 +13,10 @@ interface ClientIdentity {
   instanceId: string;
   userId: string;
   guildId: string;
-  mode: 'single' | 'multi';
+  mode: 'single' | 'multi' | 'local';
   game: GameId;
   difficulty?: BotDifficulty;
+  winningScore?: number;
 }
 
 // Rooms are keyed by instanceId alone at the transport layer's option, but a
@@ -77,10 +78,27 @@ export class ActivityRealtimeServer {
       return;
     }
 
-    const { userId, instanceId, guildId, mode, game, difficulty } = session;
+    const {
+      userId,
+      instanceId,
+      guildId,
+      mode,
+      game,
+      difficulty,
+      winningScore,
+    } = session;
     this.joinRoom(roomKey(instanceId, game), ws);
     this.joinHandlers.forEach((handler) =>
-      handler({ instanceId, userId, guildId, mode, game, difficulty, ws }),
+      handler({
+        instanceId,
+        userId,
+        guildId,
+        mode,
+        game,
+        difficulty,
+        winningScore,
+        ws,
+      }),
     );
 
     ws.on('message', (raw) => {
@@ -98,6 +116,7 @@ export class ActivityRealtimeServer {
           mode,
           game,
           difficulty,
+          winningScore,
           message,
         }),
       );
@@ -106,7 +125,15 @@ export class ActivityRealtimeServer {
     ws.on('close', () => {
       this.leaveRoom(roomKey(instanceId, game), ws);
       this.leaveHandlers.forEach((handler) =>
-        handler({ instanceId, userId, guildId, mode, game, difficulty }),
+        handler({
+          instanceId,
+          userId,
+          guildId,
+          mode,
+          game,
+          difficulty,
+          winningScore,
+        }),
       );
     });
   }

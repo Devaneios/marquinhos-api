@@ -8,9 +8,10 @@ export interface WsSessionPayload {
   userId: string;
   instanceId: string;
   guildId: string;
-  mode: 'single' | 'multi';
+  mode: 'single' | 'multi' | 'local';
   game: GameId;
   difficulty?: BotDifficulty;
+  winningScore?: number;
 }
 
 const WS_SESSION_TTL_MS = 5 * 60_000;
@@ -35,13 +36,22 @@ export function verifyWsSessionToken(token: string): WsSessionPayload | null {
     const hasValidDifficulty =
       parsed?.difficulty === undefined ||
       BOT_DIFFICULTIES.includes(parsed?.difficulty);
+    const hasValidWinningScore =
+      parsed?.winningScore === undefined ||
+      (typeof parsed?.winningScore === 'number' &&
+        Number.isInteger(parsed.winningScore) &&
+        parsed.winningScore >= 1 &&
+        parsed.winningScore <= 99);
     if (
       typeof parsed?.userId === 'string' &&
       typeof parsed?.instanceId === 'string' &&
       typeof parsed?.guildId === 'string' &&
-      (parsed?.mode === 'single' || parsed?.mode === 'multi') &&
+      (parsed?.mode === 'single' ||
+        parsed?.mode === 'multi' ||
+        parsed?.mode === 'local') &&
       isGameId(parsed?.game) &&
-      hasValidDifficulty
+      hasValidDifficulty &&
+      hasValidWinningScore
     ) {
       return {
         userId: parsed.userId,
@@ -51,6 +61,9 @@ export function verifyWsSessionToken(token: string): WsSessionPayload | null {
         game: parsed.game,
         ...(parsed.difficulty !== undefined
           ? { difficulty: parsed.difficulty }
+          : {}),
+        ...(parsed.winningScore !== undefined
+          ? { winningScore: parsed.winningScore }
           : {}),
       };
     }

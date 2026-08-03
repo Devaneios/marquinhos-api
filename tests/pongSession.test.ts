@@ -578,6 +578,72 @@ describe('PongSession', () => {
     });
   });
 
+  describe('local hot-seat mode', () => {
+    it('lets a single connection drive both paddles via an explicit side', () => {
+      const broadcaster = fakeBroadcaster();
+      const session = new PongSession('inst-1', 'guild-1', broadcaster);
+      session.addPlayer('user-a'); // left
+      session.enableLocalTwoPlayer();
+
+      session.handleInput('user-a', -1, 1, 'left');
+      session.handleInput('user-a', -1, 1, 'right');
+      session.tick();
+
+      const { paddles } = broadcaster.snapshots[0]!.snapshot;
+      expect(paddles.left).toBeLessThan((480 - 80) / 2);
+      expect(paddles.right).toBeLessThan((480 - 80) / 2);
+    });
+
+    it('starts with a single connected player, no bot and no second joiner required', () => {
+      const broadcaster = fakeBroadcaster();
+      const session = new PongSession('inst-1', 'guild-1', broadcaster);
+      session.addPlayer('user-a');
+      session.enableLocalTwoPlayer();
+      session.start();
+
+      expect((session as any).interval).not.toBeNull();
+      expect((session as any).bot).toBeNull();
+    });
+
+    it("ignores an explicit side on a normal (non-local) session, using the sender's own side instead", () => {
+      const broadcaster = fakeBroadcaster();
+      const session = new PongSession('inst-1', 'guild-1', broadcaster);
+      session.addPlayer('user-a'); // left
+      session.addPlayer('user-b'); // right
+
+      // user-a tries to spoof control of the right paddle.
+      session.handleInput('user-a', -1, 1, 'right');
+      session.tick();
+
+      const { paddles } = broadcaster.snapshots[0]!.snapshot;
+      expect(paddles.left).toBeLessThan((480 - 80) / 2);
+      expect(paddles.right).toBe((480 - 80) / 2);
+    });
+
+    it('does not record a gamification result for a local hot-seat match', () => {
+      const broadcaster = fakeBroadcaster();
+      const recorded: unknown[] = [];
+      const fakeGamification = {
+        recordGameResult: (input: unknown) => recorded.push(input),
+      } as unknown as GamificationService;
+      const session = new PongSession(
+        'inst-1',
+        'guild-1',
+        broadcaster,
+        fakeGamification,
+        { winningScore: 1 },
+      );
+      session.addPlayer('user-a');
+      session.enableLocalTwoPlayer();
+
+      (session as any).engine.state.paddles.right = 400;
+      (session as any).engine.state.ball = { x: 900, y: 240, vx: 100, vy: 0 };
+      session.tick();
+
+      expect(recorded).toEqual([]);
+    });
+  });
+
   describe('leave', () => {
     it('removes the player and clears any pending disconnect timer', async () => {
       const broadcaster = fakeBroadcaster();

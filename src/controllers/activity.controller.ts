@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import type { GameId } from '../services/activity/gameId';
+import type { ActivityMode, GameId } from '../services/activity/gameId';
 import type { BotDifficulty } from '../services/activity/pong/PongBotAI';
 import { mintWsSessionToken } from '../services/activity/wsSessionToken';
 import { DiscordService } from '../services/discord';
@@ -39,7 +39,7 @@ class ActivityController {
         accessToken: string;
         instanceId: string;
         guildId: string;
-        mode: 'single' | 'multi' | 'local';
+        mode: ActivityMode;
         game: GameId;
         difficulty?: BotDifficulty;
         winningScore?: number;

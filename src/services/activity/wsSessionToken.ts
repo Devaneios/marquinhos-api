@@ -1,5 +1,5 @@
 import { decryptTokenFull, encryptToken } from '../../utils/crypto';
-import { isGameId, type GameId } from './gameId';
+import { isGameId, type ActivityMode, type GameId } from './gameId';
 import type { BotDifficulty } from './pong/PongBotAI';
 
 const BOT_DIFFICULTIES = ['easy', 'normal', 'hard'] as const;
@@ -8,7 +8,7 @@ export interface WsSessionPayload {
   userId: string;
   instanceId: string;
   guildId: string;
-  mode: 'single' | 'multi' | 'local';
+  mode: ActivityMode;
   game: GameId;
   difficulty?: BotDifficulty;
   winningScore?: number;

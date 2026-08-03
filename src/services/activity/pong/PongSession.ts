@@ -1,5 +1,5 @@
-import { roomKey } from '../../../realtime/ActivityRealtimeServer';
 import { GamificationService } from '../../gamification';
+import type { ActivityMode } from '../gameId';
 import { BOT_TUNING, PongBot, type BotDifficulty } from './PongBotAI';
 import {
   PongEngine,
@@ -10,17 +10,31 @@ import {
 import { encodeStateSnapshot } from './pongProtocol';
 
 export interface ActivityBroadcaster {
-  broadcast(
-    instanceId: string,
-    message: { type: string; payload?: unknown },
-  ): void;
-  broadcastBinary(instanceId: string, data: ArrayBuffer): void;
+  broadcast(key: string, message: { type: string; payload?: unknown }): void;
+  broadcastBinary(key: string, data: ArrayBuffer): void;
 }
 
 interface PongPlayer {
   userId: string;
   side: PaddleSide;
   connected: boolean;
+  // Every live socket the user holds on this session. Usually one, but a
+  // reconnect can briefly overlap a stale socket, and React remounts open a
+  // second one before the first has finished saying goodbye. The slot is only
+  // released once the last of them is gone, so a superseded socket can never
+  // evict the connection that replaced it.
+  connections: Set<unknown>;
+}
+
+// The session key doubles as the transport room key — it is produced once by
+// ActivityRealtimeServer.roomKey and handed down, so the session and the room
+// it broadcasts into can never drift apart. instanceId/guildId are kept only
+// for the gamification record.
+export interface PongSessionIdentity {
+  sessionKey: string;
+  instanceId: string;
+  guildId: string;
+  mode: ActivityMode;
 }
 
 export interface PongSessionOptions {
@@ -53,8 +67,7 @@ export class PongSession {
   private disconnectGraceMs: number;
 
   constructor(
-    private instanceId: string,
-    private guildId: string,
+    private identity: PongSessionIdentity,
     private broadcaster: ActivityBroadcaster,
     private gamification: GamificationService = new GamificationService(),
     engineConfig: PongEngineConfig = {},
@@ -71,19 +84,32 @@ export class PongSession {
   }
 
   private get roomKey(): string {
-    return roomKey(this.instanceId, 'pong');
+    return this.identity.sessionKey;
   }
 
-  addPlayer(userId: string): PaddleSide | null {
+  addPlayer(userId: string, connection: unknown): PaddleSide | null {
     const existing = this.players.find((p) => p.userId === userId);
     if (existing) {
+      existing.connections.add(connection);
       if (!existing.connected) this.resumeExisting(existing);
       return existing.side;
     }
     if (this.players.length >= 2) return null;
     const side: PaddleSide = this.players.length === 0 ? 'left' : 'right';
-    this.players.push({ userId, side, connected: true });
+    this.players.push({
+      userId,
+      side,
+      connected: true,
+      connections: new Set([connection]),
+    });
     return side;
+  }
+
+  // True when `connection` was the last socket holding the slot — i.e. the
+  // user really is gone, rather than one of several sockets dropping.
+  private releaseConnection(player: PongPlayer, connection: unknown): boolean {
+    player.connections.delete(connection);
+    return player.connections.size === 0;
   }
 
   private resumeExisting(player: PongPlayer) {
@@ -106,13 +132,21 @@ export class PongSession {
   // plain leave. Otherwise the loop freezes entirely (not just the
   // departed paddle) and the player's slot is held open for
   // `disconnectGraceMs` so a reconnect can resume the same match.
-  pauseForDisconnect(userId: string) {
-    if (this.engine.getState().winner) {
-      this.leave(userId);
+  //
+  // Only 'multi' gets that grace. A private session (bot or hot-seat) has no
+  // opponent waiting on the reconnect, so holding the slot would just leave
+  // the user attached to a match they can silently fall back into the next
+  // time they pick a mode — the exact bug this is guarding against.
+  pauseForDisconnect(userId: string, connection: unknown) {
+    const player = this.players.find((p) => p.userId === userId);
+    if (!player) return; // spectator, or already handled via an explicit leave
+    if (!this.releaseConnection(player, connection)) return;
+
+    if (this.identity.mode !== 'multi' || this.engine.getState().winner) {
+      this.detach(userId);
       return;
     }
-    const player = this.players.find((p) => p.userId === userId && p.connected);
-    if (!player) return; // already handled via an explicit leave
+    if (!player.connected) return;
 
     player.connected = false;
     this.stop();
@@ -132,19 +166,41 @@ export class PongSession {
     const player = this.players.find((p) => p.userId === userId);
     if (!player || player.connected) return; // reconnected in the meantime
 
+    this.forfeitTo(userId);
+    this.removePlayer(userId);
+  }
+
+  // Settles and frees the slot: whoever is left wins an unfinished match,
+  // then the player is gone for good.
+  private detach(userId: string) {
+    const timer = this.disconnectTimers.get(userId);
+    if (timer) {
+      clearTimeout(timer);
+      this.disconnectTimers.delete(userId);
+    }
+    this.forfeitTo(userId);
+    this.removePlayer(userId);
+  }
+
+  // Hands the win to whoever is left when `userId` abandons a match that
+  // hasn't produced a winner yet. No-op when nobody is left to award it to.
+  private forfeitTo(userId: string) {
     const remaining = this.players.find(
       (p) => p.userId !== userId && p.connected,
     );
-    if (remaining && !this.engine.getState().winner) {
-      this.engine.forceWinner(remaining.side);
-      const state = this.broadcastSnapshot();
-      if (!this.resultRecorded) {
-        this.resultRecorded = true;
-        this.recordResult(state.winner!);
-      }
-    }
+    if (!remaining || this.engine.getState().winner) return;
 
+    this.engine.forceWinner(remaining.side);
+    const state = this.broadcastSnapshot();
+    if (!this.resultRecorded) {
+      this.resultRecorded = true;
+      this.recordResult(state.winner!);
+    }
+  }
+
+  private removePlayer(userId: string) {
     this.players = this.players.filter((p) => p.userId !== userId);
+    this.restartVotes.delete(userId);
     this.stop();
     if (this.players.length === 0) this.onSessionEnded?.();
   }
@@ -152,18 +208,15 @@ export class PongSession {
   // Explicit, deliberate exit (the client sent `{type:'leave'}`, or the
   // grace period for a disconnected player lapsed) — the opposite of
   // pauseForDisconnect: no grace period, the player's slot is freed
-  // immediately.
-  leave(userId: string) {
-    const timer = this.disconnectTimers.get(userId);
-    if (timer) {
-      clearTimeout(timer);
-      this.disconnectTimers.delete(userId);
-    }
-    this.players = this.players.filter((p) => p.userId !== userId);
-    if (this.players.length === 0) {
-      this.stop();
-      this.onSessionEnded?.();
-    }
+  // immediately and quitting mid-match forfeits it, exactly as letting the
+  // grace period lapse would. Leaving must always fully detach: a player who
+  // walked away must never be resumable into this match.
+  leave(userId: string, connection: unknown) {
+    const player = this.players.find((p) => p.userId === userId);
+    if (!player) return; // a spectator, who holds no slot to give up
+    if (!this.releaseConnection(player, connection)) return;
+
+    this.detach(userId);
   }
 
   // `side` is only honored in local hot-seat mode, where a single connection
@@ -311,8 +364,8 @@ export class PongSession {
   private recordResult(winner: PaddleSide) {
     if (this.players.length < 2) return;
     this.gamification.recordGameResult({
-      sessionId: this.instanceId,
-      guildId: this.guildId,
+      sessionId: this.identity.instanceId,
+      guildId: this.identity.guildId,
       gameType: 'pong',
       results: this.players.map((player) => ({
         userId: player.userId,

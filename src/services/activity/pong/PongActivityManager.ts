@@ -1,27 +1,29 @@
 import type { ActivityRealtimeServer } from '../../../realtime/ActivityRealtimeServer';
-import { PongSession } from './PongSession';
+import { PongSession, type PongSessionIdentity } from './PongSession';
 
 export function wirePongActivity(realtime: ActivityRealtimeServer) {
+  // Keyed by the transport's sessionKey, never by instanceId — that key is
+  // what scopes a match to (instance, game, mode, and user for the private
+  // modes), so a CPU game can't land on the multiplayer match the user just
+  // walked out of.
   const sessions = new Map<string, PongSession>();
 
   function getOrCreateSession(
-    instanceId: string,
-    guildId: string,
+    identity: PongSessionIdentity,
     winningScore?: number,
   ): PongSession {
-    let session = sessions.get(instanceId);
+    let session = sessions.get(identity.sessionKey);
     if (!session) {
       session = new PongSession(
-        instanceId,
-        guildId,
+        identity,
         realtime,
         undefined,
         winningScore !== undefined ? { winningScore } : undefined,
         {
-          onSessionEnded: () => sessions.delete(instanceId),
+          onSessionEnded: () => sessions.delete(identity.sessionKey),
         },
       );
-      sessions.set(instanceId, session);
+      sessions.set(identity.sessionKey, session);
     }
     return session;
   }
@@ -35,34 +37,40 @@ export function wirePongActivity(realtime: ActivityRealtimeServer) {
       game,
       difficulty,
       winningScore,
+      sessionKey,
       ws,
     }) => {
       if (game !== 'pong') return;
-      const session = getOrCreateSession(instanceId, guildId, winningScore);
-      const side = session.addPlayer(userId);
-      if (side) {
-        realtime.send(ws, {
-          type: 'init',
-          payload: { side, config: session.getPublicConfig() },
-        });
-      }
+      const session = getOrCreateSession(
+        { sessionKey, instanceId, guildId, mode },
+        winningScore,
+      );
+      // A null side means the match already has its two players: this
+      // connection joins as a read-only spectator. It still shares the room
+      // so it receives snapshots, but it must not start or reconfigure the
+      // match it is watching.
+      const side = session.addPlayer(userId, ws);
+      realtime.send(ws, {
+        type: 'init',
+        payload: { side, config: session.getPublicConfig() },
+      });
+      if (!side) return;
+
       if (mode === 'single') {
-        session.enableBot(side ?? undefined, difficulty);
-        if (side) session.start();
+        session.enableBot(side, difficulty);
+        session.start();
       } else if (mode === 'local') {
-        if (side) {
-          session.enableLocalTwoPlayer();
-          session.start();
-        }
-      } else if (side && session.playerCount === 2) {
+        session.enableLocalTwoPlayer();
+        session.start();
+      } else if (session.playerCount === 2) {
         session.start();
       }
     },
   );
 
-  realtime.onMessage(({ instanceId, userId, message, game }) => {
+  realtime.onMessage(({ sessionKey, userId, message, game, ws }) => {
     if (game !== 'pong') return;
-    const session = sessions.get(instanceId);
+    const session = sessions.get(sessionKey);
     if (!session) return;
 
     if (message.type === 'input') {
@@ -80,17 +88,17 @@ export function wirePongActivity(realtime: ActivityRealtimeServer) {
     } else if (message.type === 'restart') {
       session.requestRestart(userId);
     } else if (message.type === 'leave') {
-      session.leave(userId);
+      session.leave(userId, ws);
     }
   });
 
   // A raw WebSocket close without a preceding `leave` message means the
   // player didn't intend to quit — pause the match and give them a grace
   // period to reconnect instead of tearing the session down immediately.
-  realtime.onLeave(({ instanceId, userId, game }) => {
+  realtime.onLeave(({ sessionKey, userId, game, ws }) => {
     if (game !== 'pong') return;
-    const session = sessions.get(instanceId);
+    const session = sessions.get(sessionKey);
     if (!session) return;
-    session.pauseForDisconnect(userId);
+    session.pauseForDisconnect(userId, ws);
   });
 }

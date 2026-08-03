@@ -1,6 +1,6 @@
 import type { Server as HttpServer } from 'http';
 import { WebSocket, WebSocketServer } from 'ws';
-import type { GameId } from '../services/activity/gameId';
+import type { ActivityMode, GameId } from '../services/activity/gameId';
 import type { BotDifficulty } from '../services/activity/pong/PongBotAI';
 import { verifyWsSessionToken } from '../services/activity/wsSessionToken';
 
@@ -13,26 +13,49 @@ interface ClientIdentity {
   instanceId: string;
   userId: string;
   guildId: string;
-  mode: 'single' | 'multi' | 'local';
+  mode: ActivityMode;
   game: GameId;
   difficulty?: BotDifficulty;
   winningScore?: number;
+  sessionKey: string;
 }
 
-// Rooms are keyed by instanceId alone at the transport layer's option, but a
-// Discord Activity instance can in principle host more than one game at
-// once (e.g. two different users in the same voice channel each picking a
-// different game from the hub) — so every join/broadcast has to be scoped
-// to (instanceId, game), not instanceId alone, or two games would leak
-// messages into each other's clients.
-export function roomKey(instanceId: string, game: GameId): string {
-  return `${instanceId}:${game}`;
+export interface ActivityScope {
+  instanceId: string;
+  game: GameId;
+  mode: ActivityMode;
+  userId: string;
 }
 
+// A Discord Activity instanceId is constant for the whole lifetime of the
+// activity, so it can't identify a session on its own. The room key is what
+// decides who shares state with whom, and it has to encode every axis of
+// isolation:
+//   - game, because one instance can host more than one game from the hub;
+//   - mode, because a CPU or hot-seat game must never touch the shared match;
+//   - userId for the private modes, because two people in the same voice
+//     channel each playing the CPU are playing two different games.
+// Only 'multi' deliberately omits userId — sharing one match per instance is
+// the whole point of it.
+export function roomKey({
+  instanceId,
+  game,
+  mode,
+  userId,
+}: ActivityScope): string {
+  return mode === 'multi'
+    ? `${instanceId}:${game}:multi`
+    : `${instanceId}:${game}:${mode}:${userId}`;
+}
+
+// Every handler receives the originating socket: a user can legitimately hold
+// more than one connection to the same session at once (a reconnect racing a
+// stale socket, React remounting a component), and a goodbye from one of them
+// must not be mistaken for the user themselves leaving.
 type MessageHandler = (
-  params: ClientIdentity & { message: ActivityMessage },
+  params: ClientIdentity & { ws: WebSocket; message: ActivityMessage },
 ) => void;
-type PresenceHandler = (params: ClientIdentity) => void;
+type PresenceHandler = (params: ClientIdentity & { ws: WebSocket }) => void;
 type JoinHandler = (params: ClientIdentity & { ws: WebSocket }) => void;
 
 export class ActivityRealtimeServer {
@@ -87,19 +110,19 @@ export class ActivityRealtimeServer {
       difficulty,
       winningScore,
     } = session;
-    this.joinRoom(roomKey(instanceId, game), ws);
-    this.joinHandlers.forEach((handler) =>
-      handler({
-        instanceId,
-        userId,
-        guildId,
-        mode,
-        game,
-        difficulty,
-        winningScore,
-        ws,
-      }),
-    );
+    const sessionKey = roomKey({ instanceId, game, mode, userId });
+    const identity: ClientIdentity = {
+      instanceId,
+      userId,
+      guildId,
+      mode,
+      game,
+      difficulty,
+      winningScore,
+      sessionKey,
+    };
+    this.joinRoom(sessionKey, ws);
+    this.joinHandlers.forEach((handler) => handler({ ...identity, ws }));
 
     ws.on('message', (raw) => {
       let message: ActivityMessage;
@@ -109,49 +132,30 @@ export class ActivityRealtimeServer {
         return;
       }
       this.messageHandlers.forEach((handler) =>
-        handler({
-          instanceId,
-          userId,
-          guildId,
-          mode,
-          game,
-          difficulty,
-          winningScore,
-          message,
-        }),
+        handler({ ...identity, ws, message }),
       );
     });
 
     ws.on('close', () => {
-      this.leaveRoom(roomKey(instanceId, game), ws);
-      this.leaveHandlers.forEach((handler) =>
-        handler({
-          instanceId,
-          userId,
-          guildId,
-          mode,
-          game,
-          difficulty,
-          winningScore,
-        }),
-      );
+      this.leaveRoom(sessionKey, ws);
+      this.leaveHandlers.forEach((handler) => handler({ ...identity, ws }));
     });
   }
 
-  private joinRoom(instanceId: string, ws: WebSocket) {
-    if (!this.rooms.has(instanceId)) this.rooms.set(instanceId, new Set());
-    this.rooms.get(instanceId)!.add(ws);
+  private joinRoom(key: string, ws: WebSocket) {
+    if (!this.rooms.has(key)) this.rooms.set(key, new Set());
+    this.rooms.get(key)!.add(ws);
   }
 
-  private leaveRoom(instanceId: string, ws: WebSocket) {
-    const room = this.rooms.get(instanceId);
+  private leaveRoom(key: string, ws: WebSocket) {
+    const room = this.rooms.get(key);
     if (!room) return;
     room.delete(ws);
-    if (room.size === 0) this.rooms.delete(instanceId);
+    if (room.size === 0) this.rooms.delete(key);
   }
 
-  broadcast(instanceId: string, message: ActivityMessage, exclude?: WebSocket) {
-    const room = this.rooms.get(instanceId);
+  broadcast(key: string, message: ActivityMessage, exclude?: WebSocket) {
+    const room = this.rooms.get(key);
     if (!room) return;
     const data = JSON.stringify(message);
     for (const client of room) {
@@ -161,8 +165,8 @@ export class ActivityRealtimeServer {
     }
   }
 
-  broadcastBinary(instanceId: string, data: ArrayBuffer, exclude?: WebSocket) {
-    const room = this.rooms.get(instanceId);
+  broadcastBinary(key: string, data: ArrayBuffer, exclude?: WebSocket) {
+    const room = this.rooms.get(key);
     if (!room) return;
     for (const client of room) {
       if (client !== exclude && client.readyState === WebSocket.OPEN) {
@@ -177,8 +181,8 @@ export class ActivityRealtimeServer {
     }
   }
 
-  getRoomSize(instanceId: string): number {
-    return this.rooms.get(instanceId)?.size ?? 0;
+  getRoomSize(key: string): number {
+    return this.rooms.get(key)?.size ?? 0;
   }
 
   onJoin(handler: JoinHandler) {

@@ -6,6 +6,15 @@ import {
 } from '../src/realtime/ActivityRealtimeServer';
 import { mintWsSessionToken } from '../src/services/activity/wsSessionToken';
 
+// 'multi' rooms are shared across an instance, so the userId here is ignored
+// by roomKey — any member of the instance resolves to the same key.
+const MULTI_SCOPE = {
+  instanceId: 'inst-1',
+  game: 'pong',
+  mode: 'multi',
+  userId: 'user-1',
+} as const;
+
 function waitForOpen(ws: WebSocket): Promise<void> {
   return new Promise((resolve, reject) => {
     ws.once('open', () => resolve());
@@ -76,7 +85,7 @@ describe('ActivityRealtimeServer', () => {
     const ws = connect(token);
     await waitForOpen(ws);
 
-    expect(server.getRoomSize(roomKey('inst-1', 'pong'))).toBe(1);
+    expect(server.getRoomSize(roomKey(MULTI_SCOPE))).toBe(1);
   });
 
   it('broadcasts a message to other clients in the same instance room', async () => {
@@ -101,7 +110,7 @@ describe('ActivityRealtimeServer', () => {
     await Promise.all([waitForOpen(wsA), waitForOpen(wsB)]);
 
     const received = waitForMessage(wsB);
-    server.broadcast(roomKey('inst-1', 'pong'), {
+    server.broadcast(roomKey(MULTI_SCOPE), {
       type: 'state',
       payload: { x: 1 },
     });
@@ -134,7 +143,7 @@ describe('ActivityRealtimeServer', () => {
     wsB.once('message', () => {
       gotMessage = true;
     });
-    server.broadcast(roomKey('inst-1', 'pong'), { type: 'state', payload: {} });
+    server.broadcast(roomKey(MULTI_SCOPE), { type: 'state', payload: {} });
 
     await wait(50);
     expect(gotMessage).toBe(false);
@@ -177,11 +186,11 @@ describe('ActivityRealtimeServer', () => {
     });
     const ws = connect(token);
     await waitForOpen(ws);
-    expect(server.getRoomSize(roomKey('inst-1', 'pong'))).toBe(1);
+    expect(server.getRoomSize(roomKey(MULTI_SCOPE))).toBe(1);
 
     ws.close();
     await wait(50);
-    expect(server.getRoomSize(roomKey('inst-1', 'pong'))).toBe(0);
+    expect(server.getRoomSize(roomKey(MULTI_SCOPE))).toBe(0);
   });
 
   it('invokes onMessage handlers with the parsed message and sender identity', async () => {
@@ -202,16 +211,19 @@ describe('ActivityRealtimeServer', () => {
     ws.send(JSON.stringify({ type: 'input', payload: { dir: 1 } }));
 
     await wait(50);
-    expect(received).toEqual([
-      {
-        instanceId: 'inst-1',
-        userId: 'user-1',
-        guildId: 'guild-1',
-        mode: 'multi',
-        game: 'pong',
-        message: { type: 'input', payload: { dir: 1 } },
-      },
-    ]);
+    expect(received.length).toBe(1);
+    expect(received[0]).toMatchObject({
+      instanceId: 'inst-1',
+      userId: 'user-1',
+      guildId: 'guild-1',
+      mode: 'multi',
+      game: 'pong',
+      sessionKey: 'inst-1:pong:multi',
+      message: { type: 'input', payload: { dir: 1 } },
+    });
+    // The originating socket rides along so a session can tell one of a
+    // user's connections from another.
+    expect((received[0] as { ws: unknown }).ws).toBeDefined();
   });
 
   it('passes an optional difficulty through to onJoin handlers', async () => {
@@ -262,14 +274,83 @@ describe('ActivityRealtimeServer', () => {
 
     ws.close();
     await wait(50);
-    expect(leaves).toEqual([
-      {
+    expect(leaves.length).toBe(1);
+    expect(leaves[0]).toMatchObject({
+      instanceId: 'inst-1',
+      userId: 'user-1',
+      guildId: 'guild-1',
+      mode: 'multi',
+      game: 'pong',
+      sessionKey: 'inst-1:pong:multi',
+    });
+    expect((leaves[0] as { ws: unknown }).ws).toBe(
+      (joins[0] as { ws: unknown }).ws,
+    );
+  });
+
+  it('puts two users playing the same private mode in the same instance into separate rooms', async () => {
+    await startServer();
+
+    const tokenFor = (userId: string) =>
+      mintWsSessionToken({
+        userId,
         instanceId: 'inst-1',
-        userId: 'user-1',
         guildId: 'guild-1',
-        mode: 'multi',
+        mode: 'single',
         game: 'pong',
-      },
-    ]);
+      });
+    const wsA = connect(tokenFor('user-a'));
+    const wsB = connect(tokenFor('user-b'));
+    await Promise.all([waitForOpen(wsA), waitForOpen(wsB)]);
+
+    const keyA = roomKey({ ...MULTI_SCOPE, mode: 'single', userId: 'user-a' });
+    expect(server.getRoomSize(keyA)).toBe(1);
+    expect(
+      server.getRoomSize(
+        roomKey({ ...MULTI_SCOPE, mode: 'single', userId: 'user-b' }),
+      ),
+    ).toBe(1);
+
+    let gotMessage = false;
+    wsB.once('message', () => {
+      gotMessage = true;
+    });
+    server.broadcast(keyA, { type: 'state', payload: {} });
+
+    await wait(50);
+    expect(gotMessage).toBe(false);
+  });
+
+  it('keeps a private-mode socket out of the shared multi room of the same instance', async () => {
+    await startServer();
+
+    const soloToken = mintWsSessionToken({
+      userId: 'user-a',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'single',
+      game: 'pong',
+    });
+    const multiToken = mintWsSessionToken({
+      userId: 'user-b',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'multi',
+      game: 'pong',
+    });
+    const wsSolo = connect(soloToken);
+    const wsMulti = connect(multiToken);
+    await Promise.all([waitForOpen(wsSolo), waitForOpen(wsMulti)]);
+
+    expect(server.getRoomSize(roomKey(MULTI_SCOPE))).toBe(1);
+
+    let gotMessage = false;
+    wsSolo.once('message', () => {
+      gotMessage = true;
+    });
+    server.broadcast(roomKey(MULTI_SCOPE), { type: 'state', payload: {} });
+
+    await wait(50);
+    expect(gotMessage).toBe(false);
   });
 });

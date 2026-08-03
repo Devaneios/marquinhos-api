@@ -214,6 +214,26 @@ describe('ActivityRealtimeServer', () => {
     ]);
   });
 
+  it('passes an optional difficulty through to onJoin handlers', async () => {
+    await startServer();
+
+    const joins: unknown[] = [];
+    server.onJoin((params) => joins.push(params));
+
+    const token = mintWsSessionToken({
+      userId: 'user-1',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'single',
+      game: 'pong',
+      difficulty: 'easy',
+    });
+    const ws = connect(token);
+    await waitForOpen(ws);
+
+    expect(joins[0]).toMatchObject({ mode: 'single', difficulty: 'easy' });
+  });
+
   it('invokes onJoin and onLeave handlers', async () => {
     await startServer();
 

@@ -79,6 +79,24 @@ describe('wirePongActivity', () => {
     expect(sent).toEqual([]);
   });
 
+  it('accepts a single-player join carrying a difficulty without erroring', () => {
+    const { realtime, join, sent } = fakeRealtime();
+    wirePongActivity(realtime);
+
+    join({
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      userId: 'user-a',
+      mode: 'single',
+      difficulty: 'hard',
+      game: 'pong',
+      ws: 'ws-a',
+    });
+
+    expect(sent.length).toBe(1);
+    expect((sent[0]!.message as { type: string }).type).toBe('init');
+  });
+
   it('pauses instead of tearing down on a raw disconnect (no prior leave message)', () => {
     const { realtime, join, leave, broadcasts } = fakeRealtime();
     wirePongActivity(realtime);

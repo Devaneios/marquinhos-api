@@ -1,5 +1,8 @@
 import { decryptTokenFull, encryptToken } from '../../utils/crypto';
 import { isGameId, type GameId } from './gameId';
+import type { BotDifficulty } from './pong/PongBotAI';
+
+const BOT_DIFFICULTIES = ['easy', 'normal', 'hard'] as const;
 
 export interface WsSessionPayload {
   userId: string;
@@ -7,6 +10,7 @@ export interface WsSessionPayload {
   guildId: string;
   mode: 'single' | 'multi';
   game: GameId;
+  difficulty?: BotDifficulty;
 }
 
 const WS_SESSION_TTL_MS = 5 * 60_000;
@@ -28,12 +32,16 @@ export function verifyWsSessionToken(token: string): WsSessionPayload | null {
   }
   try {
     const parsed = JSON.parse(decrypted.token);
+    const hasValidDifficulty =
+      parsed?.difficulty === undefined ||
+      BOT_DIFFICULTIES.includes(parsed?.difficulty);
     if (
       typeof parsed?.userId === 'string' &&
       typeof parsed?.instanceId === 'string' &&
       typeof parsed?.guildId === 'string' &&
       (parsed?.mode === 'single' || parsed?.mode === 'multi') &&
-      isGameId(parsed?.game)
+      isGameId(parsed?.game) &&
+      hasValidDifficulty
     ) {
       return {
         userId: parsed.userId,
@@ -41,6 +49,9 @@ export function verifyWsSessionToken(token: string): WsSessionPayload | null {
         guildId: parsed.guildId,
         mode: parsed.mode,
         game: parsed.game,
+        ...(parsed.difficulty !== undefined
+          ? { difficulty: parsed.difficulty }
+          : {}),
       };
     }
   } catch {

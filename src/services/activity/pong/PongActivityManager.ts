@@ -25,23 +25,25 @@ export function wirePongActivity(realtime: ActivityRealtimeServer) {
     return session;
   }
 
-  realtime.onJoin(({ instanceId, guildId, userId, mode, game, ws }) => {
-    if (game !== 'pong') return;
-    const session = getOrCreateSession(instanceId, guildId);
-    const side = session.addPlayer(userId);
-    if (side) {
-      realtime.send(ws, {
-        type: 'init',
-        payload: { side, config: session.getPublicConfig() },
-      });
-    }
-    if (mode === 'single') {
-      session.enableBot(side ?? undefined);
-      if (side) session.start();
-    } else if (side && session.playerCount === 2) {
-      session.start();
-    }
-  });
+  realtime.onJoin(
+    ({ instanceId, guildId, userId, mode, game, difficulty, ws }) => {
+      if (game !== 'pong') return;
+      const session = getOrCreateSession(instanceId, guildId);
+      const side = session.addPlayer(userId);
+      if (side) {
+        realtime.send(ws, {
+          type: 'init',
+          payload: { side, config: session.getPublicConfig() },
+        });
+      }
+      if (mode === 'single') {
+        session.enableBot(side ?? undefined, difficulty);
+        if (side) session.start();
+      } else if (side && session.playerCount === 2) {
+        session.start();
+      }
+    },
+  );
 
   realtime.onMessage(({ instanceId, userId, message, game }) => {
     if (game !== 'pong') return;

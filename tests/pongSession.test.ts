@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { BOT_TUNING } from '../src/services/activity/pong/PongBotAI';
 import { PongSession } from '../src/services/activity/pong/PongSession';
 import type { GamificationService } from '../src/services/gamification';
 
@@ -162,6 +163,44 @@ describe('PongSession', () => {
 
     const { paddles } = broadcaster.snapshots[0]!.snapshot;
     expect(paddles.right).toBeGreaterThan(0);
+  });
+
+  it("anticipates a wall bounce instead of chasing the ball's current position", () => {
+    const broadcaster = fakeBroadcaster();
+    const session = new PongSession('inst-1', 'guild-1', broadcaster);
+    session.addPlayer('user-a'); // left
+    session.enableBot(undefined, 'hard'); // aimError 0, deadZone 4 -> deterministic
+
+    // Ball heading toward the bot (right) at a steep downward angle: it
+    // will hit the bottom wall and bounce back up before arriving, landing
+    // around y=280. A naive "aim at ball.y" bot would target 400 instead
+    // (400 px off) and see the paddle, already centered on 400, as
+    // correctly positioned -> no movement. The predictive bot must move up
+    // toward the real landing spot right away.
+    (session as any).engine.state.paddles.right = 360; // center = 400
+    (session as any).engine.state.ball = { x: 700, y: 400, vx: 100, vy: 300 };
+    session.tick();
+
+    const { paddles } = broadcaster.snapshots[0]!.snapshot;
+    expect(paddles.right).toBeLessThan(360);
+  });
+
+  it('defaults the bot to normal difficulty tuning when none is requested', () => {
+    const broadcaster = fakeBroadcaster();
+    const session = new PongSession('inst-1', 'guild-1', broadcaster);
+    session.addPlayer('user-a');
+    session.enableBot();
+
+    expect((session as any).bot.tuning).toEqual(BOT_TUNING.normal);
+  });
+
+  it('tunes the bot according to the requested difficulty', () => {
+    const broadcaster = fakeBroadcaster();
+    const session = new PongSession('inst-1', 'guild-1', broadcaster);
+    session.addPlayer('user-a');
+    session.enableBot(undefined, 'easy');
+
+    expect((session as any).bot.tuning).toEqual(BOT_TUNING.easy);
   });
 
   it('drives whichever side is not the sole human player, not always right', () => {

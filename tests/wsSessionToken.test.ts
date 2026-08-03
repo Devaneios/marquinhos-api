@@ -23,6 +23,39 @@ describe('mintWsSessionToken / verifyWsSessionToken', () => {
     });
   });
 
+  it('round-trips an optional difficulty', () => {
+    const token = mintWsSessionToken({
+      userId: 'user-1',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'single',
+      game: 'pong',
+      difficulty: 'hard',
+    });
+    expect(verifyWsSessionToken(token)).toEqual({
+      userId: 'user-1',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'single',
+      game: 'pong',
+      difficulty: 'hard',
+    });
+  });
+
+  it('rejects a payload with an invalid difficulty', () => {
+    const malformed = encryptToken(
+      JSON.stringify({
+        userId: 'user-1',
+        instanceId: 'inst-1',
+        guildId: 'guild-1',
+        mode: 'single',
+        game: 'pong',
+        difficulty: 'nightmare',
+      }),
+    )!;
+    expect(verifyWsSessionToken(malformed)).toBeNull();
+  });
+
   it('rejects a tampered token', () => {
     const token = mintWsSessionToken({
       userId: 'user-1',

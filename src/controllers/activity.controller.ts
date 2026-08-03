@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import type { GameId } from '../services/activity/gameId';
+import type { BotDifficulty } from '../services/activity/pong/PongBotAI';
 import { mintWsSessionToken } from '../services/activity/wsSessionToken';
 import { DiscordService } from '../services/discord';
 import { logger } from '../utils/logger';
@@ -26,13 +27,15 @@ class ActivityController {
 
   getWsSessionToken = async (req: Request, res: Response) => {
     try {
-      const { accessToken, instanceId, guildId, mode, game } = req.body as {
-        accessToken: string;
-        instanceId: string;
-        guildId: string;
-        mode: 'single' | 'multi';
-        game: GameId;
-      };
+      const { accessToken, instanceId, guildId, mode, game, difficulty } =
+        req.body as {
+          accessToken: string;
+          instanceId: string;
+          guildId: string;
+          mode: 'single' | 'multi';
+          game: GameId;
+          difficulty?: BotDifficulty;
+        };
       const user = await this.discordService.getDiscordUser(accessToken);
       if (!user?.id) {
         return res.status(401).json({ message: 'Invalid access token' });
@@ -43,6 +46,7 @@ class ActivityController {
         guildId,
         mode,
         game,
+        ...(difficulty !== undefined ? { difficulty } : {}),
       });
       return res.status(200).json({ data: { token } });
     } catch (error) {

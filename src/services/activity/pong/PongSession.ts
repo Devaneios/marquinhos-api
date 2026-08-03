@@ -1,5 +1,6 @@
 import { roomKey } from '../../../realtime/ActivityRealtimeServer';
 import { GamificationService } from '../../gamification';
+import { BOT_TUNING, PongBot, type BotDifficulty } from './PongBotAI';
 import {
   PongEngine,
   type PaddleSide,
@@ -36,10 +37,8 @@ export class PongSession {
   private players: PongPlayer[] = [];
   private interval: ReturnType<typeof setInterval> | null = null;
   private resultRecorded = false;
-  private hasBot = false;
   private botSide: PaddleSide = 'right';
-  private botTargetY: number | null = null;
-  private botReactionElapsedMs = 0;
+  private bot: PongBot | null = null;
   private restartVotes = new Set<string>();
   private snapshotSeq = 0;
   private lastInputSeq: { left: number; right: number } = {
@@ -51,10 +50,6 @@ export class PongSession {
   private disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private onSessionEnded?: () => void;
   private disconnectGraceMs: number;
-
-  private static readonly BOT_REACTION_MS = 250;
-  private static readonly BOT_AIM_ERROR = 0;
-  private static readonly BOT_DEAD_ZONE = 14;
 
   constructor(
     private instanceId: string,
@@ -185,11 +180,11 @@ export class PongSession {
   // bot has to drive 'left' instead, not hardcode 'right'. The caller
   // (PongActivityManager) always knows the joining human's side, so it's
   // passed in rather than guessed from player order.
-  enableBot(humanSide?: PaddleSide) {
-    this.hasBot = true;
+  enableBot(humanSide?: PaddleSide, difficulty: BotDifficulty = 'normal') {
     if (humanSide) {
       this.botSide = humanSide === 'left' ? 'right' : 'left';
     }
+    this.bot = new PongBot(this.botSide, BOT_TUNING[difficulty]);
   }
 
   getPublicConfig() {
@@ -210,7 +205,7 @@ export class PongSession {
     if (!this.players.some((p) => p.userId === userId)) return;
 
     this.restartVotes.add(userId);
-    const required = this.hasBot ? 1 : this.players.length;
+    const required = this.bot ? 1 : this.players.length;
 
     if (this.restartVotes.size < required) {
       this.broadcaster.broadcast(this.roomKey, {
@@ -285,30 +280,13 @@ export class PongSession {
   }
 
   private updateBot(state: PongState) {
-    if (!this.hasBot) return;
-    const config = this.engine.getConfig();
-
-    this.botReactionElapsedMs += FIXED_DT_MS;
-    const ballIncoming =
-      this.botSide === 'right' ? state.ball.vx > 0 : state.ball.vx < 0;
-    if (
-      this.botTargetY === null ||
-      this.botReactionElapsedMs >= PongSession.BOT_REACTION_MS
-    ) {
-      this.botReactionElapsedMs = 0;
-      const error = (Math.random() * 2 - 1) * PongSession.BOT_AIM_ERROR;
-      this.botTargetY = ballIncoming ? state.ball.y + error : config.height / 2;
-    }
-
-    const paddleCenter = state.paddles[this.botSide] + config.paddleHeight / 2;
-    const deadZone = PongSession.BOT_DEAD_ZONE;
-    if (this.botTargetY < paddleCenter - deadZone) {
-      this.engine.setInput(this.botSide, -1);
-    } else if (this.botTargetY > paddleCenter + deadZone) {
-      this.engine.setInput(this.botSide, 1);
-    } else {
-      this.engine.setInput(this.botSide, 0);
-    }
+    if (!this.bot) return;
+    const input = this.bot.computeInput(
+      state,
+      this.engine.getConfig(),
+      FIXED_DT_MS,
+    );
+    this.engine.setInput(this.botSide, input);
   }
 
   private recordResult(winner: PaddleSide) {

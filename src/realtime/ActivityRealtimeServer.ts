@@ -1,6 +1,7 @@
 import type { Server as HttpServer } from 'http';
 import { WebSocket, WebSocketServer } from 'ws';
 import type { GameId } from '../services/activity/gameId';
+import type { BotDifficulty } from '../services/activity/pong/PongBotAI';
 import { verifyWsSessionToken } from '../services/activity/wsSessionToken';
 
 export interface ActivityMessage {
@@ -14,6 +15,7 @@ interface ClientIdentity {
   guildId: string;
   mode: 'single' | 'multi';
   game: GameId;
+  difficulty?: BotDifficulty;
 }
 
 // Rooms are keyed by instanceId alone at the transport layer's option, but a
@@ -75,10 +77,10 @@ export class ActivityRealtimeServer {
       return;
     }
 
-    const { userId, instanceId, guildId, mode, game } = session;
+    const { userId, instanceId, guildId, mode, game, difficulty } = session;
     this.joinRoom(roomKey(instanceId, game), ws);
     this.joinHandlers.forEach((handler) =>
-      handler({ instanceId, userId, guildId, mode, game, ws }),
+      handler({ instanceId, userId, guildId, mode, game, difficulty, ws }),
     );
 
     ws.on('message', (raw) => {
@@ -89,14 +91,22 @@ export class ActivityRealtimeServer {
         return;
       }
       this.messageHandlers.forEach((handler) =>
-        handler({ instanceId, userId, guildId, mode, game, message }),
+        handler({
+          instanceId,
+          userId,
+          guildId,
+          mode,
+          game,
+          difficulty,
+          message,
+        }),
       );
     });
 
     ws.on('close', () => {
       this.leaveRoom(roomKey(instanceId, game), ws);
       this.leaveHandlers.forEach((handler) =>
-        handler({ instanceId, userId, guildId, mode, game }),
+        handler({ instanceId, userId, guildId, mode, game, difficulty }),
       );
     });
   }

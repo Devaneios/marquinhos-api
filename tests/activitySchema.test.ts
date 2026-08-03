@@ -160,6 +160,56 @@ describe('activityWsSessionSchema', () => {
     ).rejects.toThrow();
   });
 
+  it('accepts an optional difficulty value', async () => {
+    await expect(
+      activityWsSessionSchema.parseAsync({
+        body: {
+          accessToken: 'tok_abc',
+          instanceId: 'inst-1',
+          guildId: 'guild-1',
+          mode: 'single',
+          game: 'pong',
+          difficulty: 'hard',
+        },
+        query: {},
+        params: {},
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  it('accepts a payload without a difficulty', async () => {
+    await expect(
+      activityWsSessionSchema.parseAsync({
+        body: {
+          accessToken: 'tok_abc',
+          instanceId: 'inst-1',
+          guildId: 'guild-1',
+          mode: 'single',
+          game: 'pong',
+        },
+        query: {},
+        params: {},
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  it('rejects an invalid difficulty value', async () => {
+    await expect(
+      activityWsSessionSchema.parseAsync({
+        body: {
+          accessToken: 'tok_abc',
+          instanceId: 'inst-1',
+          guildId: 'guild-1',
+          mode: 'single',
+          game: 'pong',
+          difficulty: 'nightmare',
+        },
+        query: {},
+        params: {},
+      }),
+    ).rejects.toThrow();
+  });
+
   it('rejects an invalid game value', async () => {
     await expect(
       activityWsSessionSchema.parseAsync({

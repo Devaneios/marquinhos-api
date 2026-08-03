@@ -92,6 +92,35 @@ describe('ActivityController.getWsSessionToken', () => {
     });
   });
 
+  it('includes an optional difficulty in the minted token', async () => {
+    const fakeService = {
+      getDiscordUser: async () => ({ id: 'user-1' }),
+    } as unknown as DiscordService;
+    const controller = new ActivityController(fakeService);
+
+    const req = makeReq({
+      accessToken: 'tok_abc',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'single',
+      game: 'pong',
+      difficulty: 'easy',
+    });
+    const res = makeRes();
+
+    await controller.getWsSessionToken(req, res as any);
+
+    const payload = res.getPayload() as { data: { token: string } };
+    expect(verifyWsSessionToken(payload.data.token)).toEqual({
+      userId: 'user-1',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'single',
+      game: 'pong',
+      difficulty: 'easy',
+    });
+  });
+
   it('returns 401 when the access token does not resolve to a Discord user', async () => {
     const fakeService = {
       getDiscordUser: async () => ({}),

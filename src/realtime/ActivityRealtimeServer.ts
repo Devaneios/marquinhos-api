@@ -4,6 +4,13 @@ import type { ActivityMode, GameId } from '../services/activity/gameId';
 import type { BotDifficulty } from '../services/activity/pong/PongBotAI';
 import { verifyWsSessionToken } from '../services/activity/wsSessionToken';
 
+const HEARTBEAT_INTERVAL_MS = 25_000;
+const BACKPRESSURE_HIGH_WATER_BYTES = 64 * 1024;
+
+interface HeartbeatWebSocket extends WebSocket {
+  isAlive?: boolean;
+}
+
 export interface ActivityMessage {
   type: string;
   payload?: unknown;
@@ -64,6 +71,7 @@ export class ActivityRealtimeServer {
   private messageHandlers: MessageHandler[] = [];
   private joinHandlers: JoinHandler[] = [];
   private leaveHandlers: PresenceHandler[] = [];
+  private heartbeatTimer: ReturnType<typeof setInterval>;
 
   constructor(
     options: { server?: HttpServer; port?: number; path?: string } = {},
@@ -75,6 +83,17 @@ export class ActivityRealtimeServer {
     });
 
     this.wss.on('connection', (ws, req) => this.handleConnection(ws, req));
+
+    this.heartbeatTimer = setInterval(() => {
+      for (const client of this.wss.clients as Set<HeartbeatWebSocket>) {
+        if (client.isAlive === false) {
+          client.terminate();
+          continue;
+        }
+        client.isAlive = false;
+        client.ping();
+      }
+    }, HEARTBEAT_INTERVAL_MS);
   }
 
   whenReady(): Promise<void> {
@@ -92,7 +111,14 @@ export class ActivityRealtimeServer {
     return addr && typeof addr === 'object' ? addr.port : null;
   }
 
-  private handleConnection(ws: WebSocket, req: import('http').IncomingMessage) {
+  private handleConnection(
+    ws: HeartbeatWebSocket,
+    req: import('http').IncomingMessage,
+  ) {
+    // With an 8ms server tick, Nagle's algorithm can add tens of ms of
+    // avoidable latency to the small, frequent input/ack messages.
+    req.socket.setNoDelay(true);
+
     const url = new URL(req.url ?? '', 'http://localhost');
     const token = url.searchParams.get('token') ?? '';
     const session = verifyWsSessionToken(token);
@@ -100,6 +126,11 @@ export class ActivityRealtimeServer {
       ws.close(4001, 'Invalid or expired session token');
       return;
     }
+
+    ws.isAlive = true;
+    ws.on('pong', () => {
+      ws.isAlive = true;
+    });
 
     const {
       userId,
@@ -159,7 +190,11 @@ export class ActivityRealtimeServer {
     if (!room) return;
     const data = JSON.stringify(message);
     for (const client of room) {
-      if (client !== exclude && client.readyState === WebSocket.OPEN) {
+      if (
+        client !== exclude &&
+        client.readyState === WebSocket.OPEN &&
+        client.bufferedAmount < BACKPRESSURE_HIGH_WATER_BYTES
+      ) {
         client.send(data);
       }
     }
@@ -169,7 +204,11 @@ export class ActivityRealtimeServer {
     const room = this.rooms.get(key);
     if (!room) return;
     for (const client of room) {
-      if (client !== exclude && client.readyState === WebSocket.OPEN) {
+      if (
+        client !== exclude &&
+        client.readyState === WebSocket.OPEN &&
+        client.bufferedAmount < BACKPRESSURE_HIGH_WATER_BYTES
+      ) {
         client.send(data);
       }
     }
@@ -198,6 +237,7 @@ export class ActivityRealtimeServer {
   }
 
   close(): Promise<void> {
+    clearInterval(this.heartbeatTimer);
     return new Promise((resolve, reject) => {
       this.wss.close((err) => (err ? reject(err) : resolve()));
     });

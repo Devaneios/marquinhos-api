@@ -1,7 +1,27 @@
+import type { WebSocket } from 'ws';
 import type { ActivityRealtimeServer } from '../../../realtime/ActivityRealtimeServer';
 import { PongSession, type PongSessionIdentity } from './PongSession';
 
+const INPUT_RATE_LIMIT_WINDOW_MS = 1000;
+const INPUT_RATE_LIMIT_MAX = 120;
+
 export function wirePongActivity(realtime: ActivityRealtimeServer) {
+  const inputRateState = new Map<
+    WebSocket,
+    { windowStart: number; count: number }
+  >();
+
+  function isOverInputRateLimit(ws: WebSocket): boolean {
+    const now = Date.now();
+    const state = inputRateState.get(ws);
+    if (!state || now - state.windowStart >= INPUT_RATE_LIMIT_WINDOW_MS) {
+      inputRateState.set(ws, { windowStart: now, count: 1 });
+      return false;
+    }
+    state.count += 1;
+    return state.count > INPUT_RATE_LIMIT_MAX;
+  }
+
   // Keyed by the transport's sessionKey, never by instanceId — that key is
   // what scopes a match to (instance, game, mode, and user for the private
   // modes), so a CPU game can't land on the multiplayer match the user just
@@ -74,6 +94,7 @@ export function wirePongActivity(realtime: ActivityRealtimeServer) {
     if (!session) return;
 
     if (message.type === 'input') {
+      if (isOverInputRateLimit(ws)) return;
       const payload = message.payload as {
         direction?: -1 | 0 | 1;
         seq?: number;
@@ -97,6 +118,7 @@ export function wirePongActivity(realtime: ActivityRealtimeServer) {
   // period to reconnect instead of tearing the session down immediately.
   realtime.onLeave(({ sessionKey, userId, game, ws }) => {
     if (game !== 'pong') return;
+    inputRateState.delete(ws);
     const session = sessions.get(sessionKey);
     if (!session) return;
     session.pauseForDisconnect(userId, ws);

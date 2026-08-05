@@ -18,6 +18,7 @@ import * as scrobble from './routes/scrobble.route';
 import * as user from './routes/user.route';
 import wordleRouter from './routes/wordle.route';
 import { wirePongActivity } from './services/activity/pong/PongActivityManager';
+import { wireWordleActivity } from './services/activity/wordle/WordleActivityManager';
 import { AgentRateLimitService } from './services/aiChat/AgentRateLimitService';
 import { describeStaticPrompts } from './services/aiChat/promptRegistry';
 import { RateLimitService } from './services/aiChat/RateLimitService';
@@ -179,5 +180,6 @@ const activityRealtimeServer = new ActivityRealtimeServer({
   path: '/ws/activity',
 });
 wirePongActivity(activityRealtimeServer);
+wireWordleActivity(activityRealtimeServer);
 
 httpServer.listen(process.env.HTTP_PORT || 3000);

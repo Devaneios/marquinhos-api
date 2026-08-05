@@ -37,17 +37,24 @@ function scoped(params: {
 }
 
 function fakeRealtime() {
-  const joinHandlers: Handler[] = [];
-  const messageHandlers: Handler[] = [];
-  const leaveHandlers: Handler[] = [];
+  // The real ActivityRealtimeServer dispatches only to the handler set
+  // registered for a connection's own game (see activityRealtimeServer.test.ts's
+  // isolation tests) — that filtering is no longer PongActivityManager's job,
+  // so this fake just captures whatever wirePongActivity registers under
+  // 'pong' and invokes it directly.
+  let handlers: {
+    onJoin?: Handler;
+    onMessage?: Handler;
+    onLeave?: Handler;
+  } = {};
   const sent: { ws: unknown; message: any }[] = [];
   const broadcasts: { key: string; message: any }[] = [];
   const binaryBroadcasts: string[] = [];
 
   const realtime = {
-    onJoin: (h: Handler) => joinHandlers.push(h),
-    onMessage: (h: Handler) => messageHandlers.push(h),
-    onLeave: (h: Handler) => leaveHandlers.push(h),
+    registerGame: (_game: string, h: typeof handlers) => {
+      handlers = h;
+    },
     send: (ws: unknown, message: unknown) => sent.push({ ws, message }),
     broadcast: (key: string, message: unknown) =>
       broadcasts.push({ key, message }),
@@ -56,9 +63,9 @@ function fakeRealtime() {
 
   return {
     realtime: realtime as unknown as ActivityRealtimeServer,
-    join: (params: any) => joinHandlers.forEach((h) => h(scoped(params))),
-    message: (params: any) => messageHandlers.forEach((h) => h(scoped(params))),
-    leave: (params: any) => leaveHandlers.forEach((h) => h(scoped(params))),
+    join: (params: any) => handlers.onJoin?.(scoped(params)),
+    message: (params: any) => handlers.onMessage?.(scoped(params)),
+    leave: (params: any) => handlers.onLeave?.(scoped(params)),
     sent,
     broadcasts,
     binaryBroadcasts,
@@ -80,22 +87,6 @@ describe('wirePongActivity', () => {
     expect(sent[0]!.ws).toBe('ws-a');
     expect((sent[0]!.message as { type: string }).type).toBe('init');
     expect(sideOf(0)).toBe('left');
-  });
-
-  it('ignores join/message/leave events for a different game', () => {
-    const { realtime, join, message, leave, sent } = fakeRealtime();
-    wirePongActivity(realtime);
-
-    join({ userId: 'user-a', mode: 'multi', game: 'chess', ws: 'ws-a' });
-    message({
-      userId: 'user-a',
-      mode: 'multi',
-      game: 'chess',
-      message: { type: 'input', payload: { direction: 1, seq: 1 } },
-    });
-    leave({ userId: 'user-a', ws: 'ws-a', mode: 'multi', game: 'chess' });
-
-    expect(sent).toEqual([]);
   });
 
   it('accepts a single-player join carrying a difficulty without erroring', () => {

@@ -1,4 +1,4 @@
-export type GameId = 'pong';
+export type GameId = 'pong' | 'wordle';
 
 // 'multi' is the only mode where two connections share one match; 'single'
 // (vs. the bot) and 'local' (hot-seat on one keyboard) are private to the
@@ -6,5 +6,5 @@ export type GameId = 'pong';
 export type ActivityMode = 'single' | 'multi' | 'local';
 
 export function isGameId(value: unknown): value is GameId {
-  return value === 'pong';
+  return value === 'pong' || value === 'wordle';
 }

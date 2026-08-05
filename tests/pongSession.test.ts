@@ -568,7 +568,7 @@ describe('PongSession', () => {
       expect(ended).toBe(true);
       expect(recorded).toEqual([]);
       expect((session as any).interval).toBeNull();
-      expect((session as any).disconnectTimers.size).toBe(0);
+      expect((session as any).disconnectGrace.isArmed('user-a')).toBe(false);
       expect(broadcaster.messages).toEqual([]);
     });
 
@@ -589,7 +589,7 @@ describe('PongSession', () => {
       session.pauseForDisconnect('user-a', 'conn-a');
 
       expect(ended).toBe(true);
-      expect((session as any).disconnectTimers.size).toBe(0);
+      expect((session as any).disconnectGrace.isArmed('user-a')).toBe(false);
     });
   });
 
@@ -676,7 +676,7 @@ describe('PongSession', () => {
       session.leave('user-a', 'conn-a');
       await wait(40);
 
-      expect((session as any).disconnectTimers.size).toBe(0);
+      expect((session as any).disconnectGrace.isArmed('user-a')).toBe(false);
       expect(
         (session as any).players.some((p: any) => p.userId === 'user-a'),
       ).toBe(false);

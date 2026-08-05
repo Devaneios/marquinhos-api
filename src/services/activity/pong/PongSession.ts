@@ -1,5 +1,6 @@
 import { GamificationService } from '../../gamification';
 import type { ActivityMode } from '../gameId';
+import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
 import { BOT_TUNING, PongBot, type BotDifficulty } from './PongBotAI';
 import {
   PongEngine,
@@ -62,7 +63,7 @@ export class PongSession {
   };
   private lastLoopHr: bigint | null = null;
   private accumulatorMs = 0;
-  private disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private disconnectGrace = new DisconnectGraceTimer<string>();
   private onSessionEnded?: () => void;
   private disconnectGraceMs: number;
 
@@ -114,11 +115,7 @@ export class PongSession {
 
   private resumeExisting(player: PongPlayer) {
     player.connected = true;
-    const timer = this.disconnectTimers.get(player.userId);
-    if (timer) {
-      clearTimeout(timer);
-      this.disconnectTimers.delete(player.userId);
-    }
+    this.disconnectGrace.disarm(player.userId);
     if (this.players.every((p) => p.connected)) this.start();
     this.broadcaster.broadcast(this.roomKey, {
       type: 'opponent_reconnected',
@@ -154,15 +151,12 @@ export class PongSession {
       type: 'opponent_disconnected',
       payload: { side: player.side, timeoutMs: this.disconnectGraceMs },
     });
-    const timer = setTimeout(
-      () => this.forfeitDisconnected(userId),
-      this.disconnectGraceMs,
+    this.disconnectGrace.arm(userId, this.disconnectGraceMs, () =>
+      this.forfeitDisconnected(userId),
     );
-    this.disconnectTimers.set(userId, timer);
   }
 
   private forfeitDisconnected(userId: string) {
-    this.disconnectTimers.delete(userId);
     const player = this.players.find((p) => p.userId === userId);
     if (!player || player.connected) return; // reconnected in the meantime
 
@@ -173,11 +167,7 @@ export class PongSession {
   // Settles and frees the slot: whoever is left wins an unfinished match,
   // then the player is gone for good.
   private detach(userId: string) {
-    const timer = this.disconnectTimers.get(userId);
-    if (timer) {
-      clearTimeout(timer);
-      this.disconnectTimers.delete(userId);
-    }
+    this.disconnectGrace.disarm(userId);
     this.forfeitTo(userId);
     this.removePlayer(userId);
   }

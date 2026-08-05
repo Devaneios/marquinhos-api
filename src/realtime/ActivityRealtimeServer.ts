@@ -65,12 +65,21 @@ type MessageHandler = (
 type PresenceHandler = (params: ClientIdentity & { ws: WebSocket }) => void;
 type JoinHandler = (params: ClientIdentity & { ws: WebSocket }) => void;
 
+export interface GameHandlers {
+  onJoin?: JoinHandler;
+  onMessage?: MessageHandler;
+  onLeave?: PresenceHandler;
+}
+
 export class ActivityRealtimeServer {
   private wss: WebSocketServer;
   private rooms = new Map<string, Set<WebSocket>>();
-  private messageHandlers: MessageHandler[] = [];
-  private joinHandlers: JoinHandler[] = [];
-  private leaveHandlers: PresenceHandler[] = [];
+  // Keyed by GameId: a connection's messages/join/leave are only ever
+  // dispatched to the entry matching its own (server-verified) identity.game,
+  // never to every registered game. This makes cross-game delivery
+  // structurally impossible instead of relying on every handler
+  // self-guarding with `if (game !== 'x') return;`.
+  private gameHandlers = new Map<GameId, GameHandlers>();
   private heartbeatTimer: ReturnType<typeof setInterval>;
 
   constructor(
@@ -153,7 +162,7 @@ export class ActivityRealtimeServer {
       sessionKey,
     };
     this.joinRoom(sessionKey, ws);
-    this.joinHandlers.forEach((handler) => handler({ ...identity, ws }));
+    this.gameHandlers.get(game)?.onJoin?.({ ...identity, ws });
 
     ws.on('message', (raw) => {
       let message: ActivityMessage;
@@ -162,14 +171,12 @@ export class ActivityRealtimeServer {
       } catch {
         return;
       }
-      this.messageHandlers.forEach((handler) =>
-        handler({ ...identity, ws, message }),
-      );
+      this.gameHandlers.get(game)?.onMessage?.({ ...identity, ws, message });
     });
 
     ws.on('close', () => {
       this.leaveRoom(sessionKey, ws);
-      this.leaveHandlers.forEach((handler) => handler({ ...identity, ws }));
+      this.gameHandlers.get(game)?.onLeave?.({ ...identity, ws });
     });
   }
 
@@ -224,16 +231,14 @@ export class ActivityRealtimeServer {
     return this.rooms.get(key)?.size ?? 0;
   }
 
-  onJoin(handler: JoinHandler) {
-    this.joinHandlers.push(handler);
-  }
-
-  onLeave(handler: PresenceHandler) {
-    this.leaveHandlers.push(handler);
-  }
-
-  onMessage(handler: MessageHandler) {
-    this.messageHandlers.push(handler);
+  // Each GameId may register exactly once, at boot. Registering twice would
+  // silently mean only the last registration's handlers ever run, so it's
+  // rejected outright rather than left as a foot-gun.
+  registerGame(game: GameId, handlers: GameHandlers) {
+    if (this.gameHandlers.has(game)) {
+      throw new Error(`Game "${game}" is already registered`);
+    }
+    this.gameHandlers.set(game, handlers);
   }
 
   close(): Promise<void> {

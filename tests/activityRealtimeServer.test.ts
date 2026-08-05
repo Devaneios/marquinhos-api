@@ -193,11 +193,13 @@ describe('ActivityRealtimeServer', () => {
     expect(server.getRoomSize(roomKey(MULTI_SCOPE))).toBe(0);
   });
 
-  it('invokes onMessage handlers with the parsed message and sender identity', async () => {
+  it('invokes the registered game handler with the parsed message and sender identity', async () => {
     await startServer();
 
     const received: unknown[] = [];
-    server.onMessage((params) => received.push(params));
+    server.registerGame('pong', {
+      onMessage: (params) => received.push(params),
+    });
 
     const token = mintWsSessionToken({
       userId: 'user-1',
@@ -230,7 +232,7 @@ describe('ActivityRealtimeServer', () => {
     await startServer();
 
     const joins: unknown[] = [];
-    server.onJoin((params) => joins.push(params));
+    server.registerGame('pong', { onJoin: (params) => joins.push(params) });
 
     const token = mintWsSessionToken({
       userId: 'user-1',
@@ -251,8 +253,10 @@ describe('ActivityRealtimeServer', () => {
 
     const joins: unknown[] = [];
     const leaves: unknown[] = [];
-    server.onJoin((params) => joins.push(params));
-    server.onLeave((params) => leaves.push(params));
+    server.registerGame('pong', {
+      onJoin: (params) => joins.push(params),
+      onLeave: (params) => leaves.push(params),
+    });
 
     const token = mintWsSessionToken({
       userId: 'user-1',
@@ -286,6 +290,53 @@ describe('ActivityRealtimeServer', () => {
     expect((leaves[0] as { ws: unknown }).ws).toBe(
       (joins[0] as { ws: unknown }).ws,
     );
+  });
+
+  it('throws when a game is registered twice', async () => {
+    await startServer();
+    server.registerGame('pong', {});
+    expect(() => server.registerGame('pong', {})).toThrow();
+  });
+
+  it('never delivers a message from one game to another game handler', async () => {
+    await startServer();
+
+    const pongMessages: unknown[] = [];
+    const pongLeaves: unknown[] = [];
+    const wordleMessages: unknown[] = [];
+    const wordleLeaves: unknown[] = [];
+    server.registerGame('pong', {
+      onMessage: (params) => pongMessages.push(params),
+      onLeave: (params) => pongLeaves.push(params),
+    });
+    server.registerGame('wordle', {
+      onMessage: (params) => wordleMessages.push(params),
+      onLeave: (params) => wordleLeaves.push(params),
+    });
+
+    const wordleToken = mintWsSessionToken({
+      userId: 'user-1',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'single',
+      game: 'wordle',
+    });
+    const wsWordle = connect(wordleToken);
+    await waitForOpen(wsWordle);
+
+    // Adversarial case: reuse Pong's exact type-string vocabulary on a
+    // Wordle-tagged connection. The dispatcher must route this to Wordle's
+    // handler only, never Pong's, purely by connection identity.
+    wsWordle.send(JSON.stringify({ type: 'input', payload: {} }));
+    wsWordle.send(JSON.stringify({ type: 'leave', payload: {} }));
+    await wait(50);
+    wsWordle.close();
+    await wait(50);
+
+    expect(pongMessages.length).toBe(0);
+    expect(pongLeaves.length).toBe(0);
+    expect(wordleMessages.length).toBe(2);
+    expect(wordleLeaves.length).toBe(1);
   });
 
   it('puts two users playing the same private mode in the same instance into separate rooms', async () => {

@@ -1,66 +1,53 @@
-import type { WebSocket } from 'ws';
 import type { ActivityRealtimeServer } from '../../../realtime/ActivityRealtimeServer';
+import { RateLimiter } from '../shared/RateLimiter';
+import { SessionRegistry } from '../shared/SessionRegistry';
 import { PongSession, type PongSessionIdentity } from './PongSession';
 
 const INPUT_RATE_LIMIT_WINDOW_MS = 1000;
 const INPUT_RATE_LIMIT_MAX = 120;
 
 export function wirePongActivity(realtime: ActivityRealtimeServer) {
-  const inputRateState = new Map<
-    WebSocket,
-    { windowStart: number; count: number }
-  >();
-
-  function isOverInputRateLimit(ws: WebSocket): boolean {
-    const now = Date.now();
-    const state = inputRateState.get(ws);
-    if (!state || now - state.windowStart >= INPUT_RATE_LIMIT_WINDOW_MS) {
-      inputRateState.set(ws, { windowStart: now, count: 1 });
-      return false;
-    }
-    state.count += 1;
-    return state.count > INPUT_RATE_LIMIT_MAX;
-  }
+  const inputRateLimiter = new RateLimiter({
+    windowMs: INPUT_RATE_LIMIT_WINDOW_MS,
+    max: INPUT_RATE_LIMIT_MAX,
+  });
 
   // Keyed by the transport's sessionKey, never by instanceId — that key is
   // what scopes a match to (instance, game, mode, and user for the private
   // modes), so a CPU game can't land on the multiplayer match the user just
   // walked out of.
-  const sessions = new Map<string, PongSession>();
+  const sessions = new SessionRegistry<PongSession>();
 
   function getOrCreateSession(
     identity: PongSessionIdentity,
     winningScore?: number,
   ): PongSession {
-    let session = sessions.get(identity.sessionKey);
-    if (!session) {
-      session = new PongSession(
-        identity,
-        realtime,
-        undefined,
-        winningScore !== undefined ? { winningScore } : undefined,
-        {
-          onSessionEnded: () => sessions.delete(identity.sessionKey),
-        },
-      );
-      sessions.set(identity.sessionKey, session);
-    }
-    return session;
+    return sessions.getOrCreate(
+      identity.sessionKey,
+      () =>
+        new PongSession(
+          identity,
+          realtime,
+          undefined,
+          winningScore !== undefined ? { winningScore } : undefined,
+          {
+            onSessionEnded: () => sessions.delete(identity.sessionKey),
+          },
+        ),
+    );
   }
 
-  realtime.onJoin(
-    ({
+  realtime.registerGame('pong', {
+    onJoin({
       instanceId,
       guildId,
       userId,
       mode,
-      game,
       difficulty,
       winningScore,
       sessionKey,
       ws,
-    }) => {
-      if (game !== 'pong') return;
+    }) {
       const session = getOrCreateSession(
         { sessionKey, instanceId, guildId, mode },
         winningScore,
@@ -86,41 +73,39 @@ export function wirePongActivity(realtime: ActivityRealtimeServer) {
         session.start();
       }
     },
-  );
 
-  realtime.onMessage(({ sessionKey, userId, message, game, ws }) => {
-    if (game !== 'pong') return;
-    const session = sessions.get(sessionKey);
-    if (!session) return;
+    onMessage({ sessionKey, userId, message, ws }) {
+      const session = sessions.get(sessionKey);
+      if (!session) return;
 
-    if (message.type === 'input') {
-      if (isOverInputRateLimit(ws)) return;
-      const payload = message.payload as {
-        direction?: -1 | 0 | 1;
-        seq?: number;
-        side?: 'left' | 'right';
-      };
-      session.handleInput(
-        userId,
-        payload?.direction ?? 0,
-        payload?.seq ?? 0,
-        payload?.side,
-      );
-    } else if (message.type === 'restart') {
-      session.requestRestart(userId);
-    } else if (message.type === 'leave') {
-      session.leave(userId, ws);
-    }
-  });
+      if (message.type === 'input') {
+        if (inputRateLimiter.isOverLimit(ws)) return;
+        const payload = message.payload as {
+          direction?: -1 | 0 | 1;
+          seq?: number;
+          side?: 'left' | 'right';
+        };
+        session.handleInput(
+          userId,
+          payload?.direction ?? 0,
+          payload?.seq ?? 0,
+          payload?.side,
+        );
+      } else if (message.type === 'restart') {
+        session.requestRestart(userId);
+      } else if (message.type === 'leave') {
+        session.leave(userId, ws);
+      }
+    },
 
-  // A raw WebSocket close without a preceding `leave` message means the
-  // player didn't intend to quit — pause the match and give them a grace
-  // period to reconnect instead of tearing the session down immediately.
-  realtime.onLeave(({ sessionKey, userId, game, ws }) => {
-    if (game !== 'pong') return;
-    inputRateState.delete(ws);
-    const session = sessions.get(sessionKey);
-    if (!session) return;
-    session.pauseForDisconnect(userId, ws);
+    // A raw WebSocket close without a preceding `leave` message means the
+    // player didn't intend to quit — pause the match and give them a grace
+    // period to reconnect instead of tearing the session down immediately.
+    onLeave({ sessionKey, userId, ws }) {
+      inputRateLimiter.clear(ws);
+      const session = sessions.get(sessionKey);
+      if (!session) return;
+      session.pauseForDisconnect(userId, ws);
+    },
   });
 }

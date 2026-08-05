@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import ActivityController from '../src/controllers/activity.controller';
+import { roomKey } from '../src/services/activity/roomKey';
 import { verifyWsSessionToken } from '../src/services/activity/wsSessionToken';
 import type { DiscordService } from '../src/services/discord';
 
@@ -83,7 +84,9 @@ describe('ActivityController.getWsSessionToken', () => {
     await controller.getWsSessionToken(req, res as any);
 
     expect(res.getStatus()).toBe(200);
-    const payload = res.getPayload() as { data: { token: string } };
+    const payload = res.getPayload() as {
+      data: { token: string; roomKey: string };
+    };
     expect(verifyWsSessionToken(payload.data.token)).toEqual({
       userId: 'user-1',
       instanceId: 'inst-1',
@@ -91,6 +94,14 @@ describe('ActivityController.getWsSessionToken', () => {
       mode: 'single',
       game: 'pong',
     });
+    expect(payload.data.roomKey).toBe(
+      roomKey({
+        instanceId: 'inst-1',
+        game: 'pong',
+        mode: 'single',
+        userId: 'user-1',
+      }),
+    );
   });
 
   it('includes an optional difficulty in the minted token', async () => {

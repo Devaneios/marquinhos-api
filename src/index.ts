@@ -1,3 +1,5 @@
+import { WebSocketTransport } from '@colyseus/ws-transport';
+import { Server as ColyseusServer } from 'colyseus';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import type { Express, NextFunction, Request, Response } from 'express';
@@ -5,7 +7,8 @@ import express from 'express';
 import http from 'http';
 import morgan from 'morgan';
 import './database/sqlite';
-import { ActivityRealtimeServer } from './realtime/ActivityRealtimeServer';
+import { PongRoom } from './realtime/PongRoom';
+import { WordleRoom } from './realtime/WordleRoom';
 import activityRouter from './routes/activity.route';
 import aiChatRouter from './routes/aiChat.route';
 import * as auth from './routes/auth.route';
@@ -17,8 +20,6 @@ import * as privacyPolicy from './routes/privacyPolicy.route';
 import * as scrobble from './routes/scrobble.route';
 import * as user from './routes/user.route';
 import wordleRouter from './routes/wordle.route';
-import { wirePongActivity } from './services/activity/pong/PongActivityManager';
-import { wireWordleActivity } from './services/activity/wordle/WordleActivityManager';
 import { AgentRateLimitService } from './services/aiChat/AgentRateLimitService';
 import { describeStaticPrompts } from './services/aiChat/promptRegistry';
 import { RateLimitService } from './services/aiChat/RateLimitService';
@@ -175,11 +176,10 @@ try {
 
 const httpServer = http.createServer(app);
 
-const activityRealtimeServer = new ActivityRealtimeServer({
-  server: httpServer,
-  path: '/ws/activity',
+const gameServer = new ColyseusServer({
+  transport: new WebSocketTransport({ server: httpServer }),
 });
-wirePongActivity(activityRealtimeServer);
-wireWordleActivity(activityRealtimeServer);
+gameServer.define('pong', PongRoom).filterBy(['roomKey']);
+gameServer.define('wordle', WordleRoom).filterBy(['roomKey']);
 
-httpServer.listen(process.env.HTTP_PORT || 3000);
+gameServer.listen(Number(process.env.HTTP_PORT) || 3000);

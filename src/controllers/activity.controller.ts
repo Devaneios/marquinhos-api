@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import type { ActivityMode, GameId } from '../services/activity/gameId';
 import type { BotDifficulty } from '../services/activity/pong/PongBotAI';
+import { roomKey } from '../services/activity/roomKey';
 import { mintWsSessionToken } from '../services/activity/wsSessionToken';
 import { DiscordService } from '../services/discord';
 import { logger } from '../utils/logger';
@@ -73,7 +74,8 @@ class ActivityController {
         ...(difficulty !== undefined ? { difficulty } : {}),
         ...(winningScore !== undefined ? { winningScore } : {}),
       });
-      return res.status(200).json({ data: { token } });
+      const key = roomKey({ instanceId, game, mode, userId: user.id });
+      return res.status(200).json({ data: { token, roomKey: key } });
     } catch (error) {
       logger.error('activity.controller.ws_session_failed', { error });
       return res.status(500).json({ message: 'Unknown Error' });

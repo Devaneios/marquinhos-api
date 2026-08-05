@@ -28,9 +28,9 @@ interface PongPlayer {
 }
 
 // The session key doubles as the transport room key — it is produced once by
-// ActivityRealtimeServer.roomKey and handed down, so the session and the room
-// it broadcasts into can never drift apart. instanceId/guildId are kept only
-// for the gamification record.
+// roomKey() and handed down, so the session and the room it broadcasts into
+// can never drift apart. instanceId/guildId are kept only for the
+// gamification record.
 export interface PongSessionIdentity {
   sessionKey: string;
   instanceId: string;

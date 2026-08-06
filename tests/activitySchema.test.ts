@@ -210,6 +210,22 @@ describe('activityWsSessionSchema', () => {
     ).rejects.toThrow();
   });
 
+  it('accepts game "cards"', async () => {
+    await expect(
+      activityWsSessionSchema.parseAsync({
+        body: {
+          accessToken: 'tok_abc',
+          instanceId: 'inst-1',
+          guildId: 'guild-1',
+          mode: 'multi',
+          game: 'cards',
+        },
+        query: {},
+        params: {},
+      }),
+    ).resolves.toBeDefined();
+  });
+
   it('rejects an invalid game value', async () => {
     await expect(
       activityWsSessionSchema.parseAsync({

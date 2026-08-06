@@ -36,6 +36,8 @@ class ActivityController {
         game,
         difficulty,
         winningScore,
+        ruleset,
+        options,
       } = req.body as {
         accessToken: string;
         instanceId: string;
@@ -44,6 +46,8 @@ class ActivityController {
         game: GameId;
         difficulty?: BotDifficulty;
         winningScore?: number;
+        ruleset?: string;
+        options?: Record<string, unknown>;
       };
       const user = await this.discordService.getDiscordUser(accessToken);
       if (!user?.id) {
@@ -73,8 +77,16 @@ class ActivityController {
         game,
         ...(difficulty !== undefined ? { difficulty } : {}),
         ...(winningScore !== undefined ? { winningScore } : {}),
+        ...(ruleset !== undefined ? { ruleset } : {}),
+        ...(options !== undefined ? { options } : {}),
       });
-      const key = roomKey({ instanceId, game, mode, userId: user.id });
+      const key = roomKey({
+        instanceId,
+        game,
+        mode,
+        userId: user.id,
+        ...(ruleset !== undefined ? { ruleset } : {}),
+      });
       return res.status(200).json({ data: { token, roomKey: key } });
     } catch (error) {
       logger.error('activity.controller.ws_session_failed', { error });

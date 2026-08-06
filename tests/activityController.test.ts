@@ -272,6 +272,49 @@ describe('ActivityController.getWsSessionToken', () => {
     expect(res.getStatus()).toBe(500);
   });
 
+  it('includes ruleset and options in the minted token for a cards session', async () => {
+    const fakeService = {
+      getDiscordUser: async () => ({ id: 'user-1' }),
+      isGuildMember: async () => true,
+    } as unknown as DiscordService;
+    const controller = new ActivityController(fakeService);
+
+    const req = makeReq({
+      accessToken: 'tok_abc',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'multi',
+      game: 'cards',
+      ruleset: 'truco',
+      options: { seed: 7 },
+    });
+    const res = makeRes();
+
+    await controller.getWsSessionToken(req, res as any);
+
+    const payload = res.getPayload() as {
+      data: { token: string; roomKey: string };
+    };
+    expect(verifyWsSessionToken(payload.data.token)).toEqual({
+      userId: 'user-1',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'multi',
+      game: 'cards',
+      ruleset: 'truco',
+      options: { seed: 7 },
+    });
+    expect(payload.data.roomKey).toBe(
+      roomKey({
+        instanceId: 'inst-1',
+        game: 'cards',
+        mode: 'multi',
+        userId: 'user-1',
+        ruleset: 'truco',
+      }),
+    );
+  });
+
   it('returns 500 when the guild membership check throws', async () => {
     const fakeService = {
       getDiscordUser: async () => ({ id: 'user-1' }),

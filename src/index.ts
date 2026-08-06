@@ -7,6 +7,7 @@ import express from 'express';
 import http from 'http';
 import morgan from 'morgan';
 import './database/sqlite';
+import { CardTableRoom } from './realtime/CardTableRoom';
 import { PongRoom } from './realtime/PongRoom';
 import { WordleRoom } from './realtime/WordleRoom';
 import activityRouter from './routes/activity.route';
@@ -181,5 +182,6 @@ const gameServer = new ColyseusServer({
 });
 gameServer.define('pong', PongRoom).filterBy(['roomKey']);
 gameServer.define('wordle', WordleRoom).filterBy(['roomKey']);
+gameServer.define('cards', CardTableRoom).filterBy(['roomKey']);
 
 gameServer.listen(Number(process.env.HTTP_PORT) || 3000);

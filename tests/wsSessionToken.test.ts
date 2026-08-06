@@ -174,4 +174,69 @@ describe('mintWsSessionToken / verifyWsSessionToken', () => {
     )!;
     expect(verifyWsSessionToken(malformed)).toBeNull();
   });
+
+  it('round-trips a known ruleset and options bag for the cards game', () => {
+    const token = mintWsSessionToken({
+      userId: 'user-1',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'multi',
+      game: 'cards',
+      ruleset: 'truco',
+      options: { seed: 42 },
+    });
+    expect(verifyWsSessionToken(token)).toEqual({
+      userId: 'user-1',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'multi',
+      game: 'cards',
+      ruleset: 'truco',
+      options: { seed: 42 },
+    });
+  });
+
+  it('rejects a cards payload with no ruleset', () => {
+    const malformed = encryptToken(
+      JSON.stringify({
+        userId: 'user-1',
+        instanceId: 'inst-1',
+        guildId: 'guild-1',
+        mode: 'multi',
+        game: 'cards',
+      }),
+    )!;
+    expect(verifyWsSessionToken(malformed)).toBeNull();
+  });
+
+  it('rejects a cards payload with an unknown ruleset', () => {
+    const malformed = encryptToken(
+      JSON.stringify({
+        userId: 'user-1',
+        instanceId: 'inst-1',
+        guildId: 'guild-1',
+        mode: 'multi',
+        game: 'cards',
+        ruleset: 'poker',
+      }),
+    )!;
+    expect(verifyWsSessionToken(malformed)).toBeNull();
+  });
+
+  it('ignores an absent ruleset for a non-cards game (pong unaffected)', () => {
+    const token = mintWsSessionToken({
+      userId: 'user-1',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'multi',
+      game: 'pong',
+    });
+    expect(verifyWsSessionToken(token)).toEqual({
+      userId: 'user-1',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'multi',
+      game: 'pong',
+    });
+  });
 });

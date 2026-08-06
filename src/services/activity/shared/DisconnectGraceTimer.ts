@@ -28,4 +28,13 @@ export class DisconnectGraceTimer<TKey = string> {
   isArmed(key: TKey): boolean {
     return this.timers.has(key);
   }
+
+  // Disarms every key. Needed when the thing being timed stops existing (a
+  // match ends, a session shuts down) and the caller no longer has the list of
+  // keys it armed — dropping the Map instead would leave live timers pointing
+  // at a dead session.
+  clear(): void {
+    for (const timer of this.timers.values()) clearTimeout(timer);
+    this.timers.clear();
+  }
 }

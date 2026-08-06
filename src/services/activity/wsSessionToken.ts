@@ -1,4 +1,5 @@
 import { decryptTokenFull, encryptToken } from '../../utils/crypto';
+import { cardGameRegistry } from './cards/registry';
 import { isGameId, type ActivityMode, type GameId } from './gameId';
 import type { BotDifficulty } from './pong/PongBotAI';
 
@@ -12,6 +13,12 @@ export interface WsSessionPayload {
   game: GameId;
   difficulty?: BotDifficulty;
   winningScore?: number;
+  // Only meaningful (and required) for game:'cards' — selects which
+  // pluggable GameDefinition the room loads. The shape of `options` is
+  // validated by that GameDefinition's own setup(), not here, so this
+  // layer only needs to know "is this a known ruleset id."
+  ruleset?: string;
+  options?: Record<string, unknown>;
 }
 
 const WS_SESSION_TTL_MS = 5 * 60_000;
@@ -42,6 +49,11 @@ export function verifyWsSessionToken(token: string): WsSessionPayload | null {
         Number.isInteger(parsed.winningScore) &&
         parsed.winningScore >= 1 &&
         parsed.winningScore <= 99);
+    const hasValidRuleset =
+      parsed?.game !== 'cards'
+        ? parsed?.ruleset === undefined
+        : typeof parsed?.ruleset === 'string' &&
+          cardGameRegistry.isKnownRuleset(parsed.ruleset);
     if (
       typeof parsed?.userId === 'string' &&
       typeof parsed?.instanceId === 'string' &&
@@ -51,7 +63,8 @@ export function verifyWsSessionToken(token: string): WsSessionPayload | null {
         parsed?.mode === 'local') &&
       isGameId(parsed?.game) &&
       hasValidDifficulty &&
-      hasValidWinningScore
+      hasValidWinningScore &&
+      hasValidRuleset
     ) {
       return {
         userId: parsed.userId,
@@ -65,6 +78,8 @@ export function verifyWsSessionToken(token: string): WsSessionPayload | null {
         ...(parsed.winningScore !== undefined
           ? { winningScore: parsed.winningScore }
           : {}),
+        ...(parsed.ruleset !== undefined ? { ruleset: parsed.ruleset } : {}),
+        ...(parsed.options !== undefined ? { options: parsed.options } : {}),
       };
     }
   } catch {

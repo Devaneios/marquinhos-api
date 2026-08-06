@@ -50,4 +50,39 @@ describe('roomKey', () => {
       }),
     ).toBe('inst-1:wordle:single:user-1');
   });
+
+  it('is unaffected by an absent ruleset (Pong/Wordle callers unchanged)', () => {
+    expect(
+      roomKey({
+        instanceId: 'inst-1',
+        game: 'pong',
+        mode: 'multi',
+        userId: 'user-1',
+      }),
+    ).toBe('inst-1:pong:multi');
+  });
+
+  it('appends the ruleset to a multi-mode key so two different card games in the same instance never collide', () => {
+    expect(
+      roomKey({
+        instanceId: 'inst-1',
+        game: 'cards',
+        mode: 'multi',
+        userId: 'user-1',
+        ruleset: 'truco',
+      }),
+    ).toBe('inst-1:cards:multi:truco');
+  });
+
+  it('appends the ruleset to a private-mode key after the userId', () => {
+    expect(
+      roomKey({
+        instanceId: 'inst-1',
+        game: 'cards',
+        mode: 'single',
+        userId: 'user-1',
+        ruleset: 'truco',
+      }),
+    ).toBe('inst-1:cards:single:user-1:truco');
+  });
 });

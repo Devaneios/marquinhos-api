@@ -5,6 +5,11 @@ export interface ActivityScope {
   game: GameId;
   mode: ActivityMode;
   userId: string;
+  // Only meaningful for games that host more than one pluggable ruleset
+  // (cards). Appended when present so two people in the same Activity
+  // instance choosing different rulesets never collide on room key; absent
+  // for every other caller, so this is purely additive.
+  ruleset?: string;
 }
 
 // A Discord Activity instanceId is constant for the whole lifetime of the
@@ -22,8 +27,11 @@ export function roomKey({
   game,
   mode,
   userId,
+  ruleset,
 }: ActivityScope): string {
-  return mode === 'multi'
-    ? `${instanceId}:${game}:multi`
-    : `${instanceId}:${game}:${mode}:${userId}`;
+  const base =
+    mode === 'multi'
+      ? `${instanceId}:${game}:multi`
+      : `${instanceId}:${game}:${mode}:${userId}`;
+  return ruleset ? `${base}:${ruleset}` : base;
 }

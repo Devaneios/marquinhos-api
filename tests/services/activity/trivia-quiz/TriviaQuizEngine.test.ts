@@ -55,7 +55,8 @@ describe('TriviaQuizEngine', () => {
     engine.addPlayer('user1');
     engine.startGame();
     const state = engine.getState();
-    const question = state.questions[0];
+    const question = state.questions[state.currentQuestionIndex];
+    if (!question) throw new Error('Question not found');
 
     const wrongIndex = (question.correctIndex + 1) % question.options.length;
     engine.submitAnswer('user1', wrongIndex, state.questionStartedAtMs + 1000);

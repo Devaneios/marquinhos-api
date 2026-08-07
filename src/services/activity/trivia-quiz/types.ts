@@ -22,7 +22,7 @@ export interface PlayerScore {
 
 export interface TriviaQuizState {
   currentQuestionIndex: number;
-  questions: Question[];
+  questions: readonly Question[];
   players: Map<string, PlayerScore>;
   playerAnswers: Map<string, PlayerAnswer>;
   gameStartedAtMs: number;

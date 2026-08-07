@@ -3,7 +3,7 @@ import type { Question, TriviaQuizState, PlayerScore, PlayerAnswer } from './typ
 export class TriviaQuizEngine {
   private state: TriviaQuizState;
 
-  constructor(questions: Question[]) {
+  constructor(questions: readonly Question[]) {
     this.state = {
       currentQuestionIndex: -1,
       questions,

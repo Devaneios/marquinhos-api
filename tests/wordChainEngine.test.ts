@@ -35,6 +35,7 @@ describe('WordChainEngine', () => {
     const engine = new WordChainEngine();
     engine.addPlayer('user-1');
     engine.addPlayer('user-2');
+    engine.addPlayer('user-3');
 
     // First word (no requirement)
     let result = engine.submitWord('user-1', 'abelha');
@@ -44,8 +45,12 @@ describe('WordChainEngine', () => {
     result = engine.submitWord('user-2', 'abate');
     expect(result.valid).toBe(true);
 
-    // Word starting with wrong letter (not 'e')
-    result = engine.submitWord('user-1', 'abate');
+    // Next word must start with 'e'
+    result = engine.submitWord('user-3', 'efeito');
+    expect(result.valid).toBe(true);
+
+    // Word starting with wrong letter (not 'o') - using abater which is in dictionary but starts with 'a'
+    result = engine.submitWord('user-1', 'abater');
     expect(result.valid).toBe(false);
     expect(result.error).toContain('must start with');
   });
@@ -118,8 +123,9 @@ describe('WordChainEngine', () => {
     engine.addPlayer('user-3');
 
     engine.submitWord('user-1', 'abelha');
+    engine.submitWord('user-2', 'abate');
     engine.removePlayer('user-2');
-    engine.submitWord('user-3', 'abate');
+    engine.submitWord('user-3', 'efeito');
 
     const state = engine.getState();
     expect(state.currentTurn).toBe('user-1');

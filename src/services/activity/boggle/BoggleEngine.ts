@@ -96,18 +96,19 @@ export function isValidPath(path: Cell[]): boolean {
   if (path.length === 0) return false;
   const seen = new Set<string>();
   for (let i = 0; i < path.length; i++) {
-    const cell = path[i];
+    const cell: Cell = path[i]!;
     if (!inBounds(cell)) return false;
     const key = `${cell.row},${cell.col}`;
     if (seen.has(key)) return false;
     seen.add(key);
-    if (i > 0 && !isAdjacent(path[i - 1], cell)) return false;
+    const prev: Cell | undefined = path[i - 1];
+    if (i > 0 && prev && !isAdjacent(prev, cell)) return false;
   }
   return true;
 }
 
 export function extractWord(grid: string[][], path: Cell[]): string {
-  return path.map((cell) => grid[cell.row][cell.col]).join('');
+  return path.map((cell) => grid[cell.row]![cell.col]!).join('');
 }
 
 // Standard party-Boggle length scoring: 3-4 letters = 1pt, 5 = 2pt,

@@ -120,7 +120,11 @@ export class WordSearchRaceEngine {
   }
 
   private placeWord(cells: (string | null)[][], word: string): boolean {
-    for (let attempt = 0; attempt < MAX_PLACEMENT_ATTEMPTS_PER_WORD; attempt++) {
+    for (
+      let attempt = 0;
+      attempt < MAX_PLACEMENT_ATTEMPTS_PER_WORD;
+      attempt++
+    ) {
       const direction =
         DIRECTIONS[Math.floor(Math.random() * DIRECTIONS.length)]!;
       const endRow = 0 + direction.row * (word.length - 1);
@@ -132,8 +136,10 @@ export class WordSearchRaceEngine {
       const maxCol = Math.min(this.size - 1, this.size - 1 - endCol);
       if (minRow > maxRow || minCol > maxCol) continue;
 
-      const startRow = minRow + Math.floor(Math.random() * (maxRow - minRow + 1));
-      const startCol = minCol + Math.floor(Math.random() * (maxCol - minCol + 1));
+      const startRow =
+        minRow + Math.floor(Math.random() * (maxRow - minRow + 1));
+      const startCol =
+        minCol + Math.floor(Math.random() * (maxCol - minCol + 1));
 
       if (this.fits(cells, word, startRow, startCol, direction)) {
         this.write(cells, word, startRow, startCol, direction);
@@ -186,7 +192,11 @@ export class WordSearchRaceEngine {
   }
 
   getFound(): FoundWord[] {
-    return this.found.map((f) => ({ ...f, start: { ...f.start }, end: { ...f.end } }));
+    return this.found.map((f) => ({
+      ...f,
+      start: { ...f.start },
+      end: { ...f.end },
+    }));
   }
 
   getScores(): Record<string, number> {

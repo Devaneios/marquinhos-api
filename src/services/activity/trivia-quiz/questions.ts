@@ -25,7 +25,12 @@ const QUESTIONS: Question[] = [
   {
     id: 'q4',
     text: 'Who wrote "Romeo and Juliet"?',
-    options: ['Christopher Marlowe', 'William Shakespeare', 'Ben Jonson', 'John Webster'],
+    options: [
+      'Christopher Marlowe',
+      'William Shakespeare',
+      'Ben Jonson',
+      'John Webster',
+    ],
     correctIndex: 1,
     category: 'Literature',
   },
@@ -46,7 +51,12 @@ const QUESTIONS: Question[] = [
   {
     id: 'q7',
     text: 'What is the largest ocean on Earth?',
-    options: ['Atlantic Ocean', 'Indian Ocean', 'Pacific Ocean', 'Arctic Ocean'],
+    options: [
+      'Atlantic Ocean',
+      'Indian Ocean',
+      'Pacific Ocean',
+      'Arctic Ocean',
+    ],
     correctIndex: 2,
     category: 'Geography',
   },
@@ -67,7 +77,12 @@ const QUESTIONS: Question[] = [
   {
     id: 'q10',
     text: 'Who was the first President of the United States?',
-    options: ['Thomas Jefferson', 'George Washington', 'John Adams', 'Benjamin Franklin'],
+    options: [
+      'Thomas Jefferson',
+      'George Washington',
+      'John Adams',
+      'Benjamin Franklin',
+    ],
     correctIndex: 1,
     category: 'History',
   },
@@ -137,7 +152,12 @@ const QUESTIONS: Question[] = [
   {
     id: 'q20',
     text: 'Who invented the telephone?',
-    options: ['Thomas Edison', 'Alexander Graham Bell', 'Nikola Tesla', 'Michael Faraday'],
+    options: [
+      'Thomas Edison',
+      'Alexander Graham Bell',
+      'Nikola Tesla',
+      'Michael Faraday',
+    ],
     correctIndex: 1,
     category: 'History',
   },

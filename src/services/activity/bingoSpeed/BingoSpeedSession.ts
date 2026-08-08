@@ -1,7 +1,7 @@
 import { GamificationService } from '../../gamification';
 import type { ActivityMode } from '../gameId';
-import { BingoSpeedEngine, type BingoCard } from './BingoSpeedEngine';
 import type { ActivityBroadcaster } from '../pong/PongSession';
+import { BingoSpeedEngine, type BingoCard } from './BingoSpeedEngine';
 
 interface BingoPlayer {
   userId: string;
@@ -58,7 +58,7 @@ export class BingoSpeedSession {
     return this.identity.sessionKey;
   }
 
-  addPlayer(userId: string, connection: unknown): BingoCard | null {
+  addPlayer(userId: string, _connection: unknown): BingoCard | null {
     const existing = this.players.get(userId);
     if (existing) {
       return existing.card;

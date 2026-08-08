@@ -98,7 +98,11 @@ export class WordSearchRaceSession {
     if (this.players.length === 0) this.dispose();
   }
 
-  submitSelection(userId: string, start: Cell, end: Cell): FoundWord | { error: string } {
+  submitSelection(
+    userId: string,
+    start: Cell,
+    end: Cell,
+  ): FoundWord | { error: string } {
     if (this.ended) return { error: 'Game has already ended' };
     if (!this.players.some((p) => p.userId === userId)) {
       return { error: 'Player not in room' };

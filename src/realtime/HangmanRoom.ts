@@ -1,13 +1,13 @@
 import { Room, type Client } from 'colyseus';
+import type { ActivityBroadcaster } from '../services/activity/hangman/HangmanSession';
+import { HangmanSession } from '../services/activity/hangman/HangmanSession';
+import { getHangmanWord } from '../services/activity/hangman/wordList';
 import { roomKey } from '../services/activity/roomKey';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
 import {
   verifyWsSessionToken,
   type WsSessionPayload,
 } from '../services/activity/wsSessionToken';
-import type { ActivityBroadcaster } from '../services/activity/hangman/HangmanSession';
-import { HangmanSession } from '../services/activity/hangman/HangmanSession';
-import { getHangmanWord } from '../services/activity/hangman/wordList';
 
 const GUESS_RATE_LIMIT_WINDOW_MS = 1000;
 const GUESS_RATE_LIMIT_MAX = 3;
@@ -62,22 +62,19 @@ export class HangmanRoom extends Room {
       { onSessionEnded: () => this.disconnect() },
     );
 
-    this.onMessage(
-      'guess',
-      (client, payload: { letter?: string }) => {
-        if (this.guessRateLimiter.isOverLimit(client)) return;
-        const auth = client.auth as WsSessionPayload;
-        const result = this.session.guessLetter(
-          auth.userId,
-          payload?.letter ?? '',
-        );
-        if (!result.success) {
-          client.send('guess_error', { message: result.message });
-          return;
-        }
-        client.send('guess_success', {});
-      },
-    );
+    this.onMessage('guess', (client, payload: { letter?: string }) => {
+      if (this.guessRateLimiter.isOverLimit(client)) return;
+      const auth = client.auth as WsSessionPayload;
+      const result = this.session.guessLetter(
+        auth.userId,
+        payload?.letter ?? '',
+      );
+      if (!result.success) {
+        client.send('guess_error', { message: result.message });
+        return;
+      }
+      client.send('guess_success', {});
+    });
 
     this.onMessage('leave', (client) => {
       const auth = client.auth as WsSessionPayload;

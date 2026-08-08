@@ -22,7 +22,7 @@ export class WordChainEngine {
     this.wordlist = new Set(
       content
         .split('\n')
-        .map(w => w.trim().toLowerCase())
+        .map((w) => w.trim().toLowerCase())
         .filter(Boolean),
     );
 
@@ -45,7 +45,7 @@ export class WordChainEngine {
   }
 
   addPlayer(userId: string): void {
-    if (this.state.players.some(p => p.userId === userId)) return;
+    if (this.state.players.some((p) => p.userId === userId)) return;
     this.state.players.push({ userId, alive: true });
     this.turnOrder.push(userId);
     if (this.state.currentTurn === '') {
@@ -54,7 +54,7 @@ export class WordChainEngine {
   }
 
   removePlayer(userId: string): void {
-    const player = this.state.players.find(p => p.userId === userId);
+    const player = this.state.players.find((p) => p.userId === userId);
     if (player) {
       player.alive = false;
       this.checkWinCondition();
@@ -82,7 +82,9 @@ export class WordChainEngine {
 
     if (
       this.state.currentWord &&
-      !normalized.startsWith(this.state.currentWord[this.state.currentWord.length - 1])
+      !normalized.startsWith(
+        this.state.currentWord[this.state.currentWord.length - 1]!,
+      )
     ) {
       return {
         valid: false,
@@ -101,9 +103,12 @@ export class WordChainEngine {
     const maxAttempts = this.state.players.length;
 
     do {
-      this.currentTurnIndex = (this.currentTurnIndex + 1) % this.turnOrder.length;
-      const nextPlayer = this.turnOrder[this.currentTurnIndex];
-      const playerData = this.state.players.find(p => p.userId === nextPlayer);
+      this.currentTurnIndex =
+        (this.currentTurnIndex + 1) % this.turnOrder.length;
+      const nextPlayer = this.turnOrder[this.currentTurnIndex]!;
+      const playerData = this.state.players.find(
+        (p) => p.userId === nextPlayer,
+      );
 
       if (playerData?.alive) {
         this.state.currentTurn = nextPlayer;
@@ -117,10 +122,10 @@ export class WordChainEngine {
   }
 
   private checkWinCondition(): void {
-    const alivePlayers = this.state.players.filter(p => p.alive);
+    const alivePlayers = this.state.players.filter((p) => p.alive);
     if (alivePlayers.length === 1) {
       this.state.gameOver = true;
-      this.state.winner = alivePlayers[0].userId;
+      this.state.winner = alivePlayers[0]!.userId;
     } else if (alivePlayers.length === 0) {
       this.state.gameOver = true;
     }

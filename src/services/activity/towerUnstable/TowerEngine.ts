@@ -115,7 +115,10 @@ export class TowerEngine {
       return { success: false, error: 'Invalid position' };
     }
     if (!this.isEligibleLevel(level)) {
-      return { success: false, error: 'Cannot pull from the top protected levels' };
+      return {
+        success: false,
+        error: 'Cannot pull from the top protected levels',
+      };
     }
     if (!this.levels[level]!.blocks[position]) {
       return { success: false, error: 'Block already removed' };
@@ -145,12 +148,16 @@ export class TowerEngine {
     return { success: true, toppled, instability };
   }
 
-  private computeInstability(missingFromLevel: number, pullNumber: number): number {
+  private computeInstability(
+    missingFromLevel: number,
+    pullNumber: number,
+  ): number {
     const baseFactor = Math.min(pullNumber / this.totalBlocksOriginal, 1);
     const levelRatio = missingFromLevel / this.blocksPerLevel;
     const levelFactor = levelRatio * levelRatio;
     const raw =
-      BASE_INSTABILITY_WEIGHT * baseFactor + LEVEL_INSTABILITY_WEIGHT * levelFactor;
+      BASE_INSTABILITY_WEIGHT * baseFactor +
+      LEVEL_INSTABILITY_WEIGHT * levelFactor;
     return Math.min(raw, MAX_INSTABILITY);
   }
 

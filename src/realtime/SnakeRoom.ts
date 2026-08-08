@@ -1,8 +1,8 @@
 import { Room, type Client } from 'colyseus';
-import type { ActivityBroadcaster } from '../services/activity/snake-game/SnakeSession';
-import { SnakeSession } from '../services/activity/snake-game/SnakeSession';
 import { roomKey } from '../services/activity/roomKey';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
+import type { ActivityBroadcaster } from '../services/activity/snake-game/SnakeSession';
+import { SnakeSession } from '../services/activity/snake-game/SnakeSession';
 import {
   verifyWsSessionToken,
   type WsSessionPayload,

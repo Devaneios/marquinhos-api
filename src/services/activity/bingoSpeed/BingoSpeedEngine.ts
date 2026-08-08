@@ -19,19 +19,19 @@ export class BingoSpeedEngine {
       board[row] = [];
       for (let col = 0; col < 5; col++) {
         if (row === 2 && col === 2) {
-          board[row][col] = 0;
+          board[row]![col] = 0;
           continue;
         }
 
         let num = this.generateNumberForColumn(col);
         while (
-          board[row].slice(0, col).includes(num) ||
+          board[row]!.slice(0, col).includes(num) ||
           board.slice(0, row).some((r) => r[col] === num)
         ) {
           num = this.generateNumberForColumn(col);
         }
 
-        board[row][col] = num;
+        board[row]![col] = num;
       }
     }
 
@@ -39,7 +39,7 @@ export class BingoSpeedEngine {
     for (let row = 0; row < 5; row++) {
       marked[row] = [];
       for (let col = 0; col < 5; col++) {
-        marked[row][col] = row === 2 && col === 2;
+        marked[row]![col] = row === 2 && col === 2;
       }
     }
 
@@ -47,14 +47,14 @@ export class BingoSpeedEngine {
   }
 
   private generateNumberForColumn(col: number): number {
-    const ranges = [
+    const ranges: [number, number][] = [
       [1, 15],
       [16, 30],
       [31, 45],
       [46, 60],
       [61, 75],
     ];
-    const [min, max] = ranges[col];
+    const [min, max] = ranges[col]!;
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
@@ -76,8 +76,8 @@ export class BingoSpeedEngine {
   markNumber(card: BingoCard, number: number): void {
     for (let row = 0; row < 5; row++) {
       for (let col = 0; col < 5; col++) {
-        if (card.board[row][col] === number) {
-          card.marked[row][col] = true;
+        if (card.board[row]![col] === number) {
+          card.marked[row]![col] = true;
           return;
         }
       }
@@ -87,7 +87,7 @@ export class BingoSpeedEngine {
   checkBingo(card: BingoCard): boolean {
     // Check rows
     for (let row = 0; row < 5; row++) {
-      if (card.marked[row].every((m) => m)) {
+      if (card.marked[row]!.every((m) => m)) {
         return true;
       }
     }
@@ -102,7 +102,7 @@ export class BingoSpeedEngine {
     // Check diagonals
     let topLeftDiag = true;
     for (let i = 0; i < 5; i++) {
-      if (!card.marked[i][i]) {
+      if (!card.marked[i]![i]) {
         topLeftDiag = false;
         break;
       }
@@ -110,7 +110,7 @@ export class BingoSpeedEngine {
 
     let topRightDiag = true;
     for (let i = 0; i < 5; i++) {
-      if (!card.marked[i][4 - i]) {
+      if (!card.marked[i]![4 - i]) {
         topRightDiag = false;
         break;
       }
@@ -122,13 +122,14 @@ export class BingoSpeedEngine {
   verifyBingoClaim(card: BingoCard, rowOrColOrDiag: number): boolean {
     // Verify that all numbers in the claimed line were actually drawn
     // This is a placeholder - would verify the specific line based on type
+    void rowOrColOrDiag;
 
     // Check rows
     for (let row = 0; row < 5; row++) {
-      if (card.marked[row].every((m) => m)) {
+      if (card.marked[row]!.every((m) => m)) {
         for (let col = 0; col < 5; col++) {
-          const num = card.board[row][col];
-          if (num !== 0 && !this.drawnNumbers.has(num)) {
+          const num = card.board[row]![col];
+          if (num !== 0 && !this.drawnNumbers.has(num!)) {
             return false;
           }
         }
@@ -140,8 +141,8 @@ export class BingoSpeedEngine {
     for (let col = 0; col < 5; col++) {
       if (card.marked.every((row) => row[col])) {
         for (let row = 0; row < 5; row++) {
-          const num = card.board[row][col];
-          if (num !== 0 && !this.drawnNumbers.has(num)) {
+          const num = card.board[row]![col];
+          if (num !== 0 && !this.drawnNumbers.has(num!)) {
             return false;
           }
         }
@@ -152,7 +153,7 @@ export class BingoSpeedEngine {
     // Check diagonals
     let topLeftDiag = true;
     for (let i = 0; i < 5; i++) {
-      if (!card.marked[i][i]) {
+      if (!card.marked[i]![i]) {
         topLeftDiag = false;
         break;
       }
@@ -160,8 +161,8 @@ export class BingoSpeedEngine {
 
     if (topLeftDiag) {
       for (let i = 0; i < 5; i++) {
-        const num = card.board[i][i];
-        if (num !== 0 && !this.drawnNumbers.has(num)) {
+        const num = card.board[i]![i];
+        if (num !== 0 && !this.drawnNumbers.has(num!)) {
           return false;
         }
       }
@@ -170,7 +171,7 @@ export class BingoSpeedEngine {
 
     let topRightDiag = true;
     for (let i = 0; i < 5; i++) {
-      if (!card.marked[i][4 - i]) {
+      if (!card.marked[i]![4 - i]) {
         topRightDiag = false;
         break;
       }
@@ -178,8 +179,8 @@ export class BingoSpeedEngine {
 
     if (topRightDiag) {
       for (let i = 0; i < 5; i++) {
-        const num = card.board[i][4 - i];
-        if (num !== 0 && !this.drawnNumbers.has(num)) {
+        const num = card.board[i]![4 - i];
+        if (num !== 0 && !this.drawnNumbers.has(num!)) {
           return false;
         }
       }
@@ -194,7 +195,7 @@ export class BingoSpeedEngine {
     for (let row = 0; row < 5; row++) {
       marked[row] = [];
       for (let col = 0; col < 5; col++) {
-        marked[row][col] = row === 2 && col === 2;
+        marked[row]![col] = row === 2 && col === 2;
       }
     }
     return { board, marked };

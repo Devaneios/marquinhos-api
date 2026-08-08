@@ -1,6 +1,6 @@
 import { Room, type Client } from 'colyseus';
-import { MinesweeperSession } from '../services/activity/minesweeper/MinesweeperSession';
 import type { ActivityBroadcaster } from '../services/activity/minesweeper/MinesweeperSession';
+import { MinesweeperSession } from '../services/activity/minesweeper/MinesweeperSession';
 import { roomKey } from '../services/activity/roomKey';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
 import {
@@ -55,27 +55,24 @@ export class MinesweeperRoom extends Room {
       { onSessionEnded: () => this.disconnect() },
     );
 
-    this.onMessage(
-      'reveal',
-      (client, payload: { x?: number; y?: number }) => {
-        if (this.revealRateLimiter.isOverLimit(client)) return;
-        if (
-          typeof payload?.x !== 'number' ||
-          typeof payload?.y !== 'number' ||
-          !Number.isInteger(payload.x) ||
-          !Number.isInteger(payload.y)
-        ) {
-          client.send('reveal_error', { message: 'Invalid tile coordinates' });
-          return;
-        }
+    this.onMessage('reveal', (client, payload: { x?: number; y?: number }) => {
+      if (this.revealRateLimiter.isOverLimit(client)) return;
+      if (
+        typeof payload?.x !== 'number' ||
+        typeof payload?.y !== 'number' ||
+        !Number.isInteger(payload.x) ||
+        !Number.isInteger(payload.y)
+      ) {
+        client.send('reveal_error', { message: 'Invalid tile coordinates' });
+        return;
+      }
 
-        const auth = client.auth as WsSessionPayload;
-        const result = this.session.reveal(auth.userId, payload.x, payload.y);
-        if ('error' in result) {
-          client.send('reveal_error', { message: result.error });
-        }
-      },
-    );
+      const auth = client.auth as WsSessionPayload;
+      const result = this.session.reveal(auth.userId, payload.x, payload.y);
+      if ('error' in result) {
+        client.send('reveal_error', { message: result.error });
+      }
+    });
   }
 
   override onJoin(client: Client, _options: unknown, auth: WsSessionPayload) {

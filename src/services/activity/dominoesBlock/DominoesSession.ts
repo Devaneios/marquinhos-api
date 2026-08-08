@@ -1,4 +1,5 @@
 import { logger } from '../../../utils/logger';
+import { GamificationService } from '../../gamification';
 import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
 import {
   DominoesEngine,
@@ -68,7 +69,10 @@ export interface DominoesClientState {
   pipTotals: Record<string, number> | null;
 }
 
-function maskState(state: DominoesState, forPlayer: string | null): DominoesClientState {
+function maskState(
+  state: DominoesState,
+  forPlayer: string | null,
+): DominoesClientState {
   const handCounts: Record<string, number> = {};
   for (const player of state.players) {
     handCounts[player] = state.hands[player]?.length ?? 0;
@@ -108,7 +112,7 @@ export class DominoesSession {
   constructor(
     private identity: DominoesSessionIdentity,
     private broadcaster: DominoesBroadcaster,
-    private gamification: GamificationLike,
+    private gamification: GamificationLike = new GamificationService(),
     private options: DominoesSessionOptions = {},
   ) {
     this.onSessionEnded = options.onSessionEnded;
@@ -139,7 +143,11 @@ export class DominoesSession {
       return false;
     }
 
-    this.players.push({ userId, connected: true, connections: new Set([connection]) });
+    this.players.push({
+      userId,
+      connected: true,
+      connections: new Set([connection]),
+    });
     this.spectators.delete(userId);
 
     if (this.players.length >= this.minPlayers) {
@@ -165,7 +173,10 @@ export class DominoesSession {
     this.broadcastState();
   }
 
-  private releaseConnection(player: DominoesPlayer, connection: unknown): boolean {
+  private releaseConnection(
+    player: DominoesPlayer,
+    connection: unknown,
+  ): boolean {
     player.connections.delete(connection);
     return player.connections.size === 0;
   }
@@ -354,7 +365,12 @@ export class DominoesSession {
       this.engine = null;
       this.broadcaster.broadcastPublic({
         type: 'match_over',
-        payload: { winner: null, winners: null, blocked: false, abandoned: true },
+        payload: {
+          winner: null,
+          winners: null,
+          blocked: false,
+          abandoned: true,
+        },
       });
     }
     this.endIfEmpty();

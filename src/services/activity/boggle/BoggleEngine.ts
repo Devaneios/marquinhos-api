@@ -41,11 +41,29 @@ export type SubmitResult =
 // letters are always plain, unaccented uppercase — matched against the
 // diacritic-stripped dictionary in boggleWords.ts.
 const LETTER_WEIGHTS: [string, number][] = [
-  ['A', 14.63], ['E', 12.57], ['O', 10.73], ['S', 7.81], ['R', 6.53],
-  ['I', 6.18], ['N', 5.05], ['D', 4.99], ['M', 4.74], ['U', 4.63],
-  ['T', 4.34], ['C', 3.88], ['L', 2.78], ['P', 2.52], ['V', 1.67],
-  ['G', 1.3], ['H', 1.28], ['Q', 1.2], ['B', 1.04], ['F', 1.02],
-  ['Z', 0.47], ['J', 0.4], ['X', 0.21],
+  ['A', 14.63],
+  ['E', 12.57],
+  ['O', 10.73],
+  ['S', 7.81],
+  ['R', 6.53],
+  ['I', 6.18],
+  ['N', 5.05],
+  ['D', 4.99],
+  ['M', 4.74],
+  ['U', 4.63],
+  ['T', 4.34],
+  ['C', 3.88],
+  ['L', 2.78],
+  ['P', 2.52],
+  ['V', 1.67],
+  ['G', 1.3],
+  ['H', 1.28],
+  ['Q', 1.2],
+  ['B', 1.04],
+  ['F', 1.02],
+  ['Z', 0.47],
+  ['J', 0.4],
+  ['X', 0.21],
 ];
 
 const TOTAL_WEIGHT = LETTER_WEIGHTS.reduce((sum, [, w]) => sum + w, 0);
@@ -178,7 +196,11 @@ export class BoggleEngine {
   // no cross-player bookkeeping until the round ends and rewards fast,
   // independent play, which fits a timed "race" format better than
   // punishing players for finding the same obvious word as an opponent.
-  submitWord(userId: string, path: Cell[], now: number = Date.now()): SubmitResult {
+  submitWord(
+    userId: string,
+    path: Cell[],
+    now: number = Date.now(),
+  ): SubmitResult {
     if (!this.isStarted) return { accepted: false, reason: 'not_started' };
     if (this.ended || this.isExpired(now)) {
       this.ended = true;
@@ -194,7 +216,8 @@ export class BoggleEngine {
 
     const word = extractWord(this.grid, path).toLowerCase();
     if (word.length < 3) return { accepted: false, reason: 'too_short' };
-    if (!this.wordSet.has(word)) return { accepted: false, reason: 'not_a_word' };
+    if (!this.wordSet.has(word))
+      return { accepted: false, reason: 'not_a_word' };
     if (player.foundWords.some((f) => f.word === word)) {
       return { accepted: false, reason: 'already_found' };
     }

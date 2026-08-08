@@ -75,7 +75,10 @@ export class TicTacToeSession {
     return player;
   }
 
-  private releaseConnection(player: TicTacToePlayer, connection: unknown): boolean {
+  private releaseConnection(
+    player: TicTacToePlayer,
+    connection: unknown,
+  ): boolean {
     player.connections.delete(connection);
     return player.connections.size === 0;
   }
@@ -234,7 +237,6 @@ export class TicTacToeSession {
 
   private recordResult(winner: Player) {
     if (this.players.length < 2) return;
-    const winnerPlayer = this.players.find((p) => p.player === winner);
     this.gamification.recordGameResult({
       sessionId: this.identity.instanceId,
       guildId: this.identity.guildId,

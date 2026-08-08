@@ -43,9 +43,14 @@ const MINE_PENALTY = -5;
 const SAFE_TILE_POINTS = 1;
 
 const NEIGHBOR_OFFSETS: [number, number][] = [
-  [-1, -1], [0, -1], [1, -1],
-  [-1, 0], [1, 0],
-  [-1, 1], [0, 1], [1, 1],
+  [-1, -1],
+  [0, -1],
+  [1, -1],
+  [-1, 0],
+  [1, 0],
+  [-1, 1],
+  [0, 1],
+  [1, 1],
 ];
 
 export class MinesweeperEngine {
@@ -170,9 +175,7 @@ export class MinesweeperEngine {
       // A revealed mine doesn't shrink safeTilesRemaining and can't end the
       // game on its own — the match only ends once every safe tile is clear.
       return {
-        revealedTiles: [
-          { x, y, mine: true, adjacent: 0, revealedBy: userId },
-        ],
+        revealedTiles: [{ x, y, mine: true, adjacent: 0, revealedBy: userId }],
         pointsDelta: MINE_PENALTY,
         hitMine: true,
         gameOver: this.gameOver,
@@ -213,7 +216,13 @@ export class MinesweeperEngine {
       const cell = this.cellAt(x, y);
       cell.revealed = true;
       cell.revealedBy = userId;
-      revealed.push({ x, y, mine: false, adjacent: cell.adjacent, revealedBy: userId });
+      revealed.push({
+        x,
+        y,
+        mine: false,
+        adjacent: cell.adjacent,
+        revealedBy: userId,
+      });
 
       if (cell.adjacent !== 0) continue;
 

@@ -124,7 +124,7 @@ export class SnakeEngine {
     if (!snake || !snake.alive) return;
 
     snake.direction = snake.nextDirection;
-    const head = snake.segments[0];
+    const head = snake.segments[0]!;
     const newHead = this.movePoint(head, snake.direction);
 
     snake.segments.unshift(newHead);
@@ -152,7 +152,7 @@ export class SnakeEngine {
     const snake = this.state.snakes[playerId];
     if (!snake || !snake.alive) return;
 
-    const head = snake.segments[0];
+    const head = snake.segments[0]!;
 
     if (
       head.x < 0 ||
@@ -166,7 +166,8 @@ export class SnakeEngine {
     }
 
     for (let i = 1; i < snake.segments.length; i++) {
-      if (head.x === snake.segments[i].x && head.y === snake.segments[i].y) {
+      const segment = snake.segments[i]!;
+      if (head.x === segment.x && head.y === segment.y) {
         snake.alive = false;
         this.checkGameEnd();
         return;
@@ -175,7 +176,7 @@ export class SnakeEngine {
 
     for (const otherId in this.state.snakes) {
       if (otherId === playerId) continue;
-      const otherSnake = this.state.snakes[otherId];
+      const otherSnake = this.state.snakes[otherId]!;
       for (const segment of otherSnake.segments) {
         if (head.x === segment.x && head.y === segment.y) {
           snake.alive = false;
@@ -194,7 +195,7 @@ export class SnakeEngine {
     if (alive.length === 0) {
       this.state.winner = null;
     } else if (alive.length === 1) {
-      this.state.winner = alive[0][0];
+      this.state.winner = alive[0]![0];
     }
   }
 
@@ -203,18 +204,18 @@ export class SnakeEngine {
       const snake = this.state.snakes[playerId];
       if (!snake || !snake.alive) continue;
 
-      const head = snake.segments[0];
+      const head = snake.segments[0]!;
       const foodIndex = this.state.food.findIndex(
         (f) => f.x === head.x && f.y === head.y,
       );
 
       if (foodIndex !== -1) {
         this.state.food.splice(foodIndex, 1);
-        const tail = snake.segments[snake.segments.length - 1];
+        const tail = snake.segments[snake.segments.length - 1]!;
         snake.segments.push({ ...tail });
-        this.state.scores[playerId] += 1;
+        this.state.scores[playerId] = (this.state.scores[playerId] ?? 0) + 1;
 
-        if (this.state.scores[playerId] >= this.config.winningScore) {
+        if (this.state.scores[playerId]! >= this.config.winningScore) {
           this.state.winner = playerId;
         }
       }

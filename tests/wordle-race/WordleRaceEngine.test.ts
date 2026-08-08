@@ -1,10 +1,21 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'bun:test';
 
 process.env.SQLITE_PATH = ':memory:';
 
-const { WordleRaceEngine } = await import(
-  '../../src/services/activity/wordle-race/WordleRaceEngine'
-);
+const { WordleRaceEngine } =
+  await import('../../src/services/activity/wordle-race/WordleRaceEngine');
+
+function expectError<T extends { error: string } | object>(
+  result: T,
+): asserts result is Extract<T, { error: string }> {
+  expect('error' in result).toBe(true);
+}
+
+function expectSolved<T extends { solved: boolean } | object>(
+  result: T,
+): asserts result is Extract<T, { solved: boolean }> {
+  expect('error' in result).toBe(false);
+}
 
 describe('WordleRaceEngine', () => {
   let engine: InstanceType<typeof WordleRaceEngine>;
@@ -41,13 +52,13 @@ describe('WordleRaceEngine', () => {
 
     it('returns error if player not in room', () => {
       const result = engine.submitGuess('user999', 'hello');
-      expect('error' in result).toBe(true);
+      expectError(result);
       expect(result.error).toBe('Player not in room');
     });
 
     it('returns feedback for a valid guess', () => {
       const result = engine.submitGuess('user1', 'abrir');
-      expect('error' in result).toBe(false);
+      expectSolved(result);
       expect(result.solved).toBe(true);
       expect(result.feedback).toHaveLength(5);
       expect(result.feedback).toEqual([
@@ -61,34 +72,34 @@ describe('WordleRaceEngine', () => {
 
     it('returns correct feedback for partial matches', () => {
       const result = engine.submitGuess('user1', 'acaso');
-      expect('error' in result).toBe(false);
+      expectSolved(result);
       expect(result.solved).toBe(false);
       expect(result.feedback.length).toBe(5);
     });
 
     it('returns error if word is invalid', () => {
       const result = engine.submitGuess('user1', 'xxxxx');
-      expect('error' in result).toBe(true);
+      expectError(result);
       expect(result.error).toBe('Invalid word');
     });
 
     it('returns error if word length does not match', () => {
       const result = engine.submitGuess('user1', 'cat');
-      expect('error' in result).toBe(true);
+      expectError(result);
       expect(result.error).toContain('5 letters long');
     });
 
     it('returns error if already solved', () => {
       engine.submitGuess('user1', 'abrir');
       const result = engine.submitGuess('user1', 'acaso');
-      expect('error' in result).toBe(true);
+      expectError(result);
       expect(result.error).toBe('Already solved');
     });
 
     it('returns error if word already guessed', () => {
       engine.submitGuess('user1', 'acaso');
       const result = engine.submitGuess('user1', 'acaso');
-      expect('error' in result).toBe(true);
+      expectError(result);
       expect(result.error).toBe('Already guessed this word');
     });
 
@@ -123,7 +134,7 @@ describe('WordleRaceEngine', () => {
       }
 
       const result = engine.submitGuess('user1', 'abrir');
-      expect('error' in result).toBe(true);
+      expectError(result);
       expect(result.error).toBe('No attempts remaining');
     });
   });
@@ -211,14 +222,14 @@ describe('WordleRaceEngine', () => {
     it('accepts uppercase guesses', () => {
       engine.addPlayer('user1');
       const result = engine.submitGuess('user1', 'ABRIR');
-      expect('error' in result).toBe(false);
+      expectSolved(result);
       expect(result.solved).toBe(true);
     });
 
     it('accepts mixed case guesses', () => {
       engine.addPlayer('user1');
       const result = engine.submitGuess('user1', 'AbRiR');
-      expect('error' in result).toBe(false);
+      expectSolved(result);
       expect(result.solved).toBe(true);
     });
   });

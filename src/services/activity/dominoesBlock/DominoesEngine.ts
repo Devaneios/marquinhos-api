@@ -69,7 +69,11 @@ function hasLegalMove(
 ): boolean {
   if (leftEnd === null || rightEnd === null) return hand.length > 0;
   return hand.some(
-    (t) => t.a === leftEnd || t.b === leftEnd || t.a === rightEnd || t.b === rightEnd,
+    (t) =>
+      t.a === leftEnd ||
+      t.b === leftEnd ||
+      t.a === rightEnd ||
+      t.b === rightEnd,
   );
 }
 
@@ -203,7 +207,8 @@ export class DominoesEngine {
     if (!hand) return { success: false, error: 'Not a player in this game' };
 
     const idx = hand.findIndex((t) => tileMatches(t, tile));
-    if (idx === -1) return { success: false, error: 'Tile is not in your hand' };
+    if (idx === -1)
+      return { success: false, error: 'Tile is not in your hand' };
     const owned = hand[idx]!;
 
     if (this.state.chain.length === 0) {
@@ -215,7 +220,8 @@ export class DominoesEngine {
       if (end !== 'left' && end !== 'right') {
         return { success: false, error: 'Must specify which end to play on' };
       }
-      const openValue = end === 'left' ? this.state.leftEnd! : this.state.rightEnd!;
+      const openValue =
+        end === 'left' ? this.state.leftEnd! : this.state.rightEnd!;
       if (owned.a !== openValue && owned.b !== openValue) {
         return { success: false, error: 'Tile does not match that end' };
       }

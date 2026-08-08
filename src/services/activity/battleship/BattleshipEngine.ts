@@ -1,10 +1,6 @@
 export type BattleshipSide = 'p1' | 'p2';
 export type ShipType =
-  | 'carrier'
-  | 'battleship'
-  | 'cruiser'
-  | 'submarine'
-  | 'destroyer';
+  'carrier' | 'battleship' | 'cruiser' | 'submarine' | 'destroyer';
 export type Orientation = 'horizontal' | 'vertical';
 
 export const BOARD_SIZE = 10;
@@ -178,7 +174,10 @@ export class BattleshipEngine {
     return this.boards[side].placed;
   }
 
-  placeShips(side: BattleshipSide, placements: ShipPlacement[]): PlaceShipsResult {
+  placeShips(
+    side: BattleshipSide,
+    placements: ShipPlacement[],
+  ): PlaceShipsResult {
     if (this.phase !== 'placement') {
       return { ok: false, error: 'Placement is closed' };
     }
@@ -240,7 +239,12 @@ export class BattleshipEngine {
       if (isShipSunk(ship)) sunk = ship.type;
     }
 
-    board.shotsReceived.push({ x, y, hit, shipIndex: hit ? shipIndex : undefined });
+    board.shotsReceived.push({
+      x,
+      y,
+      hit,
+      shipIndex: hit ? shipIndex : undefined,
+    });
 
     const allSunk = board.ships.every((ship) => isShipSunk(ship));
     if (allSunk) {

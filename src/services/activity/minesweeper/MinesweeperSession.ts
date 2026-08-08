@@ -121,7 +121,10 @@ export class MinesweeperSession {
     // Rank purely by score, highest first; ties share the same position so
     // neither gets a phantom edge over the other.
     const ranked = [...this.players]
-      .map((player) => ({ userId: player.userId, score: scores[player.userId] ?? 0 }))
+      .map((player) => ({
+        userId: player.userId,
+        score: scores[player.userId] ?? 0,
+      }))
       .sort((a, b) => b.score - a.score);
 
     const results = ranked.map((entry, index) => {

@@ -175,16 +175,16 @@ describe('RpsEngine', () => {
 
       engine.submitPick('player1', 'rock');
       engine.submitPick('player2', 'scissors');
-      const result1 = engine.resolveRound();
+      engine.resolveRound();
 
       engine.submitPick('player1', 'paper');
       engine.submitPick('player2', 'rock');
-      const result2 = engine.resolveRound();
+      engine.resolveRound();
 
       const history = engine.getRoundHistory();
       expect(history.length).toBe(2);
-      expect(history[0].winner).toBe('player1');
-      expect(history[1].winner).toBe('player1');
+      expect(history[0]!.winner).toBe('player1');
+      expect(history[1]!.winner).toBe('player1');
     });
   });
 

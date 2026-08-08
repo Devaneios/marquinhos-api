@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { BingoSpeedEngine, type BingoCard } from '../src/services/activity/bingoSpeed/BingoSpeedEngine';
-
-const BOARD_WIDTH = 5;
-const BOARD_HEIGHT = 5;
+import { BingoSpeedEngine } from '../src/services/activity/bingoSpeed/BingoSpeedEngine';
 
 describe('BingoSpeedEngine', () => {
   describe('Card Generation', () => {
@@ -109,7 +106,7 @@ describe('BingoSpeedEngine', () => {
       const engine = new BingoSpeedEngine();
       const card = engine.generateCard();
 
-      expect(card.board[2][2]).toBe(0);
+      expect(card.board[2]![2]).toBe(0);
     });
   });
 
@@ -128,8 +125,9 @@ describe('BingoSpeedEngine', () => {
 
       for (let i = 0; i < 75; i++) {
         const number = engine.drawNumber();
-        expect(drawn.has(number)).toBe(false);
-        drawn.add(number);
+        expect(number).not.toBeNull();
+        expect(drawn.has(number!)).toBe(false);
+        drawn.add(number!);
       }
     });
 
@@ -149,7 +147,7 @@ describe('BingoSpeedEngine', () => {
       const number = engine.drawNumber();
 
       const state = engine.getState();
-      expect(state.drawnNumbers).toContain(number);
+      expect(state.drawnNumbers).toContain(number!);
     });
   });
 
@@ -159,19 +157,19 @@ describe('BingoSpeedEngine', () => {
       const card = engine.generateCard();
 
       // Manually set a known number in the card
-      (card.board[0] as any)[0] = 5; // B column
-      card.marked[0][0] = false;
+      card.board[0]![0] = 5; // B column
+      card.marked[0]![0] = false;
 
       engine.markNumber(card, 5);
 
-      expect(card.marked[0][0]).toBe(true);
+      expect(card.marked[0]![0]).toBe(true);
     });
 
     it('marks free space as always marked', () => {
       const engine = new BingoSpeedEngine();
       const card = engine.generateCard();
 
-      expect(card.marked[2][2]).toBe(true);
+      expect(card.marked[2]![2]).toBe(true);
     });
 
     it('does not mark if number is not on card', () => {
@@ -212,7 +210,7 @@ describe('BingoSpeedEngine', () => {
       ]);
 
       for (let i = 0; i < 5; i++) {
-        card.marked[i][0] = true;
+        card.marked[i]![0] = true;
       }
 
       expect(engine.checkBingo(card)).toBe(true);
@@ -229,7 +227,7 @@ describe('BingoSpeedEngine', () => {
       ]);
 
       for (let i = 0; i < 5; i++) {
-        card.marked[i][i] = true;
+        card.marked[i]![i] = true;
       }
 
       expect(engine.checkBingo(card)).toBe(true);
@@ -246,7 +244,7 @@ describe('BingoSpeedEngine', () => {
       ]);
 
       for (let i = 0; i < 5; i++) {
-        card.marked[i][4 - i] = true;
+        card.marked[i]![4 - i] = true;
       }
 
       expect(engine.checkBingo(card)).toBe(true);
@@ -288,7 +286,7 @@ describe('BingoSpeedEngine', () => {
 
       const state = engine.getState();
 
-      expect(state.drawnNumbers).toContain(number);
+      expect(state.drawnNumbers).toContain(number!);
       expect(state.numbersDrawn).toBe(1);
     });
 

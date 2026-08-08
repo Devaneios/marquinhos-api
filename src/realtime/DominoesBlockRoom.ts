@@ -1,5 +1,8 @@
 import { Room, type Client } from 'colyseus';
-import type { ChainEnd, Tile } from '../services/activity/dominoesBlock/DominoesEngine';
+import type {
+  ChainEnd,
+  Tile,
+} from '../services/activity/dominoesBlock/DominoesEngine';
 import { DominoesSession } from '../services/activity/dominoesBlock/DominoesSession';
 import { roomKey } from '../services/activity/roomKey';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
@@ -66,7 +69,8 @@ export class DominoesBlockRoom extends Room {
         sendToPlayer: (userId, message) => {
           for (const client of this.clients) {
             const auth = client.auth as WsSessionPayload | undefined;
-            if (auth?.userId === userId) client.send(message.type, message.payload);
+            if (auth?.userId === userId)
+              client.send(message.type, message.payload);
           }
         },
         broadcastPublic: (message) => {

@@ -1,7 +1,7 @@
 import { Room, type Client } from 'colyseus';
-import { TicTacToeSession } from '../services/activity/ticTacToe/TicTacToeSession';
 import { roomKey } from '../services/activity/roomKey';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
+import { TicTacToeSession } from '../services/activity/ticTacToe/TicTacToeSession';
 import {
   verifyWsSessionToken,
   type WsSessionPayload,
@@ -37,7 +37,10 @@ export class TicTacToeRoom extends Room {
       : null;
 
     const broadcaster = {
-      broadcast: (_key: string, message: { type: string; payload?: unknown }) => {
+      broadcast: (
+        _key: string,
+        message: { type: string; payload?: unknown },
+      ) => {
         this.broadcast(message.type, message.payload);
       },
     };
@@ -54,11 +57,18 @@ export class TicTacToeRoom extends Room {
       { onSessionEnded: () => this.disconnect() },
     );
 
-    this.onMessage('move', (client, payload: { row?: number; col?: number }) => {
-      if (this.moveRateLimiter.isOverLimit(client)) return;
-      const auth = client.auth as WsSessionPayload;
-      this.session.handleMove(auth.userId, payload?.row ?? -1, payload?.col ?? -1);
-    });
+    this.onMessage(
+      'move',
+      (client, payload: { row?: number; col?: number }) => {
+        if (this.moveRateLimiter.isOverLimit(client)) return;
+        const auth = client.auth as WsSessionPayload;
+        this.session.handleMove(
+          auth.userId,
+          payload?.row ?? -1,
+          payload?.col ?? -1,
+        );
+      },
+    );
 
     this.onMessage('restart', (client) => {
       const auth = client.auth as WsSessionPayload;

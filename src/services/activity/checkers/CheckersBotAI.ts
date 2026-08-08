@@ -1,6 +1,7 @@
 import type {
   CheckersEngine,
   CheckersMove,
+  CheckersState,
   Color,
   Position,
 } from './CheckersEngine';
@@ -9,7 +10,11 @@ import type {
 // means simulating each candidate jump forward on a scratch engine and
 // counting how many hops it forces before the turn can pass — the engine
 // itself only ever exposes one hop of legal moves at a time.
-function chainCaptureCount(engine: CheckersEngine, color: Color, move: CheckersMove): number {
+function chainCaptureCount(
+  engine: CheckersEngine,
+  color: Color,
+  move: CheckersMove,
+): number {
   const scratch = cloneViaState(engine);
   const result = scratch.move(color, move.from, move.to);
   if (!result.ok) return move.captures.length;
@@ -27,15 +32,15 @@ function chainCaptureCount(engine: CheckersEngine, color: Color, move: CheckersM
 
 function cloneViaState(engine: CheckersEngine): CheckersEngine {
   const EngineCtor = engine.constructor as new () => CheckersEngine;
-  const copy = new EngineCtor();
+  const copy = new EngineCtor() as unknown as CheckersState;
   const state = engine.getState();
-  (copy as any).board = state.board.map((row) => [...row]);
-  (copy as any).turn = state.turn;
-  (copy as any).winner = state.winner;
-  (copy as any).mustContinueFrom = state.mustContinueFrom
+  copy.board = state.board.map((row) => [...row]);
+  copy.turn = state.turn;
+  copy.winner = state.winner;
+  copy.mustContinueFrom = state.mustContinueFrom
     ? { ...state.mustContinueFrom }
     : null;
-  return copy;
+  return copy as unknown as CheckersEngine;
 }
 
 function isCenter(pos: Position): boolean {
@@ -46,7 +51,11 @@ function isCenter(pos: Position): boolean {
 // king (kings are the strongest piece, so activating one outweighs a man
 // shuffling forward), then prefer moves that centralize a piece, then
 // prefer advancing toward promotion.
-function scoreQuietMove(engine: CheckersEngine, color: Color, move: CheckersMove): number {
+function scoreQuietMove(
+  engine: CheckersEngine,
+  color: Color,
+  move: CheckersMove,
+): number {
   const state = engine.getState();
   const piece = state.board[move.from.row]?.[move.from.col];
   let score = 0;

@@ -2,7 +2,11 @@ import { GamificationService } from '../../gamification';
 import type { ActivityMode } from '../gameId';
 import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
 import { ConnectFourBot } from './ConnectFourBot';
-import { ConnectFourEngine, type ConnectFourState, type Disc } from './ConnectFourEngine';
+import {
+  ConnectFourEngine,
+  type ConnectFourState,
+  type Disc,
+} from './ConnectFourEngine';
 
 export interface ActivityBroadcaster {
   broadcast(key: string, message: { type: string; payload?: unknown }): void;

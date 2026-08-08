@@ -59,7 +59,10 @@ export class TicTacToeEngine {
     }
 
     if (player !== this.state.currentPlayer) {
-      return { success: false, error: `It's not ${player}'s turn, it's ${this.state.currentPlayer}` };
+      return {
+        success: false,
+        error: `It's not ${player}'s turn, it's ${this.state.currentPlayer}`,
+      };
     }
 
     this.state.board[row]![col] = player;

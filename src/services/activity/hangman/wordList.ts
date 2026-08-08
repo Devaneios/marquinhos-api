@@ -71,7 +71,7 @@ const HANGMAN_WORDS = [
 let currentIndex = 0;
 
 export function getHangmanWord(): string {
-  const word = HANGMAN_WORDS[currentIndex % HANGMAN_WORDS.length];
+  const word = HANGMAN_WORDS[currentIndex % HANGMAN_WORDS.length]!;
   currentIndex += 1;
   return word;
 }

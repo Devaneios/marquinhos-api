@@ -3,22 +3,30 @@ import { BingoSpeedSession } from '../src/services/activity/bingoSpeed/BingoSpee
 import type { ActivityBroadcaster } from '../src/services/activity/pong/PongSession';
 
 describe('BingoSpeedSession', () => {
-  function createMockBroadcaster(): ActivityBroadcaster {
+  function createMockBroadcaster() {
     return {
-      broadcast: mock(() => {}),
-      broadcastBinary: mock(() => {}),
-    };
+      broadcast: mock(
+        (_key: string, _message: { type: string; payload?: unknown }) =>
+          undefined,
+      ),
+      broadcastBinary: mock((_key: string, _data: ArrayBuffer) => undefined),
+    } satisfies ActivityBroadcaster;
   }
 
   describe('Player Management', () => {
     it('adds a player to the session', () => {
       const broadcaster = createMockBroadcaster();
       const session = new BingoSpeedSession(
-        { sessionKey: 'test:key', instanceId: 'inst1', guildId: 'guild1', mode: 'multi' },
+        {
+          sessionKey: 'test:key',
+          instanceId: 'inst1',
+          guildId: 'guild1',
+          mode: 'multi',
+        },
         broadcaster,
       );
 
-      const result = session.addPlayer('user1', {} as any);
+      const result = session.addPlayer('user1', {});
 
       expect(result).not.toBeNull();
       expect(session.playerCount).toBe(1);
@@ -27,11 +35,16 @@ describe('BingoSpeedSession', () => {
     it('generates a bingo card for each player', () => {
       const broadcaster = createMockBroadcaster();
       const session = new BingoSpeedSession(
-        { sessionKey: 'test:key', instanceId: 'inst1', guildId: 'guild1', mode: 'multi' },
+        {
+          sessionKey: 'test:key',
+          instanceId: 'inst1',
+          guildId: 'guild1',
+          mode: 'multi',
+        },
         broadcaster,
       );
 
-      const card = session.addPlayer('user1', {} as any);
+      const card = session.addPlayer('user1', {});
 
       expect(card).toBeDefined();
       expect(card!.board).toBeDefined();
@@ -41,12 +54,17 @@ describe('BingoSpeedSession', () => {
     it('prevents duplicate players', () => {
       const broadcaster = createMockBroadcaster();
       const session = new BingoSpeedSession(
-        { sessionKey: 'test:key', instanceId: 'inst1', guildId: 'guild1', mode: 'multi' },
+        {
+          sessionKey: 'test:key',
+          instanceId: 'inst1',
+          guildId: 'guild1',
+          mode: 'multi',
+        },
         broadcaster,
       );
 
-      const card1 = session.addPlayer('user1', {} as any);
-      const card2 = session.addPlayer('user1', {} as any);
+      const card1 = session.addPlayer('user1', {});
+      const card2 = session.addPlayer('user1', {});
 
       expect(card1).toEqual(card2);
       expect(session.playerCount).toBe(1);
@@ -55,11 +73,16 @@ describe('BingoSpeedSession', () => {
     it('removes a player from the session', () => {
       const broadcaster = createMockBroadcaster();
       const session = new BingoSpeedSession(
-        { sessionKey: 'test:key', instanceId: 'inst1', guildId: 'guild1', mode: 'multi' },
+        {
+          sessionKey: 'test:key',
+          instanceId: 'inst1',
+          guildId: 'guild1',
+          mode: 'multi',
+        },
         broadcaster,
       );
 
-      session.addPlayer('user1', {} as any);
+      session.addPlayer('user1', {});
       expect(session.playerCount).toBe(1);
 
       session.removePlayer('user1');
@@ -71,21 +94,26 @@ describe('BingoSpeedSession', () => {
     it('starts the game and begins drawing numbers', () => {
       const broadcaster = createMockBroadcaster();
       const session = new BingoSpeedSession(
-        { sessionKey: 'test:key', instanceId: 'inst1', guildId: 'guild1', mode: 'multi' },
+        {
+          sessionKey: 'test:key',
+          instanceId: 'inst1',
+          guildId: 'guild1',
+          mode: 'multi',
+        },
         broadcaster,
         undefined,
         { drawIntervalMs: 100 },
       );
 
-      session.addPlayer('user1', {} as any);
-      session.addPlayer('user2', {} as any);
+      session.addPlayer('user1', {});
+      session.addPlayer('user2', {});
 
       session.start();
 
       // Wait for at least one draw
       return new Promise((resolve) => {
         setTimeout(() => {
-          expect((broadcaster.broadcast as any).mock.calls.length).toBeGreaterThan(0);
+          expect(broadcaster.broadcast.mock.calls.length).toBeGreaterThan(0);
           session.stop();
           resolve(undefined);
         }, 150);
@@ -95,22 +123,27 @@ describe('BingoSpeedSession', () => {
     it('broadcasts drawn numbers to all players', () => {
       const broadcaster = createMockBroadcaster();
       const session = new BingoSpeedSession(
-        { sessionKey: 'test:key', instanceId: 'inst1', guildId: 'guild1', mode: 'multi' },
+        {
+          sessionKey: 'test:key',
+          instanceId: 'inst1',
+          guildId: 'guild1',
+          mode: 'multi',
+        },
         broadcaster,
         undefined,
         { drawIntervalMs: 100 },
       );
 
-      session.addPlayer('user1', {} as any);
-      session.addPlayer('user2', {} as any);
+      session.addPlayer('user1', {});
+      session.addPlayer('user2', {});
 
       session.start();
 
       return new Promise((resolve) => {
         setTimeout(() => {
-          const calls = (broadcaster.broadcast as any).mock.calls;
+          const calls = broadcaster.broadcast.mock.calls;
           const drawCalls = calls.filter(
-            (call: any[]) => call[1]?.type === 'number_drawn',
+            (call) => call[1]?.type === 'number_drawn',
           );
           expect(drawCalls.length).toBeGreaterThan(0);
           session.stop();
@@ -122,21 +155,26 @@ describe('BingoSpeedSession', () => {
     it('stops drawing when stopped', () => {
       const broadcaster = createMockBroadcaster();
       const session = new BingoSpeedSession(
-        { sessionKey: 'test:key', instanceId: 'inst1', guildId: 'guild1', mode: 'multi' },
+        {
+          sessionKey: 'test:key',
+          instanceId: 'inst1',
+          guildId: 'guild1',
+          mode: 'multi',
+        },
         broadcaster,
         undefined,
         { drawIntervalMs: 100 },
       );
 
-      session.addPlayer('user1', {} as any);
+      session.addPlayer('user1', {});
       session.start();
       session.stop();
 
-      const callsBeforeStop = (broadcaster.broadcast as any).mock.calls.length;
+      const callsBeforeStop = broadcaster.broadcast.mock.calls.length;
 
       return new Promise((resolve) => {
         setTimeout(() => {
-          const callsAfterStop = (broadcaster.broadcast as any).mock.calls.length;
+          const callsAfterStop = broadcaster.broadcast.mock.calls.length;
           expect(callsAfterStop).toBe(callsBeforeStop);
           resolve(undefined);
         }, 100);
@@ -148,12 +186,17 @@ describe('BingoSpeedSession', () => {
     it('validates a bingo claim from a player', () => {
       const broadcaster = createMockBroadcaster();
       const session = new BingoSpeedSession(
-        { sessionKey: 'test:key', instanceId: 'inst1', guildId: 'guild1', mode: 'multi' },
+        {
+          sessionKey: 'test:key',
+          instanceId: 'inst1',
+          guildId: 'guild1',
+          mode: 'multi',
+        },
         broadcaster,
       );
 
-      session.addPlayer('user1', {} as any);
-      session.addPlayer('user2', {} as any);
+      session.addPlayer('user1', {});
+      session.addPlayer('user2', {});
 
       // Claim bingo (without actual card state, should fail)
       const result = session.claimBingo('user1');
@@ -167,7 +210,12 @@ describe('BingoSpeedSession', () => {
     it('rejects a bingo claim from a non-existent player', () => {
       const broadcaster = createMockBroadcaster();
       const session = new BingoSpeedSession(
-        { sessionKey: 'test:key', instanceId: 'inst1', guildId: 'guild1', mode: 'multi' },
+        {
+          sessionKey: 'test:key',
+          instanceId: 'inst1',
+          guildId: 'guild1',
+          mode: 'multi',
+        },
         broadcaster,
       );
 
@@ -180,19 +228,24 @@ describe('BingoSpeedSession', () => {
     it('broadcasts game end when player wins', () => {
       const broadcaster = createMockBroadcaster();
       const session = new BingoSpeedSession(
-        { sessionKey: 'test:key', instanceId: 'inst1', guildId: 'guild1', mode: 'multi' },
+        {
+          sessionKey: 'test:key',
+          instanceId: 'inst1',
+          guildId: 'guild1',
+          mode: 'multi',
+        },
         broadcaster,
       );
 
-      const card1 = session.addPlayer('user1', {} as any);
-      session.addPlayer('user2', {} as any);
+      const card1 = session.addPlayer('user1', {});
+      session.addPlayer('user2', {});
 
       if (card1) {
         // Mark an entire row for testing
         card1.marked[0] = [true, true, true, true, true];
 
         // Mark the free space
-        card1.marked[2][2] = true;
+        card1.marked[2]![2] = true;
 
         // Draw numbers that complete the row
         for (let i = 1; i <= 5; i++) {
@@ -209,11 +262,16 @@ describe('BingoSpeedSession', () => {
     it('returns the current public state', () => {
       const broadcaster = createMockBroadcaster();
       const session = new BingoSpeedSession(
-        { sessionKey: 'test:key', instanceId: 'inst1', guildId: 'guild1', mode: 'multi' },
+        {
+          sessionKey: 'test:key',
+          instanceId: 'inst1',
+          guildId: 'guild1',
+          mode: 'multi',
+        },
         broadcaster,
       );
 
-      session.addPlayer('user1', {} as any);
+      session.addPlayer('user1', {});
       const state = session.getPublicState();
 
       expect(state).toBeDefined();
@@ -223,11 +281,16 @@ describe('BingoSpeedSession', () => {
     it('returns player card state', () => {
       const broadcaster = createMockBroadcaster();
       const session = new BingoSpeedSession(
-        { sessionKey: 'test:key', instanceId: 'inst1', guildId: 'guild1', mode: 'multi' },
+        {
+          sessionKey: 'test:key',
+          instanceId: 'inst1',
+          guildId: 'guild1',
+          mode: 'multi',
+        },
         broadcaster,
       );
 
-      const card = session.addPlayer('user1', {} as any);
+      const card = session.addPlayer('user1', {});
       const playerCard = session.getPlayerCard('user1');
 
       expect(playerCard).toEqual(card);
@@ -236,7 +299,12 @@ describe('BingoSpeedSession', () => {
     it('returns null for non-existent player card', () => {
       const broadcaster = createMockBroadcaster();
       const session = new BingoSpeedSession(
-        { sessionKey: 'test:key', instanceId: 'inst1', guildId: 'guild1', mode: 'multi' },
+        {
+          sessionKey: 'test:key',
+          instanceId: 'inst1',
+          guildId: 'guild1',
+          mode: 'multi',
+        },
         broadcaster,
       );
 
@@ -250,13 +318,18 @@ describe('BingoSpeedSession', () => {
     it('clears intervals on session end', () => {
       const broadcaster = createMockBroadcaster();
       const session = new BingoSpeedSession(
-        { sessionKey: 'test:key', instanceId: 'inst1', guildId: 'guild1', mode: 'multi' },
+        {
+          sessionKey: 'test:key',
+          instanceId: 'inst1',
+          guildId: 'guild1',
+          mode: 'multi',
+        },
         broadcaster,
         undefined,
         { drawIntervalMs: 100 },
       );
 
-      session.addPlayer('user1', {} as any);
+      session.addPlayer('user1', {});
       session.start();
 
       return new Promise((resolve) => {

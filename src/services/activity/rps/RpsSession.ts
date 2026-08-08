@@ -1,11 +1,7 @@
 import { GamificationService } from '../../gamification';
 import type { ActivityMode } from '../gameId';
 import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
-import {
-  RpsEngine,
-  type RpsEngineConfig,
-  type RoundResult,
-} from './RpsEngine';
+import { RpsEngine, type RpsEngineConfig } from './RpsEngine';
 
 export interface ActivityBroadcaster {
   broadcast(key: string, message: { type: string; payload?: unknown }): void;
@@ -136,10 +132,10 @@ export class RpsSession {
       sessionId: this.identity.sessionKey,
       guildId: this.identity.guildId,
       gameType: 'rock-paper-scissors',
-      results: {
-        winner: winner.userId,
-        players: this.players.map((p) => p.userId),
-      },
+      results: this.players.map((p) => ({
+        userId: p.userId,
+        position: p.userId === winner.userId ? 1 : 2,
+      })),
     });
 
     if (this.onSessionEnded) {

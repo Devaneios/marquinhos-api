@@ -1,8 +1,8 @@
 import { GamificationService } from '../../gamification';
 import type { ActivityMode } from '../gameId';
+import { getQuestions } from './questions';
 import { TriviaQuizEngine } from './TriviaQuizEngine';
 import type { TriviaQuizState } from './types';
-import { getQuestions } from './questions';
 
 export interface ActivityBroadcaster {
   broadcast(key: string, message: { type: string; payload?: unknown }): void;
@@ -62,14 +62,24 @@ export class TriviaQuizSession {
     return true;
   }
 
-  handleAnswer(userId: string, answerIndex: number, submittedAtMs: number): void {
-    const accepted = this.engine.submitAnswer(userId, answerIndex, submittedAtMs);
+  handleAnswer(
+    userId: string,
+    answerIndex: number,
+    submittedAtMs: number,
+  ): void {
+    const accepted = this.engine.submitAnswer(
+      userId,
+      answerIndex,
+      submittedAtMs,
+    );
     if (!accepted) return;
 
     this.broadcastState();
 
     const state = this.engine.getState();
-    const allAnswered = this.players.every((p) => state.playerAnswers.has(p.userId));
+    const allAnswered = this.players.every((p) =>
+      state.playerAnswers.has(p.userId),
+    );
     if (allAnswered) {
       this.advanceToNextQuestion();
     }

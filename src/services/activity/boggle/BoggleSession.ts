@@ -1,7 +1,6 @@
 import { GamificationService } from '../../gamification';
 import type { ActivityMode } from '../gameId';
 import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
-import { getBoggleWordSet } from './boggleWords';
 import {
   BoggleEngine,
   GAME_DURATION_MS,
@@ -9,6 +8,7 @@ import {
   type Cell,
   type SubmitResult,
 } from './BoggleEngine';
+import { getBoggleWordSet } from './boggleWords';
 
 export interface ActivityBroadcaster {
   broadcast(key: string, message: { type: string; payload?: unknown }): void;

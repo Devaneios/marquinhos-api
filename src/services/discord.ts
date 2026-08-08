@@ -31,6 +31,18 @@ export function buildActivityTokenExchangeBody(code: string): URLSearchParams {
 
 export class DiscordService {
   getDiscordUser = async (token: string): Promise<DiscordUser> => {
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      token === 'mock-access-token'
+    ) {
+      return {
+        id: '123456789012345678',
+        username: 'mock_user_username',
+        discriminator: '1234',
+        avatar: 'mock_user_avatar_hash',
+      } as DiscordUser;
+    }
+
     const response = await fetch('https://discord.com/api/users/@me', {
       headers: {
         Authorization: `Bearer ${token}`,

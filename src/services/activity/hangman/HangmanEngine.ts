@@ -55,7 +55,9 @@ export class HangmanEngine {
 
   getRevealedWord(): string {
     return Array.from(this.originalWord)
-      .map((letter) => (this.guessedLetters.has(letter.toLowerCase()) ? letter : '_'))
+      .map((letter) =>
+        this.guessedLetters.has(letter.toLowerCase()) ? letter : '_',
+      )
       .join('');
   }
 

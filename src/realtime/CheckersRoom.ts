@@ -1,5 +1,8 @@
 import { Room, type Client } from 'colyseus';
-import type { Color, Position } from '../services/activity/checkers/CheckersEngine';
+import type {
+  Color,
+  Position,
+} from '../services/activity/checkers/CheckersEngine';
 import type { ActivityBroadcaster } from '../services/activity/checkers/CheckersSession';
 import { CheckersSession } from '../services/activity/checkers/CheckersSession';
 import { roomKey } from '../services/activity/roomKey';

@@ -191,9 +191,7 @@ export class CheckersEngine {
     if (color !== this.turn) return { ok: false, error: 'not_your_turn' };
 
     const legal = this.getLegalMoves(color);
-    const match = legal.find(
-      (m) => samePos(m.from, from) && samePos(m.to, to),
-    );
+    const match = legal.find((m) => samePos(m.from, from) && samePos(m.to, to));
     if (!match) return { ok: false, error: 'illegal_move' };
 
     const piece = this.pieceAt(from)!;

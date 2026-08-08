@@ -1,20 +1,20 @@
 import { Room, type Client } from 'colyseus';
 import { roomKey } from '../services/activity/roomKey';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
-import { WordleRaceSession } from '../services/activity/wordle-race/WordleRaceSession';
+import { WordChainSession } from '../services/activity/word-chain/WordChainSession';
 import {
   verifyWsSessionToken,
   type WsSessionPayload,
 } from '../services/activity/wsSessionToken';
 
-const GUESS_RATE_LIMIT_WINDOW_MS = 1000;
-const GUESS_RATE_LIMIT_MAX = 3;
+const WORD_RATE_LIMIT_WINDOW_MS = 1000;
+const WORD_RATE_LIMIT_MAX = 3;
 
-export class WordleRaceRoom extends Room {
-  private session!: WordleRaceSession;
-  private guessRateLimiter = new RateLimiter({
-    windowMs: GUESS_RATE_LIMIT_WINDOW_MS,
-    max: GUESS_RATE_LIMIT_MAX,
+export class WordChainRoom extends Room {
+  private session!: WordChainSession;
+  private wordRateLimiter = new RateLimiter({
+    windowMs: WORD_RATE_LIMIT_WINDOW_MS,
+    max: WORD_RATE_LIMIT_MAX,
   });
 
   override async onAuth(
@@ -43,9 +43,12 @@ export class WordleRaceRoom extends Room {
       ) => {
         this.broadcast(message.type, message.payload);
       },
+      broadcastBinary: (_key: string, data: ArrayBuffer) => {
+        this.broadcastBytes('state', new Uint8Array(data), {});
+      },
     };
 
-    this.session = new WordleRaceSession(
+    this.session = new WordChainSession(
       {
         sessionKey: options.roomKey,
         instanceId: initialSession?.instanceId ?? '',
@@ -53,31 +56,38 @@ export class WordleRaceRoom extends Room {
         mode: initialSession?.mode ?? 'multi',
       },
       broadcaster,
-      undefined,
       { onSessionEnded: () => this.disconnect() },
     );
 
-    this.onMessage('guess', (client, payload: { guess?: string }) => {
-      if (this.guessRateLimiter.isOverLimit(client)) return;
+    this.onMessage('word', (client, payload: { word?: string }) => {
+      if (this.wordRateLimiter.isOverLimit(client)) return;
+
       const auth = client.auth as WsSessionPayload;
-      this.session.submitGuess(auth.userId, payload?.guess ?? '');
+      this.session.handleWordSubmission(auth.userId, payload?.word ?? '');
     });
 
     this.onMessage('leave', (client) => {
       const auth = client.auth as WsSessionPayload;
-      this.session.leave(auth.userId, client);
+      this.session.leave(auth.userId);
     });
   }
 
   override onJoin(client: Client, _options: unknown, auth: WsSessionPayload) {
     this.session.addPlayer(auth.userId, client);
-    const gameState = this.session.getGameState();
-    client.send('init', gameState);
+    const state = this.session.state;
+    client.send('init', {
+      currentWord: state.currentWord,
+      currentTurn: state.currentTurn,
+      usedWords: Array.from(state.usedWords),
+      players: state.players,
+      gameOver: state.gameOver,
+      winner: state.winner,
+    });
   }
 
   override onLeave(client: Client) {
-    this.guessRateLimiter.clear(client);
+    this.wordRateLimiter.clear(client);
     const auth = client.auth as WsSessionPayload;
-    this.session.leave(auth.userId, client);
+    this.session.pauseForDisconnect(auth.userId, client);
   }
 }

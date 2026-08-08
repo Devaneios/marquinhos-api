@@ -1,4 +1,4 @@
-import type { Question, TriviaQuizState, PlayerScore, PlayerAnswer } from './types';
+import type { Question, TriviaQuizState } from './types';
 
 export class TriviaQuizEngine {
   private state: TriviaQuizState;
@@ -41,20 +41,31 @@ export class TriviaQuizEngine {
   }
 
   tick(_elapsedMs: number): { questionEnded: boolean } {
-    if (Date.now() - this.state.questionStartedAtMs >= this.state.questionTimerMs) {
+    if (
+      Date.now() - this.state.questionStartedAtMs >=
+      this.state.questionTimerMs
+    ) {
       return { questionEnded: true };
     }
     return { questionEnded: false };
   }
 
-  submitAnswer(userId: string, answerIndex: number, submittedAtMs: number): boolean {
-    const question = this.state.questions[this.state.currentQuestionIndex];
+  submitAnswer(
+    userId: string,
+    answerIndex: number,
+    submittedAtMs: number,
+  ): boolean {
+    const question = this.state.questions[this.state.currentQuestionIndex]!;
     const questionId = question.id;
 
     if (!this.state.players.has(userId)) return false;
     if (this.state.playerAnswers.has(userId)) return false;
     if (answerIndex < 0 || answerIndex >= question.options.length) return false;
-    if (submittedAtMs > this.state.questionStartedAtMs + this.state.questionTimerMs) return false;
+    if (
+      submittedAtMs >
+      this.state.questionStartedAtMs + this.state.questionTimerMs
+    )
+      return false;
 
     this.state.playerAnswers.set(userId, {
       userId,
@@ -66,7 +77,10 @@ export class TriviaQuizEngine {
     const isCorrect = answerIndex === question.correctIndex;
     const timeElapsedMs = submittedAtMs - this.state.questionStartedAtMs;
     const points = isCorrect
-      ? Math.max(500, Math.round(1000 * (1 - timeElapsedMs / this.state.questionTimerMs)))
+      ? Math.max(
+          500,
+          Math.round(1000 * (1 - timeElapsedMs / this.state.questionTimerMs)),
+        )
       : 0;
 
     const player = this.state.players.get(userId)!;

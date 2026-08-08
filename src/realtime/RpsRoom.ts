@@ -1,6 +1,6 @@
 import { Room, type Client } from 'colyseus';
-import { RpsSession } from '../services/activity/rps/RpsSession';
 import { roomKey } from '../services/activity/roomKey';
+import { RpsSession } from '../services/activity/rps/RpsSession';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
 import {
   verifyWsSessionToken,
@@ -37,7 +37,10 @@ export class RpsRoom extends Room {
       : null;
 
     const broadcaster = {
-      broadcast: (_key: string, message: { type: string; payload?: unknown }) => {
+      broadcast: (
+        _key: string,
+        message: { type: string; payload?: unknown },
+      ) => {
         this.broadcast(message.type, message.payload);
       },
     };
@@ -55,17 +58,14 @@ export class RpsRoom extends Room {
       { onSessionEnded: () => this.disconnect() },
     );
 
-    this.onMessage(
-      'pick',
-      (client, payload: { pick?: string }) => {
-        if (this.pickRateLimiter.isOverLimit(client)) return;
-        const auth = client.auth as WsSessionPayload;
-        const success = this.session.submitPick(auth.userId, payload?.pick);
-        if (!success) {
-          client.send('error', { message: 'Invalid move' });
-        }
-      },
-    );
+    this.onMessage('pick', (client, payload: { pick?: string }) => {
+      if (this.pickRateLimiter.isOverLimit(client)) return;
+      const auth = client.auth as WsSessionPayload;
+      const success = this.session.submitPick(auth.userId, payload?.pick);
+      if (!success) {
+        client.send('error', { message: 'Invalid move' });
+      }
+    });
 
     this.onMessage('leave', (client) => {
       const auth = client.auth as WsSessionPayload;

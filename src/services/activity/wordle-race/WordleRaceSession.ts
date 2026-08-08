@@ -1,4 +1,3 @@
-import type { Client } from 'colyseus';
 import { GamificationService } from '../../gamification';
 import type { ActivityMode } from '../gameId';
 import { WordleRaceEngine } from './WordleRaceEngine';
@@ -48,14 +47,56 @@ export class WordleRaceSession {
 
   private pickRandomWord(): string {
     const wordlist = [
-      'abrir', 'acaso', 'aceno', 'aceso', 'aceto', 'achar', 'acima', 'acaba',
-      'acabo', 'acaju', 'acari', 'adaga', 'adega', 'adeus', 'adiar', 'adobe',
-      'adubo', 'afago', 'afeto', 'afiar', 'agave', 'agora', 'aguar', 'agudo',
-      'ainda', 'ajuda', 'alado', 'alama', 'alano', 'alces', 'alelo', 'aleta',
-      'alfas', 'algar', 'algoz', 'alias', 'alibe', 'alice', 'aliei', 'aliem',
-      'alier', 'alies', 'alifs', 'alijo', 'alila', 'alima', 'alimo', 'aline',
+      'abrir',
+      'acaso',
+      'aceno',
+      'aceso',
+      'aceto',
+      'achar',
+      'acima',
+      'acaba',
+      'acabo',
+      'acaju',
+      'acari',
+      'adaga',
+      'adega',
+      'adeus',
+      'adiar',
+      'adobe',
+      'adubo',
+      'afago',
+      'afeto',
+      'afiar',
+      'agave',
+      'agora',
+      'aguar',
+      'agudo',
+      'ainda',
+      'ajuda',
+      'alado',
+      'alama',
+      'alano',
+      'alces',
+      'alelo',
+      'aleta',
+      'alfas',
+      'algar',
+      'algoz',
+      'alias',
+      'alibe',
+      'alice',
+      'aliei',
+      'aliem',
+      'alier',
+      'alies',
+      'alifs',
+      'alijo',
+      'alila',
+      'alima',
+      'alimo',
+      'aline',
     ];
-    return wordlist[Math.floor(Math.random() * wordlist.length)];
+    return wordlist[Math.floor(Math.random() * wordlist.length)]!;
   }
 
   get playerCount(): number {
@@ -81,7 +122,10 @@ export class WordleRaceSession {
     this.broadcastPlayerJoined(userId);
   }
 
-  private releaseConnection(player: WordleRacePlayer, connection: unknown): boolean {
+  private releaseConnection(
+    player: WordleRacePlayer,
+    connection: unknown,
+  ): boolean {
     player.connections.delete(connection);
     return player.connections.size === 0;
   }
@@ -216,13 +260,15 @@ export class WordleRaceSession {
     return {
       targetWordLength: engineState.targetWord.length,
       maxAttempts: this.engine.getMaxAttempts(),
-      players: Array.from(engineState.players.entries()).map(([userId, player]) => ({
-        userId,
-        attempts: player.attempts,
-        solved: player.solved,
-        exhausted: player.exhausted,
-        guesses: player.guesses,
-      })),
+      players: Array.from(engineState.players.entries()).map(
+        ([userId, player]) => ({
+          userId,
+          attempts: player.attempts,
+          solved: player.solved,
+          exhausted: player.exhausted,
+          guesses: player.guesses,
+        }),
+      ),
       firstSolver: engineState.firstSolver,
       gameOver: this.engine.isGameOver(),
     };

@@ -1,6 +1,6 @@
 import { Room, type Client } from 'colyseus';
-import type { ActivityBroadcaster } from '../services/activity/pong/PongSession';
 import { BingoSpeedSession } from '../services/activity/bingoSpeed/BingoSpeedSession';
+import type { ActivityBroadcaster } from '../services/activity/pong/PongSession';
 import { roomKey } from '../services/activity/roomKey';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
 import {

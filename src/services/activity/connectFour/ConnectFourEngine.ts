@@ -132,7 +132,13 @@ export class ConnectFourEngine {
   ) {
     let r = row + dr;
     let c = col + dc;
-    while (r >= 0 && r < ROWS && c >= 0 && c < COLS && this.cellAt(r, c) === player) {
+    while (
+      r >= 0 &&
+      r < ROWS &&
+      c >= 0 &&
+      c < COLS &&
+      this.cellAt(r, c) === player
+    ) {
       line.push({ row: r, col: c });
       r += dr;
       c += dc;

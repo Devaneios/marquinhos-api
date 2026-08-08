@@ -1,10 +1,7 @@
 import { GamificationService } from '../../gamification';
 import type { ActivityMode } from '../gameId';
 import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
-import {
-  HangmanEngine,
-  type HangmanState,
-} from './HangmanEngine';
+import { HangmanEngine } from './HangmanEngine';
 
 export interface ActivityBroadcaster {
   broadcast(key: string, message: { type: string; payload?: unknown }): void;
@@ -83,13 +80,20 @@ export class HangmanSession {
     this.disconnectGrace.disarm(player.userId);
   }
 
-  guessLetter(userId: string, letter: string): { success: boolean; message?: string } {
+  guessLetter(
+    userId: string,
+    letter: string,
+  ): { success: boolean; message?: string } {
     const player = this.players.find((p) => p.userId === userId);
     if (!player) {
       return { success: false, message: 'Player not in session' };
     }
 
-    if (!letter || letter.length !== 1 || !/[a-záàâãéèêíïóôõöúçñ]/i.test(letter)) {
+    if (
+      !letter ||
+      letter.length !== 1 ||
+      !/[a-záàâãéèêíïóôõöúçñ]/i.test(letter)
+    ) {
       return { success: false, message: 'Invalid letter' };
     }
 
@@ -133,7 +137,7 @@ export class HangmanSession {
       gameType: 'hangman',
       results: players.map((p) => ({
         userId: p.userId,
-        score: p.won ? 1 : 0,
+        position: p.won ? 1 : 2,
       })),
     });
   }
@@ -165,10 +169,8 @@ export class HangmanSession {
     if (player.connections.size > 0) return;
 
     player.connected = false;
-    this.disconnectGrace.arm(
-      userId,
-      this.disconnectGraceMs,
-      () => this.forceDisconnect(userId),
+    this.disconnectGrace.arm(userId, this.disconnectGraceMs, () =>
+      this.forceDisconnect(userId),
     );
   }
 

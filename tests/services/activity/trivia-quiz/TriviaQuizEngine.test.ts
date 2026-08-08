@@ -31,9 +31,13 @@ describe('TriviaQuizEngine', () => {
     engine.addPlayer('user1');
     engine.startGame();
     const state = engine.getState();
-    const question = state.questions[0];
+    const question = state.questions[0]!;
 
-    engine.submitAnswer('user1', question.correctIndex, state.questionStartedAtMs);
+    engine.submitAnswer(
+      'user1',
+      question.correctIndex,
+      state.questionStartedAtMs,
+    );
     const player = engine.getState().players.get('user1')!;
     expect(player.totalScore).toBe(1000);
   });
@@ -43,9 +47,13 @@ describe('TriviaQuizEngine', () => {
     engine.addPlayer('user1');
     engine.startGame();
     const state = engine.getState();
-    const question = state.questions[0];
+    const question = state.questions[0]!;
 
-    engine.submitAnswer('user1', question.correctIndex, state.questionStartedAtMs + state.questionTimerMs);
+    engine.submitAnswer(
+      'user1',
+      question.correctIndex,
+      state.questionStartedAtMs + state.questionTimerMs,
+    );
     const player = engine.getState().players.get('user1')!;
     expect(player.totalScore).toBe(500);
   });
@@ -69,9 +77,13 @@ describe('TriviaQuizEngine', () => {
     engine.addPlayer('user1');
     engine.startGame();
     const state = engine.getState();
-    const question = state.questions[0];
+    const question = state.questions[0]!;
 
-    const result = engine.submitAnswer('user1', question.correctIndex, state.questionStartedAtMs + state.questionTimerMs + 1);
+    const result = engine.submitAnswer(
+      'user1',
+      question.correctIndex,
+      state.questionStartedAtMs + state.questionTimerMs + 1,
+    );
     expect(result).toBe(false);
   });
 
@@ -80,10 +92,18 @@ describe('TriviaQuizEngine', () => {
     engine.addPlayer('user1');
     engine.startGame();
     const state = engine.getState();
-    const question = state.questions[0];
+    const question = state.questions[0]!;
 
-    engine.submitAnswer('user1', question.correctIndex, state.questionStartedAtMs + 100);
-    const result = engine.submitAnswer('user1', question.correctIndex, state.questionStartedAtMs + 200);
+    engine.submitAnswer(
+      'user1',
+      question.correctIndex,
+      state.questionStartedAtMs + 100,
+    );
+    const result = engine.submitAnswer(
+      'user1',
+      question.correctIndex,
+      state.questionStartedAtMs + 200,
+    );
     expect(result).toBe(false);
   });
 });

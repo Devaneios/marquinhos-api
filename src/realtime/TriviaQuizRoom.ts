@@ -1,8 +1,8 @@
 import { Room, type Client } from 'colyseus';
-import { TriviaQuizSession } from '../services/activity/trivia-quiz/TriviaQuizSession';
-import type { ActivityBroadcaster } from '../services/activity/trivia-quiz/TriviaQuizSession';
 import { roomKey } from '../services/activity/roomKey';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
+import type { ActivityBroadcaster } from '../services/activity/trivia-quiz/TriviaQuizSession';
+import { TriviaQuizSession } from '../services/activity/trivia-quiz/TriviaQuizSession';
 import {
   verifyWsSessionToken,
   type WsSessionPayload,

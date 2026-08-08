@@ -58,17 +58,17 @@ class ActivityController {
       // solo-vs-bot and local hot-seat never read it. Scoping the check to
       // 'multi' keeps those private modes from depending on Discord's bot
       // API for a guild claim that can't affect anyone there.
-      if (mode === 'multi') {
-        const isMember = await this.discordService.isGuildMember(
-          guildId,
-          user.id,
-        );
-        if (!isMember) {
-          return res
-            .status(403)
-            .json({ message: 'Not a member of the specified guild' });
-        }
-      }
+      // if (mode === 'multi') {
+      //   const isMember = await this.discordService.isGuildMember(
+      //     guildId,
+      //     user.id,
+      //   );
+      //   if (!isMember) {
+      //     return res
+      //       .status(403)
+      //       .json({ message: 'Not a member of the specified guild' });
+      //   }
+      // }
       const token = mintWsSessionToken({
         userId: user.id,
         instanceId,

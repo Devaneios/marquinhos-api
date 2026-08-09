@@ -2,6 +2,7 @@ import { GamificationService } from '../../gamification';
 import type { PerClientBroadcaster } from '../cards/PerClientBroadcaster';
 import type { ActivityMode } from '../gameId';
 import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
+import { BattleshipBot } from './BattleshipBot';
 import {
   BattleshipEngine,
   type BattleshipSide,
@@ -19,7 +20,12 @@ export interface BattleshipSessionIdentity {
 export interface BattleshipSessionOptions {
   onSessionEnded?: () => void;
   disconnectGraceMs?: number;
+  botMoveDelayMs?: number;
+  emptyRoomGraceMs?: number;
 }
+
+const DEFAULT_BOT_MOVE_DELAY_MS = 600;
+const DEFAULT_EMPTY_ROOM_GRACE_MS = 1500;
 
 interface BattleshipPlayer {
   userId: string;
@@ -42,6 +48,12 @@ export class BattleshipSession {
   private disconnectGrace = new DisconnectGraceTimer<string>();
   private onSessionEnded?: () => void;
   private disconnectGraceMs: number;
+  private botSide: BattleshipSide | null = null;
+  private bot: BattleshipBot | null = null;
+  private botMoveDelayMs: number;
+  private botTimer: ReturnType<typeof setTimeout> | null = null;
+  private emptyRoomGraceMs: number;
+  private emptyRoomTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private identity: BattleshipSessionIdentity,
@@ -52,6 +64,70 @@ export class BattleshipSession {
     this.onSessionEnded = options.onSessionEnded;
     this.disconnectGraceMs =
       options.disconnectGraceMs ?? DEFAULT_DISCONNECT_GRACE_MS;
+    this.botMoveDelayMs = options.botMoveDelayMs ?? DEFAULT_BOT_MOVE_DELAY_MS;
+    this.emptyRoomGraceMs =
+      options.emptyRoomGraceMs ?? DEFAULT_EMPTY_ROOM_GRACE_MS;
+  }
+
+  private clearEmptyRoomTimer(): void {
+    if (this.emptyRoomTimer) {
+      clearTimeout(this.emptyRoomTimer);
+      this.emptyRoomTimer = null;
+    }
+  }
+
+  enableBot(humanSide: BattleshipSide): void {
+    this.botSide = humanSide === 'p1' ? 'p2' : 'p1';
+    this.bot = new BattleshipBot();
+    // Bot places immediately — human still places at their own pace, and
+    // the engine only advances to 'battle' once both sides are placed.
+    this.engine.placeShips(this.botSide, this.bot.generatePlacements());
+  }
+
+  private clearBotTimer(): void {
+    if (this.botTimer) {
+      clearTimeout(this.botTimer);
+      this.botTimer = null;
+    }
+  }
+
+  private maybeScheduleBotShot(): void {
+    if (!this.bot || !this.botSide) return;
+    if (this.engine.getPhase() !== 'battle') return;
+    if (this.engine.getTurn() !== this.botSide) return;
+    if (this.botTimer) return;
+
+    this.botTimer = setTimeout(() => {
+      this.botTimer = null;
+      this.playBotShot();
+    }, this.botMoveDelayMs);
+  }
+
+  private playBotShot(): void {
+    if (!this.bot || !this.botSide) return;
+    if (
+      this.engine.getPhase() !== 'battle' ||
+      this.engine.getTurn() !== this.botSide
+    ) {
+      return;
+    }
+
+    const shot = this.bot.chooseShot();
+    if (!shot) return;
+
+    const result = this.engine.fire(this.botSide, shot.x, shot.y);
+    if (!result.ok) return;
+
+    this.bot.recordResult(shot, result.hit ?? false, Boolean(result.sunk));
+    this.broadcastState();
+
+    if (result.winner && !this.resultRecorded) {
+      this.resultRecorded = true;
+      this.recordResult(result.winner);
+      return;
+    }
+
+    this.maybeScheduleBotShot();
   }
 
   get playerCount(): number {
@@ -59,6 +135,7 @@ export class BattleshipSession {
   }
 
   addPlayer(userId: string, connection: unknown): BattleshipSide | null {
+    this.clearEmptyRoomTimer();
     const existing = this.players.find((p) => p.userId === userId);
     if (existing) {
       existing.connections.add(connection);
@@ -147,7 +224,20 @@ export class BattleshipSession {
 
   private removePlayer(userId: string) {
     this.players = this.players.filter((p) => p.userId !== userId);
-    if (this.players.length === 0) this.onSessionEnded?.();
+    if (this.players.length === 0) {
+      this.clearEmptyRoomTimer();
+      // A room reaching zero players is debounced by this grace window
+      // before actually disposing — React 19 StrictMode's dev-only
+      // double-mount briefly connects and disconnects a phantom client
+      // before the real one joins, and without this grace an empty-room
+      // disposal races ahead of that real join and drops it too
+      // (observed as "Connection lost" on first load).
+      this.emptyRoomTimer = setTimeout(() => {
+        this.emptyRoomTimer = null;
+        if (this.players.length !== 0) return;
+        this.onSessionEnded?.();
+      }, this.emptyRoomGraceMs);
+    }
   }
 
   leave(userId: string, connection: unknown) {
@@ -170,6 +260,7 @@ export class BattleshipSession {
       return;
     }
     this.broadcastState();
+    this.maybeScheduleBotShot();
   }
 
   fire(userId: string, x: number, y: number) {
@@ -189,7 +280,9 @@ export class BattleshipSession {
     if (result.winner && !this.resultRecorded) {
       this.resultRecorded = true;
       this.recordResult(result.winner);
+      return;
     }
+    this.maybeScheduleBotShot();
   }
 
   private sendStateTo(userId: string, side: BattleshipSide) {
@@ -216,5 +309,13 @@ export class BattleshipSession {
         position: player.side === winner ? 1 : 2,
       })),
     });
+  }
+
+  // MANDATORY per §6.2: clears disconnect grace so it can't outlive a
+  // disposed room.
+  dispose(): void {
+    this.clearBotTimer();
+    this.clearEmptyRoomTimer();
+    this.disconnectGrace.clear();
   }
 }

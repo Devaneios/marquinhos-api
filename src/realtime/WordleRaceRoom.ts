@@ -1,5 +1,6 @@
 import { Room, type Client } from 'colyseus';
 import { roomKey } from '../services/activity/roomKey';
+import { ACTION_REJECTED } from '../services/activity/shared/ActionResult';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
 import { WordleRaceSession } from '../services/activity/wordle-race/WordleRaceSession';
 import {
@@ -60,7 +61,13 @@ export class WordleRaceRoom extends Room {
     this.onMessage('guess', (client, payload: { guess?: string }) => {
       if (this.guessRateLimiter.isOverLimit(client)) return;
       const auth = client.auth as WsSessionPayload;
-      this.session.submitGuess(auth.userId, payload?.guess ?? '');
+      const result = this.session.submitGuess(
+        auth.userId,
+        payload?.guess ?? '',
+      );
+      if (!result.ok) {
+        client.send(ACTION_REJECTED, { error: result.error });
+      }
     });
 
     this.onMessage('leave', (client) => {
@@ -71,13 +78,17 @@ export class WordleRaceRoom extends Room {
 
   override onJoin(client: Client, _options: unknown, auth: WsSessionPayload) {
     this.session.addPlayer(auth.userId, client);
-    const gameState = this.session.getGameState();
+    const gameState = this.session.getGameState(auth.userId);
     client.send('init', gameState);
   }
 
   override onLeave(client: Client) {
     this.guessRateLimiter.clear(client);
     const auth = client.auth as WsSessionPayload;
-    this.session.leave(auth.userId, client);
+    this.session.pauseForDisconnect(auth.userId, client);
+  }
+
+  override onDispose() {
+    this.session.dispose();
   }
 }

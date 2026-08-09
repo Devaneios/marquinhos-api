@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from 'bun:test';
 import { BingoSpeedSession } from '../src/services/activity/bingoSpeed/BingoSpeedSession';
-import type { ActivityBroadcaster } from '../src/services/activity/pong/PongSession';
+import type { ActivityBroadcaster } from '../src/services/activity/shared/ActivityBroadcaster';
 
 describe('BingoSpeedSession', () => {
   function createMockBroadcaster() {
@@ -9,7 +9,6 @@ describe('BingoSpeedSession', () => {
         (_key: string, _message: { type: string; payload?: unknown }) =>
           undefined,
       ),
-      broadcastBinary: mock((_key: string, _data: ArrayBuffer) => undefined),
     } satisfies ActivityBroadcaster;
   }
 
@@ -82,11 +81,34 @@ describe('BingoSpeedSession', () => {
         broadcaster,
       );
 
-      session.addPlayer('user1', {});
+      const connection = {};
+      session.addPlayer('user1', connection);
       expect(session.playerCount).toBe(1);
 
-      session.removePlayer('user1');
+      session.leave('user1', connection);
       expect(session.playerCount).toBe(0);
+    });
+
+    it('does not evict the surviving connection when a superseded socket drops', () => {
+      const broadcaster = createMockBroadcaster();
+      const session = new BingoSpeedSession(
+        {
+          sessionKey: 'test:key',
+          instanceId: 'inst1',
+          guildId: 'guild1',
+          mode: 'multi',
+        },
+        broadcaster,
+      );
+
+      const staleConn = {};
+      const liveConn = {};
+      session.addPlayer('user1', staleConn);
+      session.addPlayer('user1', liveConn);
+
+      session.pauseForDisconnect('user1', staleConn);
+
+      expect(session.playerCount).toBe(1);
     });
   });
 
@@ -311,6 +333,59 @@ describe('BingoSpeedSession', () => {
       const playerCard = session.getPlayerCard('nonexistent');
 
       expect(playerCard).toBeNull();
+    });
+  });
+
+  describe('Disconnect grace freezes drawing', () => {
+    it('stops drawing while a multi player is in disconnect grace, and resumes on reconnect', async () => {
+      const broadcaster = createMockBroadcaster();
+      const session = new BingoSpeedSession(
+        {
+          sessionKey: 'test:key',
+          instanceId: 'inst1',
+          guildId: 'guild1',
+          mode: 'multi',
+        },
+        broadcaster,
+        undefined,
+        { drawIntervalMs: 20, disconnectGraceMs: 500 },
+      );
+
+      const conn1 = {};
+      session.addPlayer('user1', conn1);
+      session.addPlayer('user2', {});
+      session.start();
+
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      const drawsBeforeDisconnect = broadcaster.broadcast.mock.calls.filter(
+        (call) => call[1]?.type === 'number_drawn',
+      ).length;
+      expect(drawsBeforeDisconnect).toBeGreaterThan(0);
+
+      session.pauseForDisconnect('user1', conn1);
+
+      const callsAtPause = broadcaster.broadcast.mock.calls.length;
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      const drawsWhilePaused = broadcaster.broadcast.mock.calls
+        .slice(callsAtPause)
+        .filter((call) => call[1]?.type === 'number_drawn').length;
+      expect(drawsWhilePaused).toBe(0);
+
+      // Reconnecting resumes the same round rather than a new one.
+      session.addPlayer('user1', conn1);
+      expect(
+        broadcaster.broadcast.mock.calls.filter(
+          (call) => call[1]?.type === 'game_started',
+        ).length,
+      ).toBe(1);
+
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      const drawsAfterReconnect = broadcaster.broadcast.mock.calls
+        .slice(callsAtPause)
+        .filter((call) => call[1]?.type === 'number_drawn').length;
+      expect(drawsAfterReconnect).toBeGreaterThan(0);
+
+      session.stop();
     });
   });
 

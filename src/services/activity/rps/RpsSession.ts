@@ -1,11 +1,11 @@
 import { GamificationService } from '../../gamification';
 import type { ActivityMode } from '../gameId';
+import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
 import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
-import { RpsEngine, type RpsEngineConfig } from './RpsEngine';
+import { RpsEngine, type RpsEngineConfig, type RpsPick } from './RpsEngine';
 
-export interface ActivityBroadcaster {
-  broadcast(key: string, message: { type: string; payload?: unknown }): void;
-}
+const BOT_PICKS: RpsPick[] = ['rock', 'paper', 'scissors'];
+const DEFAULT_BOT_PICK_DELAY_MS = 600;
 
 interface RpsPlayer {
   userId: string;
@@ -24,6 +24,7 @@ export interface RpsSessionIdentity {
 export interface RpsSessionOptions {
   onSessionEnded?: () => void;
   disconnectGraceMs?: number;
+  botPickDelayMs?: number;
 }
 
 const DEFAULT_DISCONNECT_GRACE_MS = 30_000;
@@ -35,6 +36,9 @@ export class RpsSession {
   private disconnectGrace = new DisconnectGraceTimer<string>();
   private onSessionEnded?: () => void;
   private disconnectGraceMs: number;
+  private botPlayerId: 'player1' | 'player2' | null = null;
+  private botPickDelayMs: number;
+  private botTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private identity: RpsSessionIdentity,
@@ -47,6 +51,31 @@ export class RpsSession {
     this.onSessionEnded = options.onSessionEnded;
     this.disconnectGraceMs =
       options.disconnectGraceMs ?? DEFAULT_DISCONNECT_GRACE_MS;
+    this.botPickDelayMs = options.botPickDelayMs ?? DEFAULT_BOT_PICK_DELAY_MS;
+  }
+
+  enableBot(humanPlayerId?: 'player1' | 'player2') {
+    this.botPlayerId = humanPlayerId === 'player1' ? 'player2' : 'player1';
+  }
+
+  private clearBotTimer() {
+    if (this.botTimer) {
+      clearTimeout(this.botTimer);
+      this.botTimer = null;
+    }
+  }
+
+  private maybeScheduleBotPick() {
+    if (!this.botPlayerId) return;
+    const state = this.engine.getRoundState();
+    if (state.submitted.includes(this.botPlayerId)) return;
+    if (this.botTimer) return;
+
+    this.botTimer = setTimeout(() => {
+      this.botTimer = null;
+      const pick = BOT_PICKS[Math.floor(Math.random() * BOT_PICKS.length)]!;
+      this.applyPick(this.botPlayerId!, pick);
+    }, this.botPickDelayMs);
   }
 
   get playerCount(): number {
@@ -88,7 +117,15 @@ export class RpsSession {
     const player = this.players.find((p) => p.userId === userId);
     if (!player) return false;
 
-    const success = this.engine.submitPick(player.playerId, pick);
+    const success = this.applyPick(player.playerId, pick);
+    if (!success) return false;
+
+    this.maybeScheduleBotPick();
+    return true;
+  }
+
+  private applyPick(playerId: 'player1' | 'player2', pick: unknown): boolean {
+    const success = this.engine.submitPick(playerId, pick);
     if (!success) return false;
 
     const state = this.engine.getRoundState();
@@ -107,36 +144,47 @@ export class RpsSession {
       const matchWinner = this.engine.getMatchWinner();
       if (matchWinner) {
         this.endMatch(matchWinner);
+      } else {
+        // resolveRound() advances to the next round and clears submitted
+        // picks — without this, the client's `submitted` array is stale
+        // (still lists both players from the just-finished round), which
+        // permanently disables the pick buttons for the new round.
+        this.broadcaster.broadcast(this.roomKey, {
+          type: 'round_state',
+          payload: this.engine.getRoundState(),
+        });
       }
     }
 
     return true;
   }
 
-  private endMatch(winnerId: string) {
+  private endMatch(winnerId: 'player1' | 'player2') {
     if (this.resultRecorded) return;
     this.resultRecorded = true;
+    this.clearBotTimer();
 
     const winner = this.players.find((p) => p.playerId === winnerId);
-    if (!winner) return;
 
     this.broadcaster.broadcast(this.roomKey, {
       type: 'match_end',
       payload: {
-        winner: winner.userId,
+        winner: winner?.userId ?? null,
         history: this.engine.getRoundHistory(),
       },
     });
 
-    this.gamification.recordGameResult({
-      sessionId: this.identity.sessionKey,
-      guildId: this.identity.guildId,
-      gameType: 'rock-paper-scissors',
-      results: this.players.map((p) => ({
-        userId: p.userId,
-        position: p.userId === winner.userId ? 1 : 2,
-      })),
-    });
+    if (this.players.length === 2) {
+      this.gamification.recordGameResult({
+        sessionId: this.identity.instanceId,
+        guildId: this.identity.guildId,
+        gameType: 'rock-paper-scissors',
+        results: this.players.map((p) => ({
+          userId: p.userId,
+          position: p.playerId === winnerId ? 1 : 2,
+        })),
+      });
+    }
 
     if (this.onSessionEnded) {
       this.onSessionEnded();
@@ -151,23 +199,42 @@ export class RpsSession {
     });
   }
 
-  pauseForDisconnect(userId: string, _connection: unknown) {
+  pauseForDisconnect(userId: string, connection: unknown) {
     const player = this.players.find((p) => p.userId === userId);
     if (!player) return;
+    player.connections.delete(connection);
+    if (player.connections.size > 0) return;
 
-    player.connections.forEach((conn) => {
-      if (conn === _connection) player.connections.delete(conn);
-    });
-
-    if (player.connections.size === 0) {
-      player.connected = false;
-      this.disconnectGrace.arm(userId, this.disconnectGraceMs, () => {
-        this.forceLeave(userId);
-      });
+    // Only 'multi' holds the slot open for a reconnect; single mode has no
+    // opponent waiting, and a finished match has nothing left to hold open
+    // (§6.2).
+    if (this.identity.mode !== 'multi' || this.resultRecorded) {
+      this.forceLeave(userId);
+      return;
     }
+
+    player.connected = false;
+    this.broadcaster.broadcast(this.roomKey, {
+      type: 'opponent_disconnected',
+      payload: { player: player.playerId, timeoutMs: this.disconnectGraceMs },
+    });
+    this.disconnectGrace.arm(userId, this.disconnectGraceMs, () => {
+      this.forceLeave(userId);
+    });
+  }
+
+  leave(userId: string, connection: unknown) {
+    const player = this.players.find((p) => p.userId === userId);
+    if (!player) return;
+    player.connections.delete(connection);
+    if (player.connections.size > 0) return;
+
+    this.disconnectGrace.disarm(userId);
+    this.forceLeave(userId);
   }
 
   private forceLeave(userId: string) {
+    this.disconnectGrace.disarm(userId);
     const player = this.players.find((p) => p.userId === userId);
     if (!player) return;
 
@@ -175,11 +242,25 @@ export class RpsSession {
     if (otherPlayer && !this.resultRecorded) {
       this.endMatch(otherPlayer.playerId);
     }
+
+    this.players = this.players.filter((p) => p.userId !== userId);
+    if (this.players.length === 0) this.onSessionEnded?.();
   }
 
   getPublicConfig(): object {
     return {
       bestOf: this.engine.getRoundState().bestOf,
     };
+  }
+
+  getRoundState() {
+    return this.engine.getRoundState();
+  }
+
+  // MANDATORY per §6.2: clears disconnect grace so it can't outlive a
+  // disposed room.
+  dispose(): void {
+    this.clearBotTimer();
+    this.disconnectGrace.clear();
   }
 }

@@ -1,12 +1,8 @@
 import { GamificationService } from '../../gamification';
 import type { ActivityMode } from '../gameId';
+import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
 import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
 import { HangmanEngine } from './HangmanEngine';
-
-export interface ActivityBroadcaster {
-  broadcast(key: string, message: { type: string; payload?: unknown }): void;
-  broadcastBinary(key: string, data: ArrayBuffer): void;
-}
 
 interface HangmanPlayer {
   userId: string;
@@ -132,7 +128,7 @@ export class HangmanSession {
     }));
 
     this.gamification.recordGameResult({
-      sessionId: this.identity.sessionKey,
+      sessionId: this.identity.instanceId,
       guildId: this.identity.guildId,
       gameType: 'hangman',
       results: players.map((p) => ({
@@ -161,12 +157,20 @@ export class HangmanSession {
     };
   }
 
-  pauseForDisconnect(userId: string, _connection: unknown): void {
+  pauseForDisconnect(userId: string, connection: unknown): void {
     const player = this.players.find((p) => p.userId === userId);
     if (!player) return;
 
-    player.connections.delete(_connection);
+    player.connections.delete(connection);
     if (player.connections.size > 0) return;
+
+    // Only 'multi' holds the slot open for a reconnect; single mode has no
+    // opponent waiting, and a finished game has nothing left to hold open
+    // (§6.2).
+    if (this.identity.mode !== 'multi' || this.engine.getState().gameOver) {
+      this.forceDisconnect(userId);
+      return;
+    }
 
     player.connected = false;
     this.disconnectGrace.arm(userId, this.disconnectGraceMs, () =>
@@ -175,6 +179,7 @@ export class HangmanSession {
   }
 
   private forceDisconnect(userId: string): void {
+    this.disconnectGrace.disarm(userId);
     const idx = this.players.findIndex((p) => p.userId === userId);
     if (idx === -1) return;
     this.players.splice(idx, 1);
@@ -182,5 +187,11 @@ export class HangmanSession {
     if (this.players.length === 0) {
       this.onSessionEnded?.();
     }
+  }
+
+  // MANDATORY per §6.2: clears disconnect grace so it can't outlive a
+  // disposed room.
+  dispose(): void {
+    this.disconnectGrace.clear();
   }
 }

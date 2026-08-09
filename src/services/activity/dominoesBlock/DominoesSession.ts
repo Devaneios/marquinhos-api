@@ -1,6 +1,7 @@
 import { logger } from '../../../utils/logger';
 import { GamificationService } from '../../gamification';
 import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
+import { DOMINOES_BOT_USER_ID, DominoesBot } from './DominoesBot';
 import {
   DominoesEngine,
   type ChainEnd,
@@ -40,7 +41,10 @@ export interface DominoesSessionOptions {
   minPlayers?: number;
   maxPlayers?: number;
   rng?: () => number;
+  botMoveDelayMs?: number;
 }
+
+const DEFAULT_BOT_MOVE_DELAY_MS = 700;
 
 interface DominoesPlayer {
   userId: string;
@@ -108,6 +112,10 @@ export class DominoesSession {
   private disconnectGraceMs: number;
   private minPlayers: number;
   private maxPlayers: number;
+  private botUserId: string | null = null;
+  private bot: DominoesBot | null = null;
+  private botMoveDelayMs: number;
+  private botTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private identity: DominoesSessionIdentity,
@@ -120,6 +128,60 @@ export class DominoesSession {
       options.disconnectGraceMs ?? DEFAULT_DISCONNECT_GRACE_MS;
     this.minPlayers = options.minPlayers ?? DEFAULT_MIN_PLAYERS;
     this.maxPlayers = options.maxPlayers ?? DEFAULT_MAX_PLAYERS;
+    this.botMoveDelayMs = options.botMoveDelayMs ?? DEFAULT_BOT_MOVE_DELAY_MS;
+  }
+
+  // Seats the bot as a genuine dealt-in player (block dominoes has no
+  // "virtual side" the way a masked 2-side board game does — the engine
+  // deals real tiles into a real seat), then starts the match once that
+  // brings the table up to `minPlayers`.
+  enableBot(): void {
+    if (this.botUserId) return;
+    this.botUserId = DOMINOES_BOT_USER_ID;
+    this.bot = new DominoesBot();
+    this.players.push({
+      userId: this.botUserId,
+      connected: true,
+      connections: new Set(),
+    });
+    if (this.players.length >= this.minPlayers) this.start();
+  }
+
+  private clearBotTimer(): void {
+    if (this.botTimer) {
+      clearTimeout(this.botTimer);
+      this.botTimer = null;
+    }
+  }
+
+  private maybeScheduleBotMove(): void {
+    if (!this.bot || !this.botUserId || !this.engine) return;
+    if (this.engine.isOver()) return;
+    if (this.engine.getState().currentPlayer !== this.botUserId) return;
+    if (this.botTimer) return;
+
+    this.botTimer = setTimeout(() => {
+      this.botTimer = null;
+      this.playBotMove();
+    }, this.botMoveDelayMs);
+  }
+
+  private playBotMove(): void {
+    if (!this.bot || !this.botUserId || !this.engine) return;
+    if (
+      this.engine.isOver() ||
+      this.engine.getState().currentPlayer !== this.botUserId
+    ) {
+      return;
+    }
+
+    const move = this.bot.chooseMove(this.engine, this.botUserId);
+    const result = move
+      ? this.engine.playTile(this.botUserId, move.tile, move.end)
+      : this.engine.pass(this.botUserId);
+
+    if (!result.success) return;
+    this.afterStateChange();
   }
 
   get playerCount(): number {
@@ -192,6 +254,7 @@ export class DominoesSession {
       players: this.players.length,
     });
     this.broadcastState();
+    this.maybeScheduleBotMove();
   }
 
   playTile(userId: string, tile: Tile, end?: ChainEnd): void {
@@ -236,7 +299,9 @@ export class DominoesSession {
           blocked: this.engine.getState().blocked,
         },
       });
+      return;
     }
+    this.maybeScheduleBotMove();
   }
 
   requestRestart(userId: string): void {
@@ -244,7 +309,11 @@ export class DominoesSession {
     if (!this.players.some((p) => p.userId === userId)) return;
 
     this.restartVotes.add(userId);
-    const required = this.players.filter((p) => p.connected).length;
+    // The bot always "votes" — it can't click a restart button, and the
+    // human is the only one whose consent should gate a rematch.
+    const required = this.players.filter(
+      (p) => p.connected && p.userId !== this.botUserId,
+    ).length;
     if (this.restartVotes.size < required) {
       this.broadcaster.broadcastPublic({
         type: 'restart_status',
@@ -267,6 +336,7 @@ export class DominoesSession {
   private broadcastState(): void {
     for (const player of this.players) {
       if (!player.connected) continue;
+      if (player.userId === this.botUserId) continue;
       this.sendStateTo(player.userId);
     }
     for (const userId of this.spectators.keys()) this.sendStateTo(userId);
@@ -283,6 +353,10 @@ export class DominoesSession {
 
   private recordResult(): void {
     if (!this.engine) return;
+    // Bot matches have only one real outcome to track and no opponent to
+    // rank against — matches the fleet-wide convention of skipping
+    // gamification recording in solo/bot mode.
+    if (this.botUserId) return;
     const state = this.engine.getState();
     const winners = new Set(state.winners ?? []);
     this.gamification.recordGameResult({
@@ -377,9 +451,21 @@ export class DominoesSession {
   }
 
   private endIfEmpty(): void {
-    if (this.players.length === 0 && this.spectators.size === 0) {
+    // The bot's own seat never leaves via pauseForDisconnect/leave (it has
+    // no real connection), so once every *real* player is gone the table
+    // is just as empty as if `players` were literally [].
+    const realPlayers = this.players.filter((p) => p.userId !== this.botUserId);
+    if (realPlayers.length === 0 && this.spectators.size === 0) {
       this.disconnectGrace.clear();
+      this.clearBotTimer();
       this.onSessionEnded?.();
     }
+  }
+
+  // MANDATORY per §6.2: clears disconnect grace so it can't outlive a
+  // disposed room.
+  dispose(): void {
+    this.clearBotTimer();
+    this.disconnectGrace.clear();
   }
 }

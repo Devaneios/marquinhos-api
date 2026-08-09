@@ -482,4 +482,11 @@ export class CardTableSession<TState> {
       this.onSessionEnded?.();
     }
   }
+
+  // MANDATORY per §6.2: clears both timer sets so neither outlives a
+  // disposed room.
+  dispose(): void {
+    this.disconnectGrace.clear();
+    this.turnClock.clear();
+  }
 }

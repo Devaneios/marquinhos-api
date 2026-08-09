@@ -1,16 +1,18 @@
 import { GamificationService } from '../../gamification';
 import type { ActivityMode } from '../gameId';
+// Snake ticks at ~6.6 Hz (FIXED_DT_MS = 150) — well under the ≥10 Hz
+// threshold that requires a hand-written binary snapshot (§7.2), so state
+// goes out over the JSON `broadcast` path; previously the JSON payload was
+// smuggled through `broadcastBinary` via an `as any` cast (AP-3), which is
+// what this fixed.
+import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
 import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
+import { SnakeBot } from './SnakeBotAI';
 import {
   SnakeEngine,
   type SnakeDirection,
   type SnakeEngineConfig,
 } from './SnakeEngine';
-
-export interface ActivityBroadcaster {
-  broadcast(key: string, message: { type: string; payload?: unknown }): void;
-  broadcastBinary(key: string, data: ArrayBuffer): void;
-}
 
 interface SnakePlayer {
   userId: string;
@@ -34,6 +36,7 @@ export interface SnakeSessionOptions {
 const FIXED_DT_MS = 150;
 const MAX_CATCHUP_MS = 500;
 const DEFAULT_DISCONNECT_GRACE_MS = 30_000;
+const BOT_PLAYER_ID = 'bot';
 
 export class SnakeSession {
   private engine: SnakeEngine;
@@ -46,6 +49,7 @@ export class SnakeSession {
   private disconnectGrace = new DisconnectGraceTimer<string>();
   private onSessionEnded?: () => void;
   private disconnectGraceMs: number;
+  private bot: SnakeBot | null = null;
 
   constructor(
     private identity: SnakeSessionIdentity,
@@ -182,6 +186,16 @@ export class SnakeSession {
     this.engine.setDirection(player.playerId, direction as SnakeDirection);
   }
 
+  // `single` mode is a practice match against nobody without this — the
+  // client currently even labels the empty second slot "CPU" (spec
+  // migration item 3). Adds a second, bot-driven snake to the board; the
+  // bot is not a session player (no connection, not gamification-eligible).
+  enableBot() {
+    if (this.bot) return;
+    this.engine.addSnake(BOT_PLAYER_ID);
+    this.bot = new SnakeBot(BOT_PLAYER_ID);
+  }
+
   getPublicConfig() {
     const config = this.engine.getConfig();
     return {
@@ -223,6 +237,7 @@ export class SnakeSession {
   }
 
   tick() {
+    this.updateBot();
     this.engine.tick();
     const state = this.broadcastSnapshot();
 
@@ -233,15 +248,19 @@ export class SnakeSession {
     }
   }
 
+  private updateBot() {
+    if (!this.bot) return;
+    const direction = this.bot.chooseDirection(this.engine.getState());
+    this.engine.setDirection(BOT_PLAYER_ID, direction);
+  }
+
   private broadcastSnapshot() {
     const state = this.engine.getState();
     this.snapshotSeq += 1;
-    const payload = {
-      seq: this.snapshotSeq,
-      state,
-    };
-    const data = Buffer.from(JSON.stringify(payload));
-    this.broadcaster.broadcastBinary(this.roomKey, data as any);
+    this.broadcaster.broadcast(this.roomKey, {
+      type: 'state',
+      payload: { seq: this.snapshotSeq, state },
+    });
     return state;
   }
 
@@ -259,5 +278,12 @@ export class SnakeSession {
       gameType: 'snake-game',
       results,
     });
+  }
+
+  // MANDATORY per §6.2: stops the loop and clears disconnect grace so
+  // neither outlives a disposed room.
+  dispose(): void {
+    this.stop();
+    this.disconnectGrace.clear();
   }
 }

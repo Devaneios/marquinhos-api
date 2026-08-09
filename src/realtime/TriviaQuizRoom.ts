@@ -1,7 +1,7 @@
 import { Room, type Client } from 'colyseus';
 import { roomKey } from '../services/activity/roomKey';
+import type { ActivityBroadcaster } from '../services/activity/shared/ActivityBroadcaster';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
-import type { ActivityBroadcaster } from '../services/activity/trivia-quiz/TriviaQuizSession';
 import { TriviaQuizSession } from '../services/activity/trivia-quiz/TriviaQuizSession';
 import {
   verifyWsSessionToken,
@@ -70,12 +70,12 @@ export class TriviaQuizRoom extends Room {
     const joined = this.session.addPlayer(auth.userId, client);
     if (!joined) {
       client.send('error', { message: 'Game is full' });
-      this.disconnect();
+      client.leave();
       return;
     }
 
     client.send('init', {
-      state: this.session.getState(),
+      playerScores: this.session.getPublicPlayerScores(),
       leaderboard: this.session.getLeaderboard(),
     });
 
@@ -86,6 +86,8 @@ export class TriviaQuizRoom extends Room {
 
   override onLeave(client: Client) {
     this.answerRateLimiter.clear(client);
+    const auth = client.auth as WsSessionPayload;
+    this.session.pauseForDisconnect(auth.userId, client);
   }
 
   override onDispose() {

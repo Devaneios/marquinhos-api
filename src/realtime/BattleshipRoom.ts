@@ -96,6 +96,9 @@ export class BattleshipRoom extends Room {
   override onJoin(client: Client, _options: unknown, auth: WsSessionPayload) {
     const side = this.session.addPlayer(auth.userId, client);
     client.send('init', { side });
+    if (side && auth.mode === 'single') {
+      this.session.enableBot(side);
+    }
   }
 
   override onLeave(client: Client) {
@@ -103,5 +106,9 @@ export class BattleshipRoom extends Room {
     this.placeRateLimiter.clear(client);
     const auth = client.auth as WsSessionPayload;
     this.session.pauseForDisconnect(auth.userId, client);
+  }
+
+  override onDispose() {
+    this.session.dispose();
   }
 }

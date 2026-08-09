@@ -1,10 +1,8 @@
 import { GamificationService } from '../../gamification';
 import type { ActivityMode } from '../gameId';
+import type { ActionResult } from '../shared/ActionResult';
+import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
 import { WordleRaceEngine } from './WordleRaceEngine';
-
-export interface ActivityBroadcaster {
-  broadcast(key: string, message: { type: string; payload?: unknown }): void;
-}
 
 interface WordleRaceSessionIdentity {
   sessionKey: string;
@@ -30,6 +28,7 @@ export class WordleRaceSession {
   private gamification: GamificationService;
   private resultRecorded = false;
   private onSessionEnded?: () => void;
+  private endGameTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private identity: WordleRaceSessionIdentity,
@@ -130,6 +129,14 @@ export class WordleRaceSession {
     return player.connections.size === 0;
   }
 
+  // A race has no opponent slot to hold open for a reconnect — everyone
+  // else keeps racing regardless — so both a network drop and an explicit
+  // exit free the player immediately (§6.2's "decide grace-or-detach
+  // explicitly" for grace-less sessions).
+  pauseForDisconnect(userId: string, connection: unknown) {
+    this.leave(userId, connection);
+  }
+
   leave(userId: string, connection: unknown) {
     const player = this.players.find((p) => p.userId === userId);
     if (!player) return;
@@ -145,15 +152,14 @@ export class WordleRaceSession {
     }
   }
 
-  submitGuess(userId: string, guess: string): void {
+  // Returns the outcome instead of broadcasting a rejection — an invalid
+  // guess is feedback for the submitter only, so the Room delivers it via
+  // `client.send`, never a room-wide broadcast (§6.3, AP-1).
+  submitGuess(userId: string, guess: string): ActionResult {
     const result = this.engine.submitGuess(userId, guess);
 
     if ('error' in result) {
-      this.broadcaster.broadcast(this.roomKey, {
-        type: 'guess_error',
-        payload: { userId, error: result.error },
-      });
-      return;
+      return { ok: false, error: result.error };
     }
 
     const engineState = this.engine.getState();
@@ -190,6 +196,8 @@ export class WordleRaceSession {
     if (this.engine.isGameOver()) {
       this.endGame();
     }
+
+    return { ok: true };
   }
 
   private broadcastPlayerJoined(userId: string) {
@@ -238,7 +246,7 @@ export class WordleRaceSession {
 
     try {
       this.gamification.recordGameResult({
-        sessionId: this.roomKey,
+        sessionId: this.identity.instanceId,
         guildId: this.identity.guildId,
         gameType: 'wordle-race',
         results: results.map((r) => ({
@@ -251,26 +259,42 @@ export class WordleRaceSession {
     }
 
     if (this.onSessionEnded) {
-      setTimeout(() => this.onSessionEnded?.(), 3000);
+      this.endGameTimer = setTimeout(() => this.onSessionEnded?.(), 3000);
     }
   }
 
-  getGameState() {
+  getGameState(userId: string) {
     const engineState = this.engine.getState();
+    const player = engineState.players.get(userId);
     return {
       targetWordLength: engineState.targetWord.length,
       maxAttempts: this.engine.getMaxAttempts(),
       players: Array.from(engineState.players.entries()).map(
-        ([userId, player]) => ({
-          userId,
-          attempts: player.attempts,
-          solved: player.solved,
-          exhausted: player.exhausted,
-          guesses: player.guesses,
+        ([playerId, p]) => ({
+          userId: playerId,
+          attempts: p.attempts,
+          solved: p.solved,
+          exhausted: p.exhausted,
+          guesses: p.guesses,
         }),
       ),
       firstSolver: engineState.firstSolver,
       gameOver: this.engine.isGameOver(),
+      // Denormalized view of the requesting player's own guesses — the
+      // client merges `guess_submitted` deltas into these same fields, so
+      // `init` must seed them in the same shape.
+      currentPlayerGuesses: player?.guesses ?? [],
+      currentPlayerSolved: player?.solved ?? false,
+      currentPlayerExhausted: player?.exhausted ?? false,
     };
+  }
+
+  // MANDATORY per §6.2: clears the post-game finish timer so it can't fire
+  // `onSessionEnded` into an already-disposed room.
+  dispose(): void {
+    if (this.endGameTimer) {
+      clearTimeout(this.endGameTimer);
+      this.endGameTimer = null;
+    }
   }
 }

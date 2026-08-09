@@ -1,5 +1,6 @@
 import { Room, type Client } from 'colyseus';
 import { roomKey } from '../services/activity/roomKey';
+import { ACTION_REJECTED } from '../services/activity/shared/ActionResult';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
 import { TowerSession } from '../services/activity/towerUnstable/TowerSession';
 import {
@@ -62,11 +63,14 @@ export class TowerUnstableRoom extends Room {
       (client, payload: { level?: number; position?: number }) => {
         if (this.pullRateLimiter.isOverLimit(client)) return;
         const auth = client.auth as WsSessionPayload;
-        this.session.handlePull(
+        const result = this.session.handlePull(
           auth.userId,
           payload?.level ?? -1,
           payload?.position ?? -1,
         );
+        if (!result.ok) {
+          client.send(ACTION_REJECTED, { error: result.error });
+        }
       },
     );
 
@@ -83,6 +87,9 @@ export class TowerUnstableRoom extends Room {
 
   override onJoin(client: Client, _options: unknown, auth: WsSessionPayload) {
     const joined = this.session.addPlayer(auth.userId, client);
+    if (joined && auth.mode === 'single') {
+      this.session.enableBot();
+    }
     client.send('init', {
       joined,
       state: this.session.getPublicState(),
@@ -97,5 +104,9 @@ export class TowerUnstableRoom extends Room {
     this.pullRateLimiter.clear(client);
     const auth = client.auth as WsSessionPayload;
     this.session.pauseForDisconnect(auth.userId, client);
+  }
+
+  override onDispose() {
+    this.session.dispose();
   }
 }

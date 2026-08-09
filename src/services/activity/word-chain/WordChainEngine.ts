@@ -55,10 +55,15 @@ export class WordChainEngine {
 
   removePlayer(userId: string): void {
     const player = this.state.players.find((p) => p.userId === userId);
-    if (player) {
-      player.alive = false;
-      this.checkWinCondition();
+    if (!player) return;
+    player.alive = false;
+    // Losing the current-turn player must hand the turn to the next living
+    // player — otherwise `currentTurn` keeps pointing at someone who can
+    // never submit again, and no one else can either (they're never "up").
+    if (this.state.currentTurn === userId) {
+      this.advanceTurn();
     }
+    this.checkWinCondition();
   }
 
   submitWord(userId: string, word: string): { valid: boolean; error?: string } {
@@ -133,6 +138,10 @@ export class WordChainEngine {
 
   getPlayerOrder(): string[] {
     return [...this.turnOrder];
+  }
+
+  getWordlist(): ReadonlySet<string> {
+    return this.wordlist;
   }
 
   getWinner(): string | null {

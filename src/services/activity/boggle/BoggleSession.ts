@@ -1,5 +1,6 @@
 import { GamificationService } from '../../gamification';
 import type { ActivityMode } from '../gameId';
+import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
 import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
 import {
   BoggleEngine,
@@ -9,10 +10,6 @@ import {
   type SubmitResult,
 } from './BoggleEngine';
 import { getBoggleWordSet } from './boggleWords';
-
-export interface ActivityBroadcaster {
-  broadcast(key: string, message: { type: string; payload?: unknown }): void;
-}
 
 interface BogglePlayer {
   userId: string;
@@ -159,7 +156,7 @@ export class BoggleSession {
     });
 
     this.gamification.recordGameResult({
-      sessionId: this.identity.sessionKey,
+      sessionId: this.identity.instanceId,
       guildId: this.identity.guildId,
       gameType: 'boggle-word-race',
       results,
@@ -171,6 +168,14 @@ export class BoggleSession {
     if (!player) return;
     player.connections.delete(connection);
     if (player.connections.size > 0) return;
+
+    // Only 'multi' holds the slot open for a reconnect; single mode has no
+    // opponent waiting, and a finished round has nothing left to hold open
+    // (§6.2).
+    if (this.identity.mode !== 'multi' || this.resultRecorded) {
+      this.forceDisconnect(userId);
+      return;
+    }
 
     player.connected = false;
     this.disconnectGrace.arm(userId, this.disconnectGraceMs, () =>

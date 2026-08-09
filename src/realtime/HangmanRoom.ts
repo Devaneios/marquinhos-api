@@ -1,8 +1,8 @@
 import { Room, type Client } from 'colyseus';
-import type { ActivityBroadcaster } from '../services/activity/hangman/HangmanSession';
 import { HangmanSession } from '../services/activity/hangman/HangmanSession';
 import { getHangmanWord } from '../services/activity/hangman/wordList';
 import { roomKey } from '../services/activity/roomKey';
+import type { ActivityBroadcaster } from '../services/activity/shared/ActivityBroadcaster';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
 import {
   verifyWsSessionToken,
@@ -41,9 +41,6 @@ export class HangmanRoom extends Room {
     const broadcaster: ActivityBroadcaster = {
       broadcast: (_key, message) => {
         this.broadcast(message.type, message.payload);
-      },
-      broadcastBinary: (_key, data) => {
-        this.broadcastBytes('state', new Uint8Array(data), {});
       },
     };
 
@@ -97,5 +94,9 @@ export class HangmanRoom extends Room {
     this.guessRateLimiter.clear(client);
     const auth = client.auth as WsSessionPayload;
     this.session.pauseForDisconnect(auth.userId, client);
+  }
+
+  override onDispose() {
+    this.session.dispose();
   }
 }

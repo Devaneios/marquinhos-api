@@ -1,11 +1,10 @@
 import { GamificationService } from '../../gamification';
 import type { ActivityMode } from '../gameId';
+import type { ActionResult } from '../shared/ActionResult';
+import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
 import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
+import { TicTacToeBot } from './TicTacToeBot';
 import { TicTacToeEngine, type Player } from './TicTacToeEngine';
-
-export interface ActivityBroadcaster {
-  broadcast(key: string, message: { type: string; payload?: unknown }): void;
-}
 
 interface TicTacToePlayer {
   userId: string;
@@ -24,9 +23,11 @@ export interface TicTacToeSessionIdentity {
 export interface TicTacToeSessionOptions {
   onSessionEnded?: () => void;
   disconnectGraceMs?: number;
+  botMoveDelayMs?: number;
 }
 
 const DEFAULT_DISCONNECT_GRACE_MS = 30_000;
+const DEFAULT_BOT_MOVE_DELAY_MS = 500;
 
 export class TicTacToeSession {
   private engine: TicTacToeEngine;
@@ -36,6 +37,9 @@ export class TicTacToeSession {
   private disconnectGrace = new DisconnectGraceTimer<string>();
   private onSessionEnded?: () => void;
   private disconnectGraceMs: number;
+  private bot: TicTacToeBot | null = null;
+  private botMoveDelayMs: number;
+  private botTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private identity: TicTacToeSessionIdentity,
@@ -47,6 +51,57 @@ export class TicTacToeSession {
     this.onSessionEnded = options.onSessionEnded;
     this.disconnectGraceMs =
       options.disconnectGraceMs ?? DEFAULT_DISCONNECT_GRACE_MS;
+    this.botMoveDelayMs = options.botMoveDelayMs ?? DEFAULT_BOT_MOVE_DELAY_MS;
+  }
+
+  enableBot(humanPlayer?: Player) {
+    const botPlayer: Player = humanPlayer === 'X' ? 'O' : 'X';
+    this.bot = new TicTacToeBot(botPlayer);
+    this.maybeScheduleBotMove();
+  }
+
+  private maybeScheduleBotMove() {
+    if (!this.bot) return;
+    const state = this.engine.getState();
+    if (state.winner || state.isDraw) return;
+    if (state.currentPlayer !== this.bot.side) return;
+    if (this.botTimer) return;
+
+    this.botTimer = setTimeout(() => {
+      this.botTimer = null;
+      this.playBotMove();
+    }, this.botMoveDelayMs);
+  }
+
+  private playBotMove() {
+    if (!this.bot) return;
+    const state = this.engine.getState();
+    if (state.winner || state.isDraw || state.currentPlayer !== this.bot.side)
+      return;
+
+    const move = this.bot.chooseMove(state.board);
+    if (!move) return;
+
+    const result = this.engine.makeMove(move.row, move.col, this.bot.side);
+    if (!result.success) return;
+
+    const updatedState = this.broadcastState();
+    if (updatedState.winner || updatedState.isDraw) {
+      if (!this.resultRecorded) {
+        this.resultRecorded = true;
+        if (updatedState.winner) this.recordResult(updatedState.winner);
+      }
+      return;
+    }
+
+    this.maybeScheduleBotMove();
+  }
+
+  private clearBotTimer() {
+    if (this.botTimer) {
+      clearTimeout(this.botTimer);
+      this.botTimer = null;
+    }
   }
 
   get playerCount(): number {
@@ -160,19 +215,17 @@ export class TicTacToeSession {
     this.detach(userId);
   }
 
-  handleMove(userId: string, row: number, col: number) {
+  // Returns the outcome instead of broadcasting a rejection — a rejected
+  // move is feedback for the mover only, so the Room delivers it via
+  // `client.send`, never a room-wide broadcast (§6.3, AP-1).
+  handleMove(userId: string, row: number, col: number): ActionResult {
     const player = this.players.find((p) => p.userId === userId);
-    if (!player) return;
+    if (!player) return { ok: false, error: 'Not seated at this match' };
 
-    const state = this.engine.getState();
-    const result = this.engine.makeMove(row, col, state.currentPlayer);
+    const result = this.engine.makeMove(row, col, player.player);
 
     if (!result.success) {
-      this.broadcaster.broadcast(this.roomKey, {
-        type: 'move_error',
-        payload: { error: result.error },
-      });
-      return;
+      return { ok: false, error: result.error ?? 'Invalid move' };
     }
 
     const updatedState = this.broadcastState();
@@ -184,7 +237,11 @@ export class TicTacToeSession {
           this.recordResult(updatedState.winner);
         }
       }
+    } else {
+      this.maybeScheduleBotMove();
     }
+
+    return { ok: true };
   }
 
   private broadcastState() {
@@ -208,7 +265,7 @@ export class TicTacToeSession {
     if (!this.players.some((p) => p.userId === userId)) return;
 
     this.restartVotes.add(userId);
-    const required = this.players.length;
+    const required = this.bot ? 1 : this.players.length;
 
     if (this.restartVotes.size < required) {
       this.broadcaster.broadcast(this.roomKey, {
@@ -222,6 +279,7 @@ export class TicTacToeSession {
     this.resultRecorded = false;
     this.engine.reset();
     this.broadcastState();
+    this.maybeScheduleBotMove();
   }
 
   getPublicState() {
@@ -246,5 +304,12 @@ export class TicTacToeSession {
         position: player.player === winner ? 1 : 2,
       })),
     });
+  }
+
+  // MANDATORY per §6.2: clears disconnect grace so it can't outlive a
+  // disposed room.
+  dispose(): void {
+    this.clearBotTimer();
+    this.disconnectGrace.clear();
   }
 }

@@ -1,7 +1,7 @@
 import { Room, type Client } from 'colyseus';
-import type { ActivityBroadcaster } from '../services/activity/minesweeper/MinesweeperSession';
 import { MinesweeperSession } from '../services/activity/minesweeper/MinesweeperSession';
 import { roomKey } from '../services/activity/roomKey';
+import type { ActivityBroadcaster } from '../services/activity/shared/ActivityBroadcaster';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
 import {
   verifyWsSessionToken,
@@ -84,5 +84,9 @@ export class MinesweeperRoom extends Room {
     this.revealRateLimiter.clear(client);
     const auth = client.auth as WsSessionPayload;
     this.session.removeConnection(auth.userId, client);
+  }
+
+  override onDispose() {
+    this.session.dispose();
   }
 }

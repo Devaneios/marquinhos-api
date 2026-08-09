@@ -1,12 +1,9 @@
 import { GamificationService } from '../../gamification';
+import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
 import {
   MinesweeperEngine,
   type MinesweeperEngineConfig,
 } from './MinesweeperEngine';
-
-export interface ActivityBroadcaster {
-  broadcast(key: string, message: { type: string; payload?: unknown }): void;
-}
 
 interface MinesweeperPlayer {
   userId: string;
@@ -25,13 +22,23 @@ export interface MinesweeperSessionIdentity {
 
 export interface MinesweeperSessionOptions {
   onSessionEnded?: () => void;
+  emptyRoomGraceMs?: number;
 }
+
+// A room reaching zero players is debounced by this grace window before
+// actually disposing — React 19 StrictMode's dev-only double-mount briefly
+// connects and disconnects a phantom client before the real one joins, and
+// without this grace an empty-room disposal races ahead of that real join
+// and drops it too (observed as "Connection lost" on first load).
+const DEFAULT_EMPTY_ROOM_GRACE_MS = 1500;
 
 export class MinesweeperSession {
   private engine: MinesweeperEngine;
   private players: MinesweeperPlayer[] = [];
   private resultRecorded = false;
   private onSessionEnded?: () => void;
+  private emptyRoomGraceMs: number;
+  private emptyRoomTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private identity: MinesweeperSessionIdentity,
@@ -42,6 +49,15 @@ export class MinesweeperSession {
   ) {
     this.engine = new MinesweeperEngine(engineConfig);
     this.onSessionEnded = options.onSessionEnded;
+    this.emptyRoomGraceMs =
+      options.emptyRoomGraceMs ?? DEFAULT_EMPTY_ROOM_GRACE_MS;
+  }
+
+  private clearEmptyRoomTimer() {
+    if (this.emptyRoomTimer) {
+      clearTimeout(this.emptyRoomTimer);
+      this.emptyRoomTimer = null;
+    }
   }
 
   get playerCount(): number {
@@ -53,6 +69,7 @@ export class MinesweeperSession {
   }
 
   addPlayer(userId: string, connection: unknown): void {
+    this.clearEmptyRoomTimer();
     const existing = this.players.find((p) => p.userId === userId);
     if (existing) {
       existing.connections.add(connection);
@@ -70,7 +87,13 @@ export class MinesweeperSession {
     player.connections.delete(connection);
     if (player.connections.size > 0) return;
     this.players = this.players.filter((p) => p.userId !== userId);
-    if (this.players.length === 0) this.onSessionEnded?.();
+    if (this.players.length === 0) {
+      this.clearEmptyRoomTimer();
+      this.emptyRoomTimer = setTimeout(() => {
+        this.emptyRoomTimer = null;
+        if (this.players.length === 0) this.onSessionEnded?.();
+      }, this.emptyRoomGraceMs);
+    }
   }
 
   getBoardSnapshot() {
@@ -141,5 +164,11 @@ export class MinesweeperSession {
       gameType: 'minesweeper-versus',
       results,
     });
+  }
+
+  // MANDATORY per §6.2: clears the empty-room grace timer so it can't fire
+  // `onSessionEnded` into an already-disposed room.
+  dispose(): void {
+    this.clearEmptyRoomTimer();
   }
 }

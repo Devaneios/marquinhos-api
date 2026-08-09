@@ -3,7 +3,10 @@ import { MinesweeperSession } from '../src/services/activity/minesweeper/Mineswe
 import type { GameResultInput } from '../src/services/gamification/types';
 
 function fakeBroadcaster() {
-  const messages: { key: string; message: { type: string; payload?: unknown } }[] = [];
+  const messages: {
+    key: string;
+    message: { type: string; payload?: unknown };
+  }[] = [];
   return {
     broadcast: (key: string, message: { type: string; payload?: unknown }) => {
       messages.push({ key, message });
@@ -20,7 +23,11 @@ describe('MinesweeperSession', () => {
   it('rejects a reveal from a userId that never joined', () => {
     const broadcaster = fakeBroadcaster();
     const session = new MinesweeperSession(
-      { sessionKey: 'inst-1:minesweeper-versus:multi', instanceId: 'inst-1', guildId: 'guild-1' },
+      {
+        sessionKey: 'inst-1:minesweeper-versus:multi',
+        instanceId: 'inst-1',
+        guildId: 'guild-1',
+      },
       broadcaster,
       fakeGamification() as never,
     );
@@ -33,7 +40,11 @@ describe('MinesweeperSession', () => {
   it('broadcasts a reveal event to the room for a joined player', () => {
     const broadcaster = fakeBroadcaster();
     const session = new MinesweeperSession(
-      { sessionKey: 'inst-1:minesweeper-versus:multi', instanceId: 'inst-1', guildId: 'guild-1' },
+      {
+        sessionKey: 'inst-1:minesweeper-versus:multi',
+        instanceId: 'inst-1',
+        guildId: 'guild-1',
+      },
       broadcaster,
       fakeGamification() as never,
       { width: 3, height: 3, mineCount: 0 },
@@ -44,7 +55,9 @@ describe('MinesweeperSession', () => {
     expect('error' in result).toBe(false);
 
     expect(broadcaster.messages.length).toBeGreaterThan(0);
-    const revealMsg = broadcaster.messages.find((m) => m.message.type === 'reveal');
+    const revealMsg = broadcaster.messages.find(
+      (m) => m.message.type === 'reveal',
+    );
     expect(revealMsg).toBeDefined();
     const payload = revealMsg!.message.payload as { userId: string };
     expect(payload.userId).toBe('user-a');
@@ -53,7 +66,11 @@ describe('MinesweeperSession', () => {
   it('never leaks unrevealed mine positions in the board snapshot', () => {
     const broadcaster = fakeBroadcaster();
     const session = new MinesweeperSession(
-      { sessionKey: 'inst-1:minesweeper-versus:multi', instanceId: 'inst-1', guildId: 'guild-1' },
+      {
+        sessionKey: 'inst-1:minesweeper-versus:multi',
+        instanceId: 'inst-1',
+        guildId: 'guild-1',
+      },
       broadcaster,
       fakeGamification() as never,
       { width: 6, height: 6, mineCount: 10 },
@@ -73,7 +90,11 @@ describe('MinesweeperSession', () => {
     const broadcaster = fakeBroadcaster();
     const gamification = fakeGamification();
     const session = new MinesweeperSession(
-      { sessionKey: 'inst-1:minesweeper-versus:multi', instanceId: 'inst-1', guildId: 'guild-1' },
+      {
+        sessionKey: 'inst-1:minesweeper-versus:multi',
+        instanceId: 'inst-1',
+        guildId: 'guild-1',
+      },
       broadcaster,
       gamification as never,
       { width: 3, height: 3, mineCount: 1 },
@@ -84,8 +105,16 @@ describe('MinesweeperSession', () => {
     // Drive the tiny 3x3/1-mine board to completion: whichever tile isn't
     // the mine will cascade to the win since a single-mine 3x3 board is one
     // connected open region.
-    for (let y = 0; y < 3 && gamification.recordGameResult.mock.calls.length === 0; y++) {
-      for (let x = 0; x < 3 && gamification.recordGameResult.mock.calls.length === 0; x++) {
+    for (
+      let y = 0;
+      y < 3 && gamification.recordGameResult.mock.calls.length === 0;
+      y++
+    ) {
+      for (
+        let x = 0;
+        x < 3 && gamification.recordGameResult.mock.calls.length === 0;
+        x++
+      ) {
         session.reveal('user-a', x, y);
       }
     }
@@ -96,14 +125,20 @@ describe('MinesweeperSession', () => {
     const userIds = input.results.map((r) => r.userId).sort();
     expect(userIds).toEqual(['user-a', 'user-b']);
 
-    const gameOverMsg = broadcaster.messages.find((m) => m.message.type === 'game_over');
+    const gameOverMsg = broadcaster.messages.find(
+      (m) => m.message.type === 'game_over',
+    );
     expect(gameOverMsg).toBeDefined();
   });
 
   it('does not affect other players when one disconnects', () => {
     const broadcaster = fakeBroadcaster();
     const session = new MinesweeperSession(
-      { sessionKey: 'inst-1:minesweeper-versus:multi', instanceId: 'inst-1', guildId: 'guild-1' },
+      {
+        sessionKey: 'inst-1:minesweeper-versus:multi',
+        instanceId: 'inst-1',
+        guildId: 'guild-1',
+      },
       broadcaster,
       fakeGamification() as never,
       { width: 4, height: 4, mineCount: 0 },
@@ -117,15 +152,24 @@ describe('MinesweeperSession', () => {
     expect('error' in result).toBe(false);
   });
 
-  it('ends the session only once every player has disconnected', () => {
+  it('ends the session only once every player has disconnected', async () => {
     const broadcaster = fakeBroadcaster();
     let ended = false;
     const session = new MinesweeperSession(
-      { sessionKey: 'inst-1:minesweeper-versus:multi', instanceId: 'inst-1', guildId: 'guild-1' },
+      {
+        sessionKey: 'inst-1:minesweeper-versus:multi',
+        instanceId: 'inst-1',
+        guildId: 'guild-1',
+      },
       broadcaster,
       fakeGamification() as never,
       {},
-      { onSessionEnded: () => { ended = true; } },
+      {
+        onSessionEnded: () => {
+          ended = true;
+        },
+        emptyRoomGraceMs: 0,
+      },
     );
     session.addPlayer('user-a', 'conn-a');
     session.addPlayer('user-b', 'conn-b');
@@ -133,6 +177,11 @@ describe('MinesweeperSession', () => {
     session.removeConnection('user-a', 'conn-a');
     expect(ended).toBe(false);
     session.removeConnection('user-b', 'conn-b');
+    expect(ended).toBe(false);
+    // The empty-room grace timer defers `onSessionEnded` by a tick (see
+    // MinesweeperSession) to absorb React StrictMode's dev-only phantom
+    // mount/unmount — flush it here.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(ended).toBe(true);
   });
 });

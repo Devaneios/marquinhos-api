@@ -116,4 +116,8 @@ export class CardTableRoom extends Room {
     const auth = client.auth as WsSessionPayload;
     this.session.pauseForDisconnect(auth.userId, client);
   }
+
+  override onDispose() {
+    this.session.dispose();
+  }
 }

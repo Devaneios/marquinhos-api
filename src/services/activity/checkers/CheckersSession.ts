@@ -1,5 +1,7 @@
 import { GamificationService } from '../../gamification';
 import type { ActivityMode } from '../gameId';
+import type { ActionResult } from '../shared/ActionResult';
+import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
 import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
 import { chooseCheckersMove } from './CheckersBotAI';
 import {
@@ -8,10 +10,6 @@ import {
   type Color,
   type Position,
 } from './CheckersEngine';
-
-export interface ActivityBroadcaster {
-  broadcast(key: string, message: { type: string; payload?: unknown }): void;
-}
 
 interface CheckersPlayer {
   userId: string;
@@ -174,29 +172,27 @@ export class CheckersSession {
     return this.engine.getState();
   }
 
-  requestMove(userId: string, from: Position, to: Position): boolean {
+  // Returns the outcome instead of broadcasting a rejection — a rejected
+  // move is feedback for the mover only, so the Room delivers it via
+  // `client.send`, never a room-wide broadcast (§6.3, AP-1).
+  requestMove(userId: string, from: Position, to: Position): ActionResult {
     const player = this.players.find((p) => p.userId === userId);
-    if (!player) return false;
+    if (!player) return { ok: false, error: 'Not seated at this match' };
 
     const result = this.engine.move(player.color, from, to);
     if (!result.ok) {
-      const requester = this.players.find((p) => p.userId === userId);
-      this.broadcaster.broadcast(this.roomKey, {
-        type: 'move_rejected',
-        payload: { userId: requester?.userId, reason: result.error },
-      });
-      return false;
+      return { ok: false, error: result.error ?? 'Invalid move' };
     }
 
     const state = this.broadcastState();
     if (state.winner && !this.resultRecorded) {
       this.resultRecorded = true;
       this.recordResult(state.winner);
-      return true;
+      return { ok: true };
     }
 
     this.maybeScheduleBotMove();
-    return true;
+    return { ok: true };
   }
 
   private maybeScheduleBotMove() {

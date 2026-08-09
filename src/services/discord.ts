@@ -35,8 +35,14 @@ export class DiscordService {
       process.env.NODE_ENV !== 'production' &&
       token === 'mock-access-token'
     ) {
+      // Must match @discord/embedded-app-sdk's DiscordSDKMock, which always
+      // resolves `user.id` to this literal client-side — any other value
+      // here desyncs `identity.userId` from the userId the server embeds
+      // in broadcasts, silently breaking every "is this me" comparison in
+      // local dev (discovered via WordleRaceGame's per-player guess merge
+      // never matching).
       return {
-        id: '123456789012345678',
+        id: 'mock_user_id',
         username: 'mock_user_username',
         discriminator: '1234',
         avatar: 'mock_user_avatar_hash',

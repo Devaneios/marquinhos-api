@@ -1,12 +1,11 @@
 import { GamificationService } from '../../gamification';
 import { SeededRng } from '../cards/core/rng';
 import type { ActivityMode } from '../gameId';
+import type { ActionResult } from '../shared/ActionResult';
+import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
 import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
+import { TOWER_BOT_USER_ID, TowerBot } from './TowerBot';
 import { TowerEngine, type TowerState } from './TowerEngine';
-
-export interface ActivityBroadcaster {
-  broadcast(key: string, message: { type: string; payload?: unknown }): void;
-}
 
 interface TowerPlayer {
   userId: string;
@@ -27,10 +26,14 @@ export interface TowerSessionOptions {
   // Only for tests: pins the tower's topple rolls to a known sequence
   // instead of a fresh SeededRng.randomSeed() every match.
   seed?: number;
+  botMoveDelayMs?: number;
+  emptyRoomGraceMs?: number;
 }
 
 const MAX_PLAYERS = 2;
 const DEFAULT_DISCONNECT_GRACE_MS = 30_000;
+const DEFAULT_BOT_MOVE_DELAY_MS = 700;
+const DEFAULT_EMPTY_ROOM_GRACE_MS = 1500;
 
 export class TowerSession {
   private engine: TowerEngine | null = null;
@@ -41,6 +44,12 @@ export class TowerSession {
   private onSessionEnded?: () => void;
   private disconnectGraceMs: number;
   private seed?: number;
+  private botUserId: string | null = null;
+  private bot: TowerBot | null = null;
+  private botMoveDelayMs: number;
+  private botTimer: ReturnType<typeof setTimeout> | null = null;
+  private emptyRoomGraceMs: number;
+  private emptyRoomTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private identity: TowerSessionIdentity,
@@ -52,6 +61,16 @@ export class TowerSession {
     this.disconnectGraceMs =
       options.disconnectGraceMs ?? DEFAULT_DISCONNECT_GRACE_MS;
     this.seed = options.seed;
+    this.botMoveDelayMs = options.botMoveDelayMs ?? DEFAULT_BOT_MOVE_DELAY_MS;
+    this.emptyRoomGraceMs =
+      options.emptyRoomGraceMs ?? DEFAULT_EMPTY_ROOM_GRACE_MS;
+  }
+
+  private clearEmptyRoomTimer(): void {
+    if (this.emptyRoomTimer) {
+      clearTimeout(this.emptyRoomTimer);
+      this.emptyRoomTimer = null;
+    }
   }
 
   get playerCount(): number {
@@ -63,6 +82,7 @@ export class TowerSession {
   }
 
   addPlayer(userId: string, connection: unknown): boolean {
+    this.clearEmptyRoomTimer();
     const existing = this.players.find((p) => p.userId === userId);
     if (existing) {
       existing.connections.add(connection);
@@ -81,8 +101,61 @@ export class TowerSession {
         this.players.map((p) => p.userId),
         this.seed ?? SeededRng.randomSeed(),
       );
+      this.maybeScheduleBotPull();
     }
     return true;
+  }
+
+  // Seats the bot as a genuine player — the engine requires exactly
+  // MAX_PLAYERS to start, and there's no "virtual side" here the way a
+  // masked board game has.
+  enableBot(): void {
+    if (this.botUserId) return;
+    this.botUserId = TOWER_BOT_USER_ID;
+    this.bot = new TowerBot();
+    this.addPlayer(this.botUserId, null);
+  }
+
+  private clearBotTimer(): void {
+    if (this.botTimer) {
+      clearTimeout(this.botTimer);
+      this.botTimer = null;
+    }
+  }
+
+  private maybeScheduleBotPull(): void {
+    if (!this.bot || !this.botUserId || !this.engine) return;
+    const state = this.engine.getState();
+    if (state.status !== 'playing') return;
+    if (state.currentPlayer !== this.botUserId) return;
+    if (this.botTimer) return;
+
+    this.botTimer = setTimeout(() => {
+      this.botTimer = null;
+      this.playBotPull();
+    }, this.botMoveDelayMs);
+  }
+
+  private playBotPull(): void {
+    if (!this.bot || !this.botUserId || !this.engine) return;
+    const state = this.engine.getState();
+    if (state.status !== 'playing' || state.currentPlayer !== this.botUserId) {
+      return;
+    }
+
+    const move = this.bot.choosePull(state);
+    if (!move) return;
+
+    const result = this.engine.pull(this.botUserId, move.level, move.position);
+    if (!result.success) return;
+
+    const updated = this.broadcastState();
+    if (updated.status === 'ended' && updated.winner && !this.resultRecorded) {
+      this.resultRecorded = true;
+      this.recordResult(updated.winner);
+      return;
+    }
+    this.maybeScheduleBotPull();
   }
 
   private releaseConnection(player: TowerPlayer, connection: unknown): boolean {
@@ -151,7 +224,28 @@ export class TowerSession {
   private removePlayer(userId: string) {
     this.players = this.players.filter((p) => p.userId !== userId);
     this.restartVotes.delete(userId);
-    if (this.players.length === 0) this.onSessionEnded?.();
+    // The bot's own seat never leaves via detach/leave (it has no real
+    // connection), so once every *real* player is gone the table is just
+    // as empty as if `players` were literally [].
+    const realPlayers = this.players.filter((p) => p.userId !== this.botUserId);
+    if (realPlayers.length === 0) {
+      this.clearBotTimer();
+      this.clearEmptyRoomTimer();
+      // Debounced by this grace window before actually disposing — React
+      // 19 StrictMode's dev-only double-mount briefly connects and
+      // disconnects a phantom client before the real one joins, and
+      // without this grace an empty-room disposal races ahead of that
+      // real join and drops it too (observed as "Connection lost" on
+      // first load).
+      this.emptyRoomTimer = setTimeout(() => {
+        this.emptyRoomTimer = null;
+        const stillReal = this.players.filter(
+          (p) => p.userId !== this.botUserId,
+        );
+        if (stillReal.length !== 0) return;
+        this.onSessionEnded?.();
+      }, this.emptyRoomGraceMs);
+    }
   }
 
   leave(userId: string, connection: unknown) {
@@ -162,18 +256,19 @@ export class TowerSession {
     this.detach(userId);
   }
 
-  handlePull(userId: string, level: number, position: number) {
-    if (!this.players.some((p) => p.userId === userId)) return;
-    if (!this.engine) return;
+  // Returns the outcome instead of broadcasting a rejection — a rejected
+  // pull is feedback for the requester only, so the Room delivers it via
+  // `client.send`, never a room-wide broadcast (§6.3, AP-1).
+  handlePull(userId: string, level: number, position: number): ActionResult {
+    if (!this.players.some((p) => p.userId === userId)) {
+      return { ok: false, error: 'Not seated at this match' };
+    }
+    if (!this.engine) return { ok: false, error: 'Match not started' };
 
     const result = this.engine.pull(userId, level, position);
 
     if (!result.success) {
-      this.broadcaster.broadcast(this.roomKey, {
-        type: 'pull_error',
-        payload: { error: result.error },
-      });
-      return;
+      return { ok: false, error: result.error ?? 'Invalid pull' };
     }
 
     const state = this.broadcastState();
@@ -181,14 +276,22 @@ export class TowerSession {
     if (state.status === 'ended' && state.winner && !this.resultRecorded) {
       this.resultRecorded = true;
       this.recordResult(state.winner);
+      return { ok: true };
     }
+
+    this.maybeScheduleBotPull();
+    return { ok: true };
   }
 
   private broadcastState(): TowerState {
     const state = this.engine!.getState();
+    // Payload shape must match 'game_ready' (`{ state }`), which is what
+    // the client's applyState() unwraps for both message types — sending
+    // the bare state here crashed the client on every pull with
+    // "Cannot read properties of undefined (reading 'lastPull')".
     this.broadcaster.broadcast(this.roomKey, {
       type: 'state_update',
-      payload: state,
+      payload: { state },
     });
     return state;
   }
@@ -199,7 +302,10 @@ export class TowerSession {
     if (!this.players.some((p) => p.userId === userId)) return;
 
     this.restartVotes.add(userId);
-    const required = this.players.length;
+    // The bot always "votes" — it can't click a restart button.
+    const required = this.players.filter(
+      (p) => p.userId !== this.botUserId,
+    ).length;
 
     if (this.restartVotes.size < required) {
       this.broadcaster.broadcast(this.roomKey, {
@@ -216,6 +322,7 @@ export class TowerSession {
       this.seed ?? SeededRng.randomSeed(),
     );
     this.broadcastState();
+    this.maybeScheduleBotPull();
   }
 
   getPublicState(): TowerState | null {
@@ -223,7 +330,10 @@ export class TowerSession {
   }
 
   private recordResult(winner: string) {
-    if (this.players.length < 2) return;
+    // Bot matches have only one real outcome to track and no opponent to
+    // rank against — matches the fleet-wide convention of skipping
+    // gamification recording in solo/bot mode.
+    if (this.players.length < 2 || this.botUserId) return;
     this.gamification.recordGameResult({
       sessionId: this.identity.instanceId,
       guildId: this.identity.guildId,
@@ -233,5 +343,13 @@ export class TowerSession {
         position: player.userId === winner ? 1 : 2,
       })),
     });
+  }
+
+  // MANDATORY per §6.2: clears disconnect grace so it can't outlive a
+  // disposed room.
+  dispose(): void {
+    this.clearBotTimer();
+    this.clearEmptyRoomTimer();
+    this.disconnectGrace.clear();
   }
 }

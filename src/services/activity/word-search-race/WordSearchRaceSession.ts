@@ -1,11 +1,8 @@
 import { GamificationService } from '../../gamification';
 import type { ActivityMode } from '../gameId';
+import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
 import type { Cell, FoundWord } from './WordSearchRaceEngine';
 import { WordSearchRaceEngine } from './WordSearchRaceEngine';
-
-export interface ActivityBroadcaster {
-  broadcast(key: string, message: { type: string; payload?: unknown }): void;
-}
 
 interface WordSearchRacePlayer {
   userId: string;
@@ -24,6 +21,7 @@ export interface WordSearchRaceSessionIdentity {
 export interface WordSearchRaceSessionOptions {
   onSessionEnded?: () => void;
   timeLimitMs?: number;
+  emptyRoomGraceMs?: number;
 }
 
 // Unlike Pong, this game has no turn order or adversarial forfeit — players
@@ -31,6 +29,13 @@ export interface WordSearchRaceSessionOptions {
 // to hunt every word on a 12x12 board without dragging a stalled room on
 // forever."
 const DEFAULT_TIME_LIMIT_MS = 3 * 60_000;
+
+// A room reaching zero players is debounced by this grace window before
+// actually disposing — React 19 StrictMode's dev-only double-mount briefly
+// connects and disconnects a phantom client before the real one joins, and
+// without this grace an empty-room disposal races ahead of that real join
+// and drops it too (observed as "Connection lost" on first load).
+const DEFAULT_EMPTY_ROOM_GRACE_MS = 1500;
 
 export class WordSearchRaceSession {
   private engine: WordSearchRaceEngine;
@@ -41,6 +46,8 @@ export class WordSearchRaceSession {
   private ended = false;
   private resultRecorded = false;
   private onSessionEnded?: () => void;
+  private emptyRoomGraceMs: number;
+  private emptyRoomTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private identity: WordSearchRaceSessionIdentity,
@@ -51,6 +58,8 @@ export class WordSearchRaceSession {
     this.engine = new WordSearchRaceEngine();
     this.timeLimitMs = options.timeLimitMs ?? DEFAULT_TIME_LIMIT_MS;
     this.onSessionEnded = options.onSessionEnded;
+    this.emptyRoomGraceMs =
+      options.emptyRoomGraceMs ?? DEFAULT_EMPTY_ROOM_GRACE_MS;
     this.startedAt = Date.now();
     this.timer = setTimeout(() => this.endGame('timeout'), this.timeLimitMs);
   }
@@ -80,6 +89,7 @@ export class WordSearchRaceSession {
   }
 
   addPlayer(userId: string, connection: unknown): void {
+    this.clearEmptyRoomTimer();
     const existing = this.players.find((p) => p.userId === userId);
     if (existing) {
       existing.connections.add(connection);
@@ -95,7 +105,7 @@ export class WordSearchRaceSession {
     if (player.connections.size > 0) return;
 
     this.players = this.players.filter((p) => p.userId !== userId);
-    if (this.players.length === 0) this.dispose();
+    if (this.players.length === 0) this.clearTimerAndNotifyEnded();
   }
 
   submitSelection(
@@ -163,11 +173,34 @@ export class WordSearchRaceSession {
     });
   }
 
-  private dispose() {
+  private clearEmptyRoomTimer() {
+    if (this.emptyRoomTimer) {
+      clearTimeout(this.emptyRoomTimer);
+      this.emptyRoomTimer = null;
+    }
+  }
+
+  private clearTimerAndNotifyEnded() {
+    this.clearEmptyRoomTimer();
+    this.emptyRoomTimer = setTimeout(() => {
+      this.emptyRoomTimer = null;
+      if (this.players.length !== 0) return;
+      if (this.timer) {
+        clearTimeout(this.timer);
+        this.timer = null;
+      }
+      this.onSessionEnded?.();
+    }, this.emptyRoomGraceMs);
+  }
+
+  // MANDATORY per §6.2: clears the round timer so it can't fire into a
+  // disposed room. No `onSessionEnded` call here — the Room is already
+  // tearing itself down when this runs.
+  dispose(): void {
+    this.clearEmptyRoomTimer();
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
     }
-    this.onSessionEnded?.();
   }
 }

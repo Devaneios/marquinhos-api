@@ -1,5 +1,6 @@
 import { Room, type Client } from 'colyseus';
 import { roomKey } from '../services/activity/roomKey';
+import { ACTION_REJECTED } from '../services/activity/shared/ActionResult';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
 import { WordChainSession } from '../services/activity/word-chain/WordChainSession';
 import {
@@ -43,9 +44,6 @@ export class WordChainRoom extends Room {
       ) => {
         this.broadcast(message.type, message.payload);
       },
-      broadcastBinary: (_key: string, data: ArrayBuffer) => {
-        this.broadcastBytes('state', new Uint8Array(data), {});
-      },
     };
 
     this.session = new WordChainSession(
@@ -63,17 +61,26 @@ export class WordChainRoom extends Room {
       if (this.wordRateLimiter.isOverLimit(client)) return;
 
       const auth = client.auth as WsSessionPayload;
-      this.session.handleWordSubmission(auth.userId, payload?.word ?? '');
+      const result = this.session.handleWordSubmission(
+        auth.userId,
+        payload?.word ?? '',
+      );
+      if (!result.ok) {
+        client.send(ACTION_REJECTED, { error: result.error });
+      }
     });
 
     this.onMessage('leave', (client) => {
       const auth = client.auth as WsSessionPayload;
-      this.session.leave(auth.userId);
+      this.session.leave(auth.userId, client);
     });
   }
 
   override onJoin(client: Client, _options: unknown, auth: WsSessionPayload) {
     this.session.addPlayer(auth.userId, client);
+    if (auth.mode === 'single') {
+      this.session.enableBot();
+    }
     const state = this.session.state;
     client.send('init', {
       currentWord: state.currentWord,
@@ -89,5 +96,9 @@ export class WordChainRoom extends Room {
     this.wordRateLimiter.clear(client);
     const auth = client.auth as WsSessionPayload;
     this.session.pauseForDisconnect(auth.userId, client);
+  }
+
+  override onDispose() {
+    this.session.dispose();
   }
 }

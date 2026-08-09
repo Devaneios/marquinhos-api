@@ -131,6 +131,24 @@ describe('WordChainEngine', () => {
     expect(state.currentTurn).toBe('user-1');
   });
 
+  it('hands the turn to the next alive player when the current-turn player is removed', () => {
+    const engine = new WordChainEngine();
+    engine.addPlayer('user-1');
+    engine.addPlayer('user-2');
+    engine.addPlayer('user-3');
+
+    // user-1 is up; removing them (a turn timeout or a disconnect) must not
+    // leave currentTurn pointing at a player who can never submit again.
+    engine.removePlayer('user-1');
+
+    const state = engine.getState();
+    expect(state.gameOver).toBe(false);
+    expect(state.currentTurn).toBe('user-2');
+
+    const accepted = engine.submitWord('user-2', 'abelha');
+    expect(accepted.valid).toBe(true);
+  });
+
   it('is case-insensitive', () => {
     const engine = new WordChainEngine();
     engine.addPlayer('user-1');

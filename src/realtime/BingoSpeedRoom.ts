@@ -1,7 +1,7 @@
 import { Room, type Client } from 'colyseus';
 import { BingoSpeedSession } from '../services/activity/bingoSpeed/BingoSpeedSession';
-import type { ActivityBroadcaster } from '../services/activity/pong/PongSession';
 import { roomKey } from '../services/activity/roomKey';
+import type { ActivityBroadcaster } from '../services/activity/shared/ActivityBroadcaster';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
 import {
   verifyWsSessionToken,
@@ -41,9 +41,6 @@ export class BingoSpeedRoom extends Room {
       broadcast: (_key, message) => {
         this.broadcast(message.type, message.payload);
       },
-      broadcastBinary: (_key, data) => {
-        this.broadcastBytes('state', new Uint8Array(data), {});
-      },
     };
 
     this.session = new BingoSpeedSession(
@@ -64,6 +61,11 @@ export class BingoSpeedRoom extends Room {
       const result = this.session.claimBingo(auth.userId);
       client.send('bingo_claim_result', result);
     });
+
+    this.onMessage('leave', (client) => {
+      const auth = client.auth as WsSessionPayload;
+      this.session.leave(auth.userId, client);
+    });
   }
 
   override onJoin(client: Client, _options: unknown, auth: WsSessionPayload) {
@@ -83,6 +85,10 @@ export class BingoSpeedRoom extends Room {
   override onLeave(client: Client) {
     this.claimRateLimiter.clear(client);
     const auth = client.auth as WsSessionPayload;
-    this.session.removePlayer(auth.userId);
+    this.session.pauseForDisconnect(auth.userId, client);
+  }
+
+  override onDispose() {
+    this.session.dispose();
   }
 }

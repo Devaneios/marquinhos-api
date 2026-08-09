@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 import type { ActivityMode } from '../src/services/activity/gameId';
-import type { GamificationService } from '../src/services/gamification';
 import {
   WordSearchRaceSession,
   type WordSearchRaceSessionIdentity,
 } from '../src/services/activity/word-search-race/WordSearchRaceSession';
+import type { GamificationService } from '../src/services/gamification';
 
 function identity(mode: ActivityMode = 'multi'): WordSearchRaceSessionIdentity {
   return {
@@ -16,7 +16,10 @@ function identity(mode: ActivityMode = 'multi'): WordSearchRaceSessionIdentity {
 }
 
 function fakeBroadcaster() {
-  const messages: { key: string; message: { type: string; payload?: unknown } }[] = [];
+  const messages: {
+    key: string;
+    message: { type: string; payload?: unknown };
+  }[] = [];
   return {
     broadcast: (key: string, message: { type: string; payload?: unknown }) => {
       messages.push({ key, message });
@@ -44,7 +47,11 @@ describe('WordSearchRaceSession', () => {
     const broadcaster = fakeBroadcaster();
     const session = new WordSearchRaceSession(identity(), broadcaster);
 
-    const result = session.submitSelection('ghost', { row: 0, col: 0 }, { row: 0, col: 1 });
+    const result = session.submitSelection(
+      'ghost',
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+    );
 
     expect(result).toEqual({ error: 'Player not in room' });
   });
@@ -61,9 +68,14 @@ describe('WordSearchRaceSession', () => {
     const result = session.submitSelection('user-a', start, end);
 
     expect('error' in (result as object)).toBe(false);
-    const found = broadcaster.messages.find((m) => m.message.type === 'word_found');
+    const found = broadcaster.messages.find(
+      (m) => m.message.type === 'word_found',
+    );
     expect(found).toBeTruthy();
-    const payload = found!.message.payload as { userId: string; scores: Record<string, number> };
+    const payload = found!.message.payload as {
+      userId: string;
+      scores: Record<string, number>;
+    };
     expect(payload.userId).toBe('user-a');
     expect(payload.scores).toEqual({ 'user-a': 1 });
   });
@@ -80,9 +92,13 @@ describe('WordSearchRaceSession', () => {
       session.submitSelection('user-a', start, end);
     }
 
-    const gameOver = broadcaster.messages.find((m) => m.message.type === 'game_over');
+    const gameOver = broadcaster.messages.find(
+      (m) => m.message.type === 'game_over',
+    );
     expect(gameOver).toBeTruthy();
-    expect((gameOver!.message.payload as { reason: string }).reason).toBe('completed');
+    expect((gameOver!.message.payload as { reason: string }).reason).toBe(
+      'completed',
+    );
     expect(recorded.length).toBe(1);
   });
 
@@ -116,27 +132,42 @@ describe('WordSearchRaceSession', () => {
 
     await wait(50);
 
-    const gameOver = broadcaster.messages.find((m) => m.message.type === 'game_over');
+    const gameOver = broadcaster.messages.find(
+      (m) => m.message.type === 'game_over',
+    );
     expect(gameOver).toBeTruthy();
-    expect((gameOver!.message.payload as { reason: string }).reason).toBe('timeout');
+    expect((gameOver!.message.payload as { reason: string }).reason).toBe(
+      'timeout',
+    );
     expect(recorded.length).toBe(1);
   });
 
-  it('disposes the session once the last connection of the last player leaves', () => {
+  it('disposes the session once the last connection of the last player leaves', async () => {
     const broadcaster = fakeBroadcaster();
     let ended = false;
-    const session = new WordSearchRaceSession(identity(), broadcaster, undefined, {
-      onSessionEnded: () => {
-        ended = true;
+    const session = new WordSearchRaceSession(
+      identity(),
+      broadcaster,
+      undefined,
+      {
+        onSessionEnded: () => {
+          ended = true;
+        },
+        emptyRoomGraceMs: 0,
       },
-    });
+    );
     const conn = {};
     session.addPlayer('user-a', conn);
 
     session.removePlayer('user-a', conn);
-
-    expect(ended).toBe(true);
+    expect(ended).toBe(false);
     expect(session.playerCount).toBe(0);
+
+    // The empty-room grace timer defers `onSessionEnded` by a tick (see
+    // WordSearchRaceSession) to absorb React StrictMode's dev-only phantom
+    // mount/unmount — flush it here.
+    await wait(0);
+    expect(ended).toBe(true);
   });
 });
 

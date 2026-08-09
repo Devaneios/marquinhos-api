@@ -1,5 +1,6 @@
 import { GamificationService } from '../../gamification';
 import type { ActivityMode } from '../gameId';
+import type { BinaryActivityBroadcaster } from '../shared/ActivityBroadcaster';
 import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
 import { BOT_TUNING, PongBot, type BotDifficulty } from './PongBotAI';
 import {
@@ -10,10 +11,7 @@ import {
 } from './PongEngine';
 import { encodeStateSnapshot } from './pongProtocol';
 
-export interface ActivityBroadcaster {
-  broadcast(key: string, message: { type: string; payload?: unknown }): void;
-  broadcastBinary(key: string, data: ArrayBuffer): void;
-}
+export type ActivityBroadcaster = BinaryActivityBroadcaster;
 
 interface PongPlayer {
   userId: string;
@@ -362,5 +360,12 @@ export class PongSession {
         position: player.side === winner ? 1 : 2,
       })),
     });
+  }
+
+  // MANDATORY per §6.2: stops the loop and clears disconnect grace so
+  // neither outlives a disposed room.
+  dispose(): void {
+    this.stop();
+    this.disconnectGrace.clear();
   }
 }

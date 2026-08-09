@@ -1,5 +1,6 @@
 import { GamificationService } from '../../gamification';
 import type { ActivityMode } from '../gameId';
+import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
 import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
 import { ConnectFourBot } from './ConnectFourBot';
 import {
@@ -7,10 +8,6 @@ import {
   type ConnectFourState,
   type Disc,
 } from './ConnectFourEngine';
-
-export interface ActivityBroadcaster {
-  broadcast(key: string, message: { type: string; payload?: unknown }): void;
-}
 
 interface ConnectFourPlayer {
   userId: string;
@@ -280,5 +277,12 @@ export class ConnectFourSession {
         position: player.disc === winner ? 1 : 2,
       })),
     });
+  }
+
+  // MANDATORY per §6.2: clears the bot timer and disconnect grace so
+  // neither outlives a disposed room.
+  dispose(): void {
+    this.clearBotTimer();
+    this.disconnectGrace.clear();
   }
 }

@@ -97,7 +97,12 @@ export class RpsEngine {
     };
 
     this.history.push(result);
-    this.currentRound++;
+    // A tie replays the same round rather than consuming one of the
+    // bestOf slots — otherwise the round counter can exceed bestOf
+    // (e.g. "4/3") on a draw-heavy match.
+    if (winner !== null) {
+      this.currentRound++;
+    }
     this.currentPicks = {};
 
     return result;
@@ -116,7 +121,7 @@ export class RpsEngine {
     };
   }
 
-  getMatchWinner(): string | null {
+  getMatchWinner(): 'player1' | 'player2' | null {
     const winsNeeded = Math.floor(this.config.bestOf / 2) + 1;
     if (this.scores.player1 >= winsNeeded) return 'player1';
     if (this.scores.player2 >= winsNeeded) return 'player2';

@@ -1,7 +1,7 @@
 import { Room, type Client } from 'colyseus';
 import { roomKey } from '../services/activity/roomKey';
+import type { ActivityBroadcaster } from '../services/activity/shared/ActivityBroadcaster';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
-import type { ActivityBroadcaster } from '../services/activity/snake-game/SnakeSession';
 import { SnakeSession } from '../services/activity/snake-game/SnakeSession';
 import {
   verifyWsSessionToken,
@@ -41,9 +41,6 @@ export class SnakeRoom extends Room {
       broadcast: (_key, message) => {
         this.broadcast(message.type, message.payload);
       },
-      broadcastBinary: (_key, data) => {
-        this.broadcastBytes('state', new Uint8Array(data), {});
-      },
     };
 
     this.session = new SnakeSession(
@@ -80,6 +77,9 @@ export class SnakeRoom extends Room {
 
   override onJoin(client: Client, _options: unknown, auth: WsSessionPayload) {
     const playerId = this.session.addPlayer(auth.userId, client);
+    if (auth.mode === 'single') {
+      this.session.enableBot();
+    }
     client.send('init', {
       playerId,
       config: this.session.getPublicConfig(),
@@ -90,5 +90,9 @@ export class SnakeRoom extends Room {
     this.inputRateLimiter.clear(client);
     const auth = client.auth as WsSessionPayload;
     this.session.pauseForDisconnect(auth.userId, client);
+  }
+
+  override onDispose() {
+    this.session.dispose();
   }
 }

@@ -13,14 +13,9 @@ const MOCK_IDENTITY: SnakeSessionIdentity = {
 
 class MockBroadcaster {
   messages: Array<{ key: string; message: any }> = [];
-  binaryMessages: Array<{ key: string; data: ArrayBuffer }> = [];
 
   broadcast(key: string, message: any) {
     this.messages.push({ key, message });
-  }
-
-  broadcastBinary(key: string, data: ArrayBuffer) {
-    this.binaryMessages.push({ key, data });
   }
 }
 
@@ -93,9 +88,34 @@ describe('SnakeSession', () => {
     session.addPlayer('user2', {});
 
     setTimeout(() => {
-      expect(broadcaster.binaryMessages.length).toBeGreaterThan(0);
+      expect(broadcaster.messages.some((m) => m.message.type === 'state')).toBe(
+        true,
+      );
       session.stop();
       done();
     }, 200);
+  });
+
+  it('gives a solo single-mode player a bot opponent instead of an empty board', (done) => {
+    const broadcaster = new MockBroadcaster();
+    const singleIdentity: SnakeSessionIdentity = {
+      ...MOCK_IDENTITY,
+      mode: 'single',
+    };
+    const session = new SnakeSession(singleIdentity, broadcaster as any);
+
+    session.addPlayer('user1', {});
+    session.enableBot();
+
+    setTimeout(() => {
+      const stateMsg = broadcaster.messages.find(
+        (m) => m.message.type === 'state',
+      );
+      expect(stateMsg).toBeDefined();
+      const snakes = stateMsg!.message.payload.state.snakes;
+      expect(Object.keys(snakes)).toContain('bot');
+      session.stop();
+      done();
+    }, 400);
   });
 });

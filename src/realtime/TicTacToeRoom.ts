@@ -1,5 +1,6 @@
 import { Room, type Client } from 'colyseus';
 import { roomKey } from '../services/activity/roomKey';
+import { ACTION_REJECTED } from '../services/activity/shared/ActionResult';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
 import { TicTacToeSession } from '../services/activity/ticTacToe/TicTacToeSession';
 import {
@@ -62,11 +63,14 @@ export class TicTacToeRoom extends Room {
       (client, payload: { row?: number; col?: number }) => {
         if (this.moveRateLimiter.isOverLimit(client)) return;
         const auth = client.auth as WsSessionPayload;
-        this.session.handleMove(
+        const result = this.session.handleMove(
           auth.userId,
           payload?.row ?? -1,
           payload?.col ?? -1,
         );
+        if (!result.ok) {
+          client.send(ACTION_REJECTED, { error: result.error });
+        }
       },
     );
 
@@ -87,6 +91,11 @@ export class TicTacToeRoom extends Room {
       player,
       state: this.session.getPublicState(),
     });
+    if (!player) return;
+
+    if (auth.mode === 'single') {
+      this.session.enableBot(player);
+    }
 
     if (this.session.playerCount === 2) {
       this.broadcast('game_ready', {
@@ -99,5 +108,9 @@ export class TicTacToeRoom extends Room {
     this.moveRateLimiter.clear(client);
     const auth = client.auth as WsSessionPayload;
     this.session.pauseForDisconnect(auth.userId, client);
+  }
+
+  override onDispose() {
+    this.session.dispose();
   }
 }

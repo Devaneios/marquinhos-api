@@ -1,8 +1,8 @@
 import { Room, type Client } from 'colyseus';
 import type { Cell } from '../services/activity/boggle/BoggleEngine';
-import type { ActivityBroadcaster } from '../services/activity/boggle/BoggleSession';
 import { BoggleSession } from '../services/activity/boggle/BoggleSession';
 import { roomKey } from '../services/activity/roomKey';
+import type { ActivityBroadcaster } from '../services/activity/shared/ActivityBroadcaster';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
 import {
   verifyWsSessionToken,

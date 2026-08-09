@@ -69,7 +69,7 @@ export class RpsRoom extends Room {
 
     this.onMessage('leave', (client) => {
       const auth = client.auth as WsSessionPayload;
-      this.session.pauseForDisconnect(auth.userId, client);
+      this.session.leave(auth.userId, client);
     });
   }
 
@@ -86,8 +86,13 @@ export class RpsRoom extends Room {
       config: this.session.getPublicConfig(),
     });
 
-    if (this.session.playerCount === 2) {
+    if (auth.mode === 'single') {
+      this.session.enableBot(playerId);
+    }
+
+    if (this.session.playerCount === 2 || auth.mode === 'single') {
       this.broadcast('game_start', {});
+      this.broadcast('round_state', this.session.getRoundState());
     }
   }
 
@@ -95,5 +100,9 @@ export class RpsRoom extends Room {
     this.pickRateLimiter.clear(client);
     const auth = client.auth as WsSessionPayload;
     this.session.pauseForDisconnect(auth.userId, client);
+  }
+
+  override onDispose() {
+    this.session.dispose();
   }
 }

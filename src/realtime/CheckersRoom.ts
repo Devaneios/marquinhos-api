@@ -3,9 +3,10 @@ import type {
   Color,
   Position,
 } from '../services/activity/checkers/CheckersEngine';
-import type { ActivityBroadcaster } from '../services/activity/checkers/CheckersSession';
 import { CheckersSession } from '../services/activity/checkers/CheckersSession';
 import { roomKey } from '../services/activity/roomKey';
+import { ACTION_REJECTED } from '../services/activity/shared/ActionResult';
+import type { ActivityBroadcaster } from '../services/activity/shared/ActivityBroadcaster';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
 import {
   verifyWsSessionToken,
@@ -77,7 +78,14 @@ export class CheckersRoom extends Room {
         if (!isPosition(payload?.from) || !isPosition(payload?.to)) return;
 
         const auth = client.auth as WsSessionPayload;
-        this.session.requestMove(auth.userId, payload.from, payload.to);
+        const result = this.session.requestMove(
+          auth.userId,
+          payload.from,
+          payload.to,
+        );
+        if (!result.ok) {
+          client.send(ACTION_REJECTED, { error: result.error });
+        }
       },
     );
 

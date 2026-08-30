@@ -241,4 +241,18 @@ describe('activityWsSessionSchema', () => {
       }),
     ).rejects.toThrow();
   });
+
+  it('parses roomId through when present', () => {
+    const result = activityWsSessionSchema.parse({
+      body: {
+        accessToken: 'token',
+        instanceId: 'inst-1',
+        guildId: 'guild-1',
+        mode: 'multi',
+        game: 'tic-tac-toe',
+        roomId: 'ABC123',
+      },
+    });
+    expect(result.body.roomId).toBe('ABC123');
+  });
 });

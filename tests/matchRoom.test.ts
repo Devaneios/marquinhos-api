@@ -152,4 +152,85 @@ describe('MatchRoom', () => {
       }),
     ).rejects.toBeTruthy();
   });
+
+  it('does not leak game_ready broadcasts across two concurrent Tic-Tac-Toe rooms', async () => {
+    // ADAPTER_REGISTRY holds one shared adapter object per game across every
+    // concurrent room of that game. Regression test for a bug where the
+    // Tic-Tac-Toe adapter captured its AdapterContext in a module-level
+    // variable inside setup() — the second room's setup() call clobbered the
+    // first room's captured context, so a game_ready broadcast triggered by
+    // filling room A's second seat would fire through room B's ctx.broadcast
+    // into room B's connections instead. Room A is created first but filled
+    // second, which is the exact ordering that would trigger the bug: room
+    // B's setup() (called when B is created, after A) overwrites the
+    // module-level capture before A's second player ever joins.
+    function ticTacToeSession(userId: string, roomId: string) {
+      const key = roomKey({
+        instanceId: 'inst-1',
+        game: 'tic-tac-toe',
+        mode: 'multi',
+        userId,
+        roomId,
+      });
+      const token = mintWsSessionToken({
+        userId,
+        instanceId: 'inst-1',
+        guildId: 'guild-1',
+        mode: 'multi',
+        game: 'tic-tac-toe',
+        roomId,
+      });
+      return { key, token };
+    }
+
+    const a1 = ticTacToeSession('a-user-1', 'ROOMA');
+    const roomA = await colyseus.createRoom('match', {
+      roomKey: a1.key,
+      game: 'tic-tac-toe',
+    });
+    const clientA1 = await colyseus.connectTo(roomA, {
+      token: a1.token,
+      roomKey: a1.key,
+    });
+    await clientA1.waitForNextMessage(); // init
+
+    const b1 = ticTacToeSession('b-user-1', 'ROOMB');
+    const roomB = await colyseus.createRoom('match', {
+      roomKey: b1.key,
+      game: 'tic-tac-toe',
+    });
+    const clientB1 = await colyseus.connectTo(roomB, {
+      token: b1.token,
+      roomKey: b1.key,
+    });
+    await clientB1.waitForNextMessage(); // init
+
+    const b2 = ticTacToeSession('b-user-2', 'ROOMB');
+    const clientB2 = await colyseus.connectTo(roomB, {
+      token: b2.token,
+      roomKey: b2.key,
+    });
+    await clientB2.waitForNextMessage(); // init
+
+    let aGotGameReady = false;
+    let bGotGameReady = false;
+    clientA1.onMessage('game_ready', () => {
+      aGotGameReady = true;
+    });
+    clientB1.onMessage('game_ready', () => {
+      bGotGameReady = true;
+    });
+
+    const a2 = ticTacToeSession('a-user-2', 'ROOMA');
+    const clientA2 = await colyseus.connectTo(roomA, {
+      token: a2.token,
+      roomKey: a2.key,
+    });
+    await clientA2.waitForNextMessage(); // init
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(aGotGameReady).toBe(true);
+    expect(bGotGameReady).toBe(false);
+  });
 });

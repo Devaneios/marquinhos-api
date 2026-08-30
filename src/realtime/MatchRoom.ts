@@ -7,7 +7,11 @@ import {
   type WsSessionPayload,
 } from '../services/activity/wsSessionToken';
 import { ADAPTER_REGISTRY } from './adapters/registry';
-import type { GameRoomAdapter, SeatRole } from './GameRoomAdapter';
+import type {
+  AdapterContext,
+  GameRoomAdapter,
+  SeatRole,
+} from './GameRoomAdapter';
 
 interface Member {
   userId: string;
@@ -22,6 +26,14 @@ interface Member {
 export class MatchRoom extends Room {
   private adapter!: GameRoomAdapter<unknown>;
   private session!: unknown;
+  // The per-room AdapterContext, re-captured here (not on the adapter
+  // object) because ADAPTER_REGISTRY holds one shared adapter instance
+  // across every concurrent room of that game — a module-level capture
+  // inside the adapter itself would get clobbered by the next room's
+  // setup() call. Passed to onJoin so adapters that need ctx.broadcast
+  // outside setup() (e.g. Tic-Tac-Toe's game_ready) always see their own
+  // room's context, not whichever room's setup() ran most recently.
+  private ctx!: AdapterContext;
   private members: Member[] = [];
   private hostUserId: string | null = null;
   private mode: ActivityMode = 'multi';
@@ -106,6 +118,7 @@ export class MatchRoom extends Room {
     for (const unsubscribe of this.messageUnsubscribers) unsubscribe();
     this.messageUnsubscribers = [];
 
+    this.ctx = ctx;
     const { session, messageHandlers } = this.adapter.setup(ctx);
     this.session = session;
     this.rateLimiters.clear();
@@ -141,7 +154,7 @@ export class MatchRoom extends Room {
       role = this.assignSeat();
       this.members.push({ userId: auth.userId, role, connections: 1 });
     }
-    this.adapter.onJoin(this.session, auth, client, role);
+    this.adapter.onJoin(this.session, auth, client, role, this.ctx);
   }
 
   override onLeave(client: Client) {

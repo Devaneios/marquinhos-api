@@ -5,18 +5,12 @@ import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 const MOVE_RATE_LIMIT_WINDOW_MS = 1000;
 const MOVE_RATE_LIMIT_MAX = 10;
 
-// `onJoin` doesn't receive `ctx`, but it needs `ctx.broadcast` to reproduce
-// TicTacToeRoom's `game_ready` broadcast — captured here the same way later
-// adapter tasks (RPS, TowerUnstable) are planned to.
-let capturedCtx: AdapterContext;
-
 export const ticTacToeAdapter: GameRoomAdapter<TicTacToeSession> = {
   maxPlayers: 2,
   supportsBot: true,
   supportsQueue: true,
 
   setup(ctx: AdapterContext) {
-    capturedCtx = ctx;
     const session = new TicTacToeSession(
       {
         sessionKey: ctx.roomKey,
@@ -66,7 +60,7 @@ export const ticTacToeAdapter: GameRoomAdapter<TicTacToeSession> = {
     };
   },
 
-  onJoin(session, auth, client, seat) {
+  onJoin(session, auth, client, seat, ctx) {
     // Matches TicTacToeRoom.onJoin's original behavior exactly: it never
     // kicked an overflow joiner, it just sent `init` with a null `player`
     // and left the connection open watching broadcasts.
@@ -81,7 +75,7 @@ export const ticTacToeAdapter: GameRoomAdapter<TicTacToeSession> = {
     if (auth.mode === 'single') session.enableBot(player);
 
     if (session.playerCount === 2) {
-      capturedCtx.broadcast('game_ready', {
+      ctx.broadcast('game_ready', {
         state: session.getPublicState(),
       });
     }

@@ -46,6 +46,7 @@ export interface GameRoomAdapter<TSession> {
     auth: WsSessionPayload,
     client: Client,
     seat: SeatRole,
+    ctx: AdapterContext,
   ): void;
   onLeave(session: TSession, auth: WsSessionPayload, client: Client): void;
   onDispose(session: TSession): void;

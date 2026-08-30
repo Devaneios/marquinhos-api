@@ -1,8 +1,14 @@
+import { ACTION_REJECTED } from '../../services/activity/shared/ActionResult';
 import { TicTacToeSession } from '../../services/activity/ticTacToe/TicTacToeSession';
 import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 
 const MOVE_RATE_LIMIT_WINDOW_MS = 1000;
 const MOVE_RATE_LIMIT_MAX = 10;
+
+// `onJoin` doesn't receive `ctx`, but it needs `ctx.broadcast` to reproduce
+// TicTacToeRoom's `game_ready` broadcast — captured here the same way later
+// adapter tasks (RPS, TowerUnstable) are planned to.
+let capturedCtx: AdapterContext;
 
 export const ticTacToeAdapter: GameRoomAdapter<TicTacToeSession> = {
   maxPlayers: 2,
@@ -10,6 +16,7 @@ export const ticTacToeAdapter: GameRoomAdapter<TicTacToeSession> = {
   supportsQueue: true,
 
   setup(ctx: AdapterContext) {
+    capturedCtx = ctx;
     const session = new TicTacToeSession(
       {
         sessionKey: ctx.roomKey,
@@ -42,22 +49,42 @@ export const ticTacToeAdapter: GameRoomAdapter<TicTacToeSession> = {
               col ?? -1,
             );
             if (!result.ok)
-              client.send('action_rejected', { error: result.error });
+              client.send(ACTION_REJECTED, { error: result.error });
           },
         },
         restart: {
           handle: (auth) => session.requestRestart(auth.userId),
+        },
+        leave: {
+          // A deliberate quit uses the immediate-detach path (`leave`), not
+          // the disconnect-with-grace path (`pauseForDisconnect`) that
+          // `onLeave` uses for a network drop — matches TicTacToeRoom's
+          // original distinction between the two.
+          handle: (auth, client) => session.leave(auth.userId, client),
         },
       },
     };
   },
 
   onJoin(session, auth, client, seat) {
-    if (seat !== 'player') return;
+    // Matches TicTacToeRoom.onJoin's original behavior exactly: it never
+    // kicked an overflow joiner, it just sent `init` with a null `player`
+    // and left the connection open watching broadcasts.
+    if (seat !== 'player') {
+      client.send('init', { player: null, state: session.getPublicState() });
+      return;
+    }
     const player = session.addPlayer(auth.userId, client);
     client.send('init', { player, state: session.getPublicState() });
     if (!player) return;
+
     if (auth.mode === 'single') session.enableBot(player);
+
+    if (session.playerCount === 2) {
+      capturedCtx.broadcast('game_ready', {
+        state: session.getPublicState(),
+      });
+    }
   },
 
   onLeave(session, auth, client) {

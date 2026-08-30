@@ -50,7 +50,13 @@ export const hangmanAdapter: GameRoomAdapter<HangmanSession> = {
   },
 
   onJoin(session, auth, client, seat) {
-    if (seat !== 'player') return;
+    // Matches HangmanRoom.onJoin's original behavior exactly: Hangman never
+    // had a spectator concept, so an overflow joiner is kicked outright,
+    // same as `addPlayer` returning false.
+    if (seat !== 'player') {
+      client.leave(1008, 'Room is full');
+      return;
+    }
     const added = session.addPlayer(auth.userId, client);
     if (!added) {
       client.leave(1008, 'Room is full');

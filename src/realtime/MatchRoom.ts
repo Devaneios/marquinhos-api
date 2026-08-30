@@ -1,5 +1,5 @@
 import { Room, type Client } from 'colyseus';
-import type { GameId } from '../services/activity/gameId';
+import type { ActivityMode, GameId } from '../services/activity/gameId';
 import { roomKey } from '../services/activity/roomKey';
 import { RateLimiter } from '../services/activity/shared/RateLimiter';
 import {
@@ -12,6 +12,11 @@ import type { GameRoomAdapter, SeatRole } from './GameRoomAdapter';
 interface Member {
   userId: string;
   role: SeatRole;
+  // Counts concurrent connections (e.g. two tabs) under one userId so a
+  // reconnect/second-tab join doesn't inflate `assignSeat()`'s player count
+  // or trigger a spurious host handoff when only one of several connections
+  // for the same user drops.
+  connections: number;
 }
 
 export class MatchRoom extends Room {
@@ -19,8 +24,15 @@ export class MatchRoom extends Room {
   private session!: unknown;
   private members: Member[] = [];
   private hostUserId: string | null = null;
-  private mode: 'single' | 'multi' | 'local' = 'multi';
+  private mode: ActivityMode = 'multi';
   private rateLimiters = new Map<string, RateLimiter>();
+  // Unbind functions returned by `onMessage`, so `loadSession()` can tear
+  // down the previous adapter's handlers before registering new ones —
+  // `onMessage` appends a listener rather than replacing one for the same
+  // type, so without this a second `loadSession()` call (Task 4's
+  // `switch_game`) would leave stale handlers firing against a disposed
+  // session.
+  private messageUnsubscribers: Array<() => void> = [];
   // Stored on the instance (not read back from `this.metadata`) so it's
   // available synchronously the moment onCreate runs, and again later from
   // `loadSession()` when Task 4's `switch_game` calls it a second time
@@ -52,11 +64,14 @@ export class MatchRoom extends Room {
       : null;
     this.mode = initialSession?.mode ?? 'multi';
 
-    // The real client join (`client.joinOrCreate('match', { token, roomKey })`)
-    // never needs to pass `game` — it's already encoded in the signed token.
-    // `options.game` exists purely so tests can create a room without first
-    // minting a token (see this task's own test above).
-    const game = options.game ?? initialSession?.game;
+    // The signed token's `game` always wins when present — `options.game` is
+    // unsigned and, since `onAuth` only cross-checks `roomKey`, a caller
+    // could otherwise pass a `game` that disagrees with the token used to
+    // derive that roomKey and load the wrong adapter under it. `options.game`
+    // exists purely so tests can create a room without first minting a token
+    // (see this task's own test above); the real client join
+    // (`client.joinOrCreate('match', { token, roomKey })`) never needs it.
+    const game = initialSession?.game ?? options.game;
     if (!game) throw new Error('Cannot determine which game this room is for');
     const adapter = ADAPTER_REGISTRY[game];
     if (!adapter) throw new Error(`No adapter registered for game "${game}"`);
@@ -88,6 +103,9 @@ export class MatchRoom extends Room {
       onSessionEnded: () => this.disconnect(),
     };
 
+    for (const unsubscribe of this.messageUnsubscribers) unsubscribe();
+    this.messageUnsubscribers = [];
+
     const { session, messageHandlers } = this.adapter.setup(ctx);
     this.session = session;
     this.rateLimiters.clear();
@@ -96,11 +114,12 @@ export class MatchRoom extends Room {
       messageHandlers,
     )) {
       if (rateLimit) this.rateLimiters.set(type, new RateLimiter(rateLimit));
-      this.onMessage(type, (client, payload) => {
+      const unsubscribe = this.onMessage(type, (client, payload) => {
         const limiter = this.rateLimiters.get(type);
         if (limiter?.isOverLimit(client)) return;
         handle(client.auth as WsSessionPayload, client, payload);
       });
+      this.messageUnsubscribers.push(unsubscribe);
     }
   }
 
@@ -113,14 +132,28 @@ export class MatchRoom extends Room {
   override onJoin(client: Client, _options: unknown, auth: WsSessionPayload) {
     if (this.hostUserId === null) this.hostUserId = auth.userId;
 
-    const role = this.assignSeat();
-    this.members.push({ userId: auth.userId, role });
+    const existing = this.members.find((m) => m.userId === auth.userId);
+    let role: SeatRole;
+    if (existing) {
+      existing.connections += 1;
+      role = existing.role;
+    } else {
+      role = this.assignSeat();
+      this.members.push({ userId: auth.userId, role, connections: 1 });
+    }
     this.adapter.onJoin(this.session, auth, client, role);
   }
 
   override onLeave(client: Client) {
     const auth = client.auth as WsSessionPayload;
+
+    for (const limiter of this.rateLimiters.values()) limiter.clear(client);
     this.adapter.onLeave(this.session, auth, client);
+
+    const member = this.members.find((m) => m.userId === auth.userId);
+    if (!member) return;
+    member.connections -= 1;
+    if (member.connections > 0) return;
 
     const wasHost = auth.userId === this.hostUserId;
     this.members = this.members.filter((m) => m.userId !== auth.userId);

@@ -63,4 +63,93 @@ describe('MatchRoom', () => {
       colyseus.connectTo(room, { token: 'garbage', roomKey: key }),
     ).rejects.toBeTruthy();
   });
+
+  it('routes a guess message through the Hangman adapter and returns a response', async () => {
+    const key = roomKey({
+      instanceId: 'inst-1',
+      game: 'hangman',
+      mode: 'multi',
+      userId: 'user-a',
+      roomId: 'ROOM02',
+    });
+    const room = await colyseus.createRoom('match', {
+      roomKey: key,
+      game: 'hangman',
+    });
+    const token = mintWsSessionToken({
+      userId: 'user-a',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'multi',
+      game: 'hangman',
+      roomId: 'ROOM02',
+    });
+    const client = await colyseus.connectTo(room, { token, roomKey: key });
+    await client.waitForNextMessage(); // init
+
+    // HangmanSession.guessLetter() first broadcasts `game_state` to the
+    // whole room, then the adapter sends `guess_success` directly to the
+    // guesser — so listen for the specific type rather than "next message".
+    const success = new Promise<void>((resolve) => {
+      client.onMessage('guess_success', () => resolve());
+    });
+    client.send('guess', { letter: 'a' });
+
+    // 'a' is always a fresh, valid letter for a brand-new session, so the
+    // adapter's guessLetter() call is guaranteed to succeed regardless of
+    // which word getHangmanWord() picked.
+    await success;
+  });
+
+  it('rate-limits rapid guess messages, dropping the one that crosses the window limit', async () => {
+    const key = roomKey({
+      instanceId: 'inst-1',
+      game: 'hangman',
+      mode: 'multi',
+      userId: 'user-a',
+      roomId: 'ROOM03',
+    });
+    const room = await colyseus.createRoom('match', {
+      roomKey: key,
+      game: 'hangman',
+    });
+    const token = mintWsSessionToken({
+      userId: 'user-a',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'multi',
+      game: 'hangman',
+      roomId: 'ROOM03',
+    });
+    const client = await colyseus.connectTo(room, { token, roomKey: key });
+    await client.waitForNextMessage(); // init
+
+    let replies = 0;
+    client.onMessage('guess_success', () => {
+      replies += 1;
+    });
+    client.onMessage('guess_error', () => {
+      replies += 1;
+    });
+
+    // The Hangman adapter's guess rate limit is 3 per 1000ms; each letter is
+    // distinct and unguessed so every processed guess would otherwise
+    // succeed, isolating the rate limiter as the only thing that can drop
+    // the 4th one.
+    for (const letter of ['a', 'e', 'i', 'o']) {
+      client.send('guess', { letter });
+    }
+    await client.waitForNextMessage(200);
+
+    expect(replies).toBe(3);
+  });
+
+  it('throws when creating a room for a game with no registered adapter', async () => {
+    await expect(
+      colyseus.createRoom('match', {
+        roomKey: 'inst-1:ROOM04:not-a-real-game:multi',
+        game: 'not-a-real-game',
+      }),
+    ).rejects.toBeTruthy();
+  });
 });

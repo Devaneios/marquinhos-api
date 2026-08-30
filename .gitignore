@@ -139,4 +139,4 @@ ehthumbs_vista.db
 # cert files
 *.pem
 *.crt
-*.key
+*.key.worktrees/

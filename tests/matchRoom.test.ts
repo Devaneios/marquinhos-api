@@ -7,10 +7,50 @@ const { MatchRoom } = await import('../src/realtime/MatchRoom');
 const { mintWsSessionToken } =
   await import('../src/services/activity/wsSessionToken');
 const { roomKey } = await import('../src/services/activity/roomKey');
+const { ACTION_REJECTED } =
+  await import('../src/services/activity/shared/ActionResult');
 
 type ColyseusTestServer = import('@colyseus/testing').ColyseusTestServer;
 
 let colyseus: ColyseusTestServer;
+
+function ticTacToeCreds(userId: string, roomId: string) {
+  const key = roomKey({
+    instanceId: 'inst-1',
+    game: 'tic-tac-toe',
+    mode: 'multi',
+    userId,
+    roomId,
+  });
+  const token = mintWsSessionToken({
+    userId,
+    instanceId: 'inst-1',
+    guildId: 'guild-1',
+    mode: 'multi',
+    game: 'tic-tac-toe',
+    roomId,
+  });
+  return { key, token };
+}
+
+// Plays out the exact move sequence used throughout this file: X (user-a)
+// completes the top row on move 5, with O (user-b) losing.
+async function playXWinsTopRow(
+  room: Awaited<ReturnType<ColyseusTestServer['createRoom']>>,
+  clientA: Awaited<ReturnType<ColyseusTestServer['connectTo']>>,
+  clientB: Awaited<ReturnType<ColyseusTestServer['connectTo']>>,
+) {
+  clientA.send('move', { row: 0, col: 0 });
+  await room.waitForNextPatch();
+  clientB.send('move', { row: 1, col: 0 });
+  await room.waitForNextPatch();
+  clientA.send('move', { row: 0, col: 1 });
+  await room.waitForNextPatch();
+  clientB.send('move', { row: 1, col: 1 });
+  await room.waitForNextPatch();
+  clientA.send('move', { row: 0, col: 2 }); // X completes the top row
+  await room.waitForNextPatch();
+}
 
 beforeAll(async () => {
   const gameServer = new Server({ transport: new WebSocketTransport() });
@@ -298,5 +338,327 @@ describe('MatchRoom', () => {
     clientA.leave();
     clientB.leave();
     clientC.leave();
+  });
+
+  it('does not cascade a rotation onto the next broadcast once a match has already rotated', async () => {
+    // Regression test for the bug where `maybeRotateAfterMatchEnd()` had no
+    // "already rotated" guard: the engine's winner stays set until both
+    // remaining players vote restart, so the very next broadcast (here, a
+    // partial restart vote) would recompute "loser" as the just-promoted
+    // challenger and rotate them straight back out.
+    const key = roomKey({
+      instanceId: 'inst-1',
+      game: 'tic-tac-toe',
+      mode: 'multi',
+      userId: 'user-a',
+      roomId: 'ROOM20',
+    });
+    const room = await colyseus.createRoom('match', {
+      roomKey: key,
+      game: 'tic-tac-toe',
+      queueEnabled: true,
+    });
+
+    const clientA = await colyseus.connectTo(room, {
+      token: ticTacToeCreds('user-a', 'ROOM20').token,
+      roomKey: key,
+    });
+    const clientB = await colyseus.connectTo(room, {
+      token: ticTacToeCreds('user-b', 'ROOM20').token,
+      roomKey: key,
+    });
+    const clientC = await colyseus.connectTo(room, {
+      token: ticTacToeCreds('user-c', 'ROOM20').token,
+      roomKey: key,
+    });
+    const clientD = await colyseus.connectTo(room, {
+      token: ticTacToeCreds('user-d', 'ROOM20').token,
+      roomKey: key,
+    });
+
+    await playXWinsTopRow(room, clientA, clientB);
+
+    const roomInternals = room as unknown as {
+      members: Array<{ userId: string; role: string }>;
+    };
+    // First rotation: user-b (loser) -> queued, user-c (queue head) -> player.
+    expect(roomInternals.members.find((m) => m.userId === 'user-b')?.role).toBe(
+      'queued',
+    );
+    expect(roomInternals.members.find((m) => m.userId === 'user-c')?.role).toBe(
+      'player',
+    );
+    expect(roomInternals.members.find((m) => m.userId === 'user-d')?.role).toBe(
+      'queued',
+    );
+
+    // A partial restart vote still broadcasts `restart_status` (only 1 of the
+    // 2 required votes is in), which re-invokes the ctx.broadcast rotation
+    // hook against the same still-set winner. Without the dedup guard this
+    // would incorrectly rotate user-c back out and promote user-d.
+    clientA.send('restart', {});
+    await room.waitForNextPatch();
+
+    expect(roomInternals.members.find((m) => m.userId === 'user-c')?.role).toBe(
+      'player',
+    );
+    expect(roomInternals.members.find((m) => m.userId === 'user-d')?.role).toBe(
+      'queued',
+    );
+    expect(roomInternals.members.find((m) => m.userId === 'user-b')?.role).toBe(
+      'queued',
+    );
+
+    clientA.leave();
+    clientB.leave();
+    clientC.leave();
+    clientD.leave();
+  });
+
+  describe('switch_game', () => {
+    it('rejects a non-host request', async () => {
+      const { key } = ticTacToeCreds('user-a', 'ROOM30');
+      const room = await colyseus.createRoom('match', {
+        roomKey: key,
+        game: 'tic-tac-toe',
+      });
+      const clientA = await colyseus.connectTo(room, {
+        token: ticTacToeCreds('user-a', 'ROOM30').token,
+        roomKey: key,
+      });
+      const clientB = await colyseus.connectTo(room, {
+        token: ticTacToeCreds('user-b', 'ROOM30').token,
+        roomKey: key,
+      });
+
+      const rejection = new Promise<{ error: string }>((resolve) => {
+        clientB.onMessage(ACTION_REJECTED, (payload: { error: string }) =>
+          resolve(payload),
+        );
+      });
+      clientB.send('switch_game', { game: 'hangman' });
+      const payload = await rejection;
+      expect(payload.error).toMatch(/host/i);
+
+      clientA.leave();
+      clientB.leave();
+    });
+
+    it('rejects a switch while a match is in progress', async () => {
+      const { key } = ticTacToeCreds('user-a', 'ROOM31');
+      const room = await colyseus.createRoom('match', {
+        roomKey: key,
+        game: 'tic-tac-toe',
+      });
+      const clientA = await colyseus.connectTo(room, {
+        token: ticTacToeCreds('user-a', 'ROOM31').token,
+        roomKey: key,
+      });
+      const clientB = await colyseus.connectTo(room, {
+        token: ticTacToeCreds('user-b', 'ROOM31').token,
+        roomKey: key,
+      });
+
+      // Both seats are full and there's no winner yet — a match is in progress.
+      const rejection = new Promise<{ error: string }>((resolve) => {
+        clientA.onMessage(ACTION_REJECTED, (payload: { error: string }) =>
+          resolve(payload),
+        );
+      });
+      clientA.send('switch_game', { game: 'hangman' });
+      const payload = await rejection;
+      expect(payload.error).toMatch(/mid-match/i);
+
+      clientA.leave();
+      clientB.leave();
+    });
+
+    it("rejects 'cards' as a switch target", async () => {
+      const { key, token } = ticTacToeCreds('user-a', 'ROOM32');
+      const room = await colyseus.createRoom('match', {
+        roomKey: key,
+        game: 'tic-tac-toe',
+      });
+      const clientA = await colyseus.connectTo(room, { token, roomKey: key });
+
+      const rejection = new Promise<{ error: string }>((resolve) => {
+        clientA.onMessage(ACTION_REJECTED, (payload: { error: string }) =>
+          resolve(payload),
+        );
+      });
+      clientA.send('switch_game', { game: 'cards' });
+      const payload = await rejection;
+      expect(payload.error).toMatch(/unknown or unswitchable/i);
+
+      clientA.leave();
+    });
+
+    it('rejects an unregistered game id', async () => {
+      const { key, token } = ticTacToeCreds('user-a', 'ROOM33');
+      const room = await colyseus.createRoom('match', {
+        roomKey: key,
+        game: 'tic-tac-toe',
+      });
+      const clientA = await colyseus.connectTo(room, { token, roomKey: key });
+
+      const rejection = new Promise<{ error: string }>((resolve) => {
+        clientA.onMessage(ACTION_REJECTED, (payload: { error: string }) =>
+          resolve(payload),
+        );
+      });
+      clientA.send('switch_game', { game: 'not-a-real-game' });
+      const payload = await rejection;
+      expect(payload.error).toMatch(/unknown or unswitchable/i);
+
+      clientA.leave();
+    });
+  });
+
+  describe('toggle_queue', () => {
+    it('flips queueEnabled and updates room metadata when the host toggles it', async () => {
+      const { key, token } = ticTacToeCreds('user-a', 'ROOM34');
+      const room = await colyseus.createRoom('match', {
+        roomKey: key,
+        game: 'tic-tac-toe',
+      });
+      const clientA = await colyseus.connectTo(room, { token, roomKey: key });
+
+      clientA.send('toggle_queue', { enabled: true });
+      await room.waitForNextPatch();
+
+      expect(
+        (room as unknown as { metadata: { queueEnabled: boolean } }).metadata
+          .queueEnabled,
+      ).toBe(true);
+
+      clientA.leave();
+    });
+
+    it('rejects a non-host request and leaves queueEnabled unchanged', async () => {
+      const { key, token: tokenA } = ticTacToeCreds('user-a', 'ROOM35');
+      const room = await colyseus.createRoom('match', {
+        roomKey: key,
+        game: 'tic-tac-toe',
+      });
+      const clientA = await colyseus.connectTo(room, {
+        token: tokenA,
+        roomKey: key,
+      });
+      const clientB = await colyseus.connectTo(room, {
+        token: ticTacToeCreds('user-b', 'ROOM35').token,
+        roomKey: key,
+      });
+
+      const rejection = new Promise<{ error: string }>((resolve) => {
+        clientB.onMessage(ACTION_REJECTED, (payload: { error: string }) =>
+          resolve(payload),
+        );
+      });
+      clientB.send('toggle_queue', { enabled: true });
+      const payload = await rejection;
+      expect(payload.error).toMatch(/host/i);
+      expect(
+        (room as unknown as { metadata: { queueEnabled: boolean } }).metadata
+          .queueEnabled,
+      ).toBe(false);
+
+      clientA.leave();
+      clientB.leave();
+    });
+  });
+
+  describe('rotate_seat', () => {
+    // Shared setup: two players play out a match to a decisive win with the
+    // queue OFF (so nothing auto-rotates), then the host turns the queue on
+    // and a third client joins it — leaving a stable, concluded match with a
+    // seated winner+loser and one queued challenger, ready for a deliberate
+    // manual `rotate_seat` in each test below.
+    async function concludedMatchWithQueue(roomId: string) {
+      const { key } = ticTacToeCreds('user-a', roomId);
+      const room = await colyseus.createRoom('match', {
+        roomKey: key,
+        game: 'tic-tac-toe',
+        queueEnabled: false,
+      });
+      const clientA = await colyseus.connectTo(room, {
+        token: ticTacToeCreds('user-a', roomId).token,
+        roomKey: key,
+      });
+      const clientB = await colyseus.connectTo(room, {
+        token: ticTacToeCreds('user-b', roomId).token,
+        roomKey: key,
+      });
+
+      await playXWinsTopRow(room, clientA, clientB);
+
+      clientA.send('toggle_queue', { enabled: true });
+      await room.waitForNextPatch();
+
+      return { room, key, clientA, clientB };
+    }
+
+    it('rejects a request from someone who is not a seated player', async () => {
+      const { room, key, clientA, clientB } =
+        await concludedMatchWithQueue('ROOM36');
+      const clientC = await colyseus.connectTo(room, {
+        token: ticTacToeCreds('user-c', 'ROOM36').token,
+        roomKey: key,
+      });
+
+      const rejection = new Promise<{ error: string }>((resolve) => {
+        clientC.onMessage(ACTION_REJECTED, (payload: { error: string }) =>
+          resolve(payload),
+        );
+      });
+      clientC.send('rotate_seat');
+      const payload = await rejection;
+      expect(payload.error).toMatch(/seated player/i);
+
+      clientA.leave();
+      clientB.leave();
+      clientC.leave();
+    });
+
+    it('rejects a request when the queue is empty', async () => {
+      const { clientA, clientB } = await concludedMatchWithQueue('ROOM37');
+
+      const rejection = new Promise<{ error: string }>((resolve) => {
+        clientA.onMessage(ACTION_REJECTED, (payload: { error: string }) =>
+          resolve(payload),
+        );
+      });
+      clientA.send('rotate_seat');
+      const payload = await rejection;
+      expect(payload.error).toMatch(/no one is waiting/i);
+
+      clientA.leave();
+      clientB.leave();
+    });
+
+    it('succeeds and promotes the queue head when a seated player rotates out', async () => {
+      const { room, key, clientA, clientB } =
+        await concludedMatchWithQueue('ROOM38');
+      const clientC = await colyseus.connectTo(room, {
+        token: ticTacToeCreds('user-c', 'ROOM38').token,
+        roomKey: key,
+      });
+
+      clientB.send('rotate_seat');
+      await room.waitForNextPatch();
+
+      const roomInternals = room as unknown as {
+        members: Array<{ userId: string; role: string }>;
+      };
+      expect(
+        roomInternals.members.find((m) => m.userId === 'user-b')?.role,
+      ).toBe('queued');
+      expect(
+        roomInternals.members.find((m) => m.userId === 'user-c')?.role,
+      ).toBe('player');
+
+      clientA.leave();
+      clientB.leave();
+      clientC.leave();
+    });
   });
 });

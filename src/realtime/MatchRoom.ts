@@ -46,6 +46,17 @@ export class MatchRoom extends Room {
   private hostUserId: string | null = null;
   private mode: ActivityMode = 'multi';
   private queueEnabled = false;
+  // Guards `maybeRotateAfterMatchEnd()` against cascading: the engine's own
+  // winner doesn't clear until both remaining players vote to restart, so
+  // without this a rotation, once performed, would re-trigger on the very
+  // next call (any subsequent message or broadcast) and see the same
+  // still-set winner — computing the just-promoted challenger as "the loser"
+  // and rotating them straight back out. Reset to false the moment
+  // `getWinnerUserId` reports no winner (i.e. the match has been reset),
+  // re-arming the guard for that match's eventual conclusion. Deliberately
+  // not "skip if same winner as last time" — that would incorrectly skip a
+  // legitimate second win in a row by the same player.
+  private rotatedForCurrentMatch = false;
   private rateLimiters = new Map<string, RateLimiter>();
   // Unbind functions returned by `onMessage`, so `loadSession()` can tear
   // down the previous adapter's handlers before registering new ones —
@@ -172,15 +183,34 @@ export class MatchRoom extends Room {
       winningScore: this.identity.winningScore,
       ruleset: this.identity.ruleset,
       options: this.identity.options,
-      broadcast: (type: string, payload?: unknown) =>
-        this.broadcast(type, payload),
-      broadcastBinary: (type: string, data: Uint8Array) =>
-        this.broadcastBytes(type, data, {}),
+      // Every match-ending state change — whether it lands here from an
+      // `onMessage` handler or from an async path entirely outside one (e.g.
+      // TicTacToeSession's disconnect-grace-timeout forfeit, which fires from
+      // a bare `setTimeout`) — routes through one of this context's three
+      // outbound primitives before reaching a client. Hooking
+      // `maybeRotateAfterMatchEnd()` here, instead of only after the
+      // originating `onMessage` handler returns, is what makes queue
+      // rotation fire for the disconnect-forfeit path too. Deferred to a
+      // microtask (via `Promise.resolve().then`, not called inline) so it
+      // runs after the *entire* current synchronous call completes — calling
+      // it inline here would re-enter `substitutePlayer()` while, e.g.,
+      // `TicTacToeSession`'s own `forfeitTo()`/`handleMove()` is still using
+      // its pre-rotation `players` array a few lines further down (for
+      // `recordResult()`), corrupting whose result gets recorded.
+      broadcast: (type: string, payload?: unknown) => {
+        this.broadcast(type, payload);
+        Promise.resolve().then(() => this.maybeRotateAfterMatchEnd());
+      },
+      broadcastBinary: (type: string, data: Uint8Array) => {
+        this.broadcastBytes(type, data, {});
+        Promise.resolve().then(() => this.maybeRotateAfterMatchEnd());
+      },
       sendToPlayer: (userId: string, type: string, payload?: unknown) => {
         for (const client of this.clients) {
           if ((client.auth as WsSessionPayload)?.userId !== userId) continue;
           client.send(type, payload);
         }
+        Promise.resolve().then(() => this.maybeRotateAfterMatchEnd());
       },
       onSessionEnded: () => this.disconnect(),
     };
@@ -200,8 +230,16 @@ export class MatchRoom extends Room {
       const unsubscribe = this.onMessage(type, (client, payload) => {
         const limiter = this.rateLimiters.get(type);
         if (limiter?.isOverLimit(client)) return;
-        handle(client.auth as WsSessionPayload, client, payload);
-        this.maybeRotateAfterMatchEnd();
+        const auth = client.auth as WsSessionPayload;
+        handle(auth, client, payload);
+        // A deliberate quit ('leave' — the same literal message name every
+        // adapter uses for it) detaches the player inside the adapter's
+        // handler immediately, but `this.members` otherwise wouldn't reflect
+        // that until the real socket close later fires `onLeave` — which
+        // normally follows right away, but isn't guaranteed. Special-cased
+        // here so playerCount/isMatchInProgress/queue rotation stay in sync
+        // without waiting for the socket to actually close.
+        if (type === 'leave') this.handleMemberDeparture(auth.userId);
       });
       this.messageUnsubscribers.push(unsubscribe);
     }
@@ -292,7 +330,11 @@ export class MatchRoom extends Room {
       return;
     }
     const winnerUserId = this.adapter.getWinnerUserId(this.session);
-    if (!winnerUserId) return;
+    if (!winnerUserId) {
+      this.rotatedForCurrentMatch = false; // engine reset — armed for this match's eventual conclusion
+      return;
+    }
+    if (this.rotatedForCurrentMatch) return; // already rotated for this match; waiting for a fresh one
 
     const loser = this.members.find(
       (m) => m.role === 'player' && m.userId !== winnerUserId,
@@ -301,6 +343,7 @@ export class MatchRoom extends Room {
     if (!loser || !queueHead) return; // no one waiting — winner and loser stay seated for a rematch
 
     this.rotateSeat(loser.userId, queueHead.userId);
+    this.rotatedForCurrentMatch = true;
   }
 
   private rotateSeat(outgoingUserId: string, incomingUserId: string) {
@@ -369,17 +412,27 @@ export class MatchRoom extends Room {
     this.adapter.onLeave(this.session, auth, client);
 
     const member = this.members.find((m) => m.userId === auth.userId);
-    if (member) {
-      member.connections -= 1;
-      if (member.connections <= 0) {
-        const wasHost = auth.userId === this.hostUserId;
-        this.members = this.members.filter((m) => m.userId !== auth.userId);
-        if (wasHost && this.members.length > 0) {
-          this.hostUserId = this.members[0]!.userId;
-        }
-      }
+    if (!member) return;
+    member.connections -= 1;
+    if (member.connections <= 0) this.handleMemberDeparture(auth.userId);
+  }
+
+  // Shared by the real socket-close `onLeave` and the `'leave'`-message
+  // special case in `loadSession()`'s dispatch loop — whichever one notices
+  // the departure first does the actual work; the other finds `userId`
+  // already gone from `this.members` and no-ops, which is what makes calling
+  // this from both places safe.
+  private handleMemberDeparture(userId: string) {
+    const member = this.members.find((m) => m.userId === userId);
+    if (!member) return;
+
+    const wasHost = userId === this.hostUserId;
+    this.members = this.members.filter((m) => m.userId !== userId);
+    if (wasHost && this.members.length > 0) {
+      this.hostUserId = this.members[0]!.userId;
     }
     this.syncMetadata();
+    this.maybeRotateAfterMatchEnd();
   }
 
   override onDispose() {
@@ -390,6 +443,7 @@ export class MatchRoom extends Room {
     this.adapter.onDispose(this.session);
     this.adapter = ADAPTER_REGISTRY[game]!;
     this.game = game;
+    this.rotatedForCurrentMatch = false; // fresh session — no match has concluded yet
     this.loadSession();
 
     this.members = [];

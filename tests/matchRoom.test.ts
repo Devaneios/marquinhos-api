@@ -749,4 +749,136 @@ describe('MatchRoom', () => {
       clientC.leave();
     });
   });
+
+  describe('Connect Four', () => {
+    function connectFourCreds(userId: string, roomId: string) {
+      const key = roomKey({
+        instanceId: 'inst-1',
+        game: 'connect-four',
+        mode: 'multi',
+        userId,
+        roomId,
+      });
+      const token = mintWsSessionToken({
+        userId,
+        instanceId: 'inst-1',
+        guildId: 'guild-1',
+        mode: 'multi',
+        game: 'connect-four',
+        roomId,
+      });
+      return { key, token };
+    }
+
+    // p1 (user-a) wins with a vertical line in column 0; p2 (user-b) drops
+    // into column 1 between each of user-a's moves so it never blocks.
+    async function playP1WinsColumnZero(
+      room: Awaited<ReturnType<ColyseusTestServer['createRoom']>>,
+      clientA: Awaited<ReturnType<ColyseusTestServer['connectTo']>>,
+      clientB: Awaited<ReturnType<ColyseusTestServer['connectTo']>>,
+    ) {
+      clientA.send('drop', { col: 0 });
+      await room.waitForNextPatch();
+      clientB.send('drop', { col: 1 });
+      await room.waitForNextPatch();
+      clientA.send('drop', { col: 0 });
+      await room.waitForNextPatch();
+      clientB.send('drop', { col: 1 });
+      await room.waitForNextPatch();
+      clientA.send('drop', { col: 0 });
+      await room.waitForNextPatch();
+      clientB.send('drop', { col: 1 });
+      await room.waitForNextPatch();
+      clientA.send('drop', { col: 0 }); // p1 completes a vertical line in col 0
+      await room.waitForNextPatch();
+    }
+
+    it('sends init with a null disc to a spectator/queued joiner', async () => {
+      const key = roomKey({
+        instanceId: 'inst-1',
+        game: 'connect-four',
+        mode: 'multi',
+        userId: 'user-a',
+        roomId: 'ROOM50',
+      });
+      const room = await colyseus.createRoom('match', {
+        roomKey: key,
+        game: 'connect-four',
+      });
+      const clientA = await colyseus.connectTo(room, {
+        token: connectFourCreds('user-a', 'ROOM50').token,
+        roomKey: key,
+      });
+      const clientB = await colyseus.connectTo(room, {
+        token: connectFourCreds('user-b', 'ROOM50').token,
+        roomKey: key,
+      });
+
+      const clientC = await colyseus.connectTo(room, {
+        token: connectFourCreds('user-c', 'ROOM50').token,
+        roomKey: key,
+      });
+      const [, payload] = (await clientC.waitForNextMessage()) as [
+        string,
+        { disc: string | null },
+      ];
+      expect(payload.disc).toBeNull();
+
+      clientA.leave();
+      clientB.leave();
+      clientC.leave();
+    });
+
+    it("promotes the queue head into the departing player's vacated seat on an explicit 'leave'", async () => {
+      const key = roomKey({
+        instanceId: 'inst-1',
+        game: 'connect-four',
+        mode: 'multi',
+        userId: 'user-a',
+        roomId: 'ROOM51',
+      });
+      const room = await colyseus.createRoom('match', {
+        roomKey: key,
+        game: 'connect-four',
+        queueEnabled: false,
+      });
+      const clientA = await colyseus.connectTo(room, {
+        token: connectFourCreds('user-a', 'ROOM51').token,
+        roomKey: key,
+      });
+      const clientB = await colyseus.connectTo(room, {
+        token: connectFourCreds('user-b', 'ROOM51').token,
+        roomKey: key,
+      });
+
+      await playP1WinsColumnZero(room, clientA, clientB);
+
+      clientA.send('toggle_queue', { enabled: true });
+      await room.waitForNextPatch();
+
+      const clientC = await colyseus.connectTo(room, {
+        token: connectFourCreds('user-c', 'ROOM51').token,
+        roomKey: key,
+      });
+
+      // user-b (the loser) sends the application-level 'leave' message
+      // rather than closing the socket — this is the exact wiring the
+      // ConnectFourAdapter was missing.
+      clientB.send('leave');
+      await room.waitForNextPatch();
+
+      const roomInternals = room as unknown as {
+        members: Array<{ userId: string; role: string }>;
+      };
+      expect(
+        roomInternals.members.find((m) => m.userId === 'user-b'),
+      ).toBeUndefined();
+      expect(
+        roomInternals.members.find((m) => m.userId === 'user-c')?.role,
+      ).toBe('player');
+
+      clientA.leave();
+      clientC.leave();
+    });
+  });
 });

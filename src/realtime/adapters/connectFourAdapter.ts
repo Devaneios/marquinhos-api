@@ -34,18 +34,29 @@ export const connectFourAdapter: GameRoomAdapter<ConnectFourSession> = {
             max: MOVE_RATE_LIMIT_MAX,
           },
           handle: (auth, client, payload: unknown) => {
-            const col = (payload as { col?: number })?.col ?? -1;
-            const accepted = session.dropDisc(auth.userId, col);
+            const col = (payload as { col?: number })?.col;
+            const accepted = session.dropDisc(auth.userId, col ?? -1);
             if (!accepted) client.send('move_rejected', { col });
           },
         },
         restart: { handle: (auth) => session.requestRestart(auth.userId) },
+        leave: {
+          // A deliberate quit uses the immediate-detach path (`leave`), not
+          // the disconnect-with-grace path (`pauseForDisconnect`) that
+          // `onLeave` uses for a network drop — matches ticTacToeAdapter's
+          // distinction between the two, and is also what MatchRoom's queue
+          // hand-off is gated on.
+          handle: (auth, client) => session.leave(auth.userId, client),
+        },
       },
     };
   },
 
   onJoin(session, auth, client, seat) {
-    if (seat !== 'player') return;
+    if (seat !== 'player') {
+      client.send('init', { disc: null, state: session.getPublicState() });
+      return;
+    }
     const disc = session.addPlayer(auth.userId, client);
     client.send('init', { disc, state: session.getPublicState() });
     if (disc && auth.mode === 'single') session.enableBot(disc);

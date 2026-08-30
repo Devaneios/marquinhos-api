@@ -13,6 +13,9 @@ export interface WsSessionPayload {
   game: GameId;
   difficulty?: BotDifficulty;
   winningScore?: number;
+  // Required for mode 'multi' (a room subdivides a Discord instance);
+  // absent for 'single'/'local', which stay scoped per-user as before.
+  roomId?: string;
   // Only meaningful (and required) for game:'cards' — selects which
   // pluggable GameDefinition the room loads. The shape of `options` is
   // validated by that GameDefinition's own setup(), not here, so this
@@ -54,6 +57,8 @@ export function verifyWsSessionToken(token: string): WsSessionPayload | null {
         ? parsed?.ruleset === undefined
         : typeof parsed?.ruleset === 'string' &&
           cardGameRegistry.isKnownRuleset(parsed.ruleset);
+    const hasValidRoomId =
+      typeof parsed?.roomId === 'string' || parsed?.roomId === undefined;
     if (
       typeof parsed?.userId === 'string' &&
       typeof parsed?.instanceId === 'string' &&
@@ -64,7 +69,8 @@ export function verifyWsSessionToken(token: string): WsSessionPayload | null {
       isGameId(parsed?.game) &&
       hasValidDifficulty &&
       hasValidWinningScore &&
-      hasValidRuleset
+      hasValidRuleset &&
+      hasValidRoomId
     ) {
       return {
         userId: parsed.userId,
@@ -78,6 +84,7 @@ export function verifyWsSessionToken(token: string): WsSessionPayload | null {
         ...(parsed.winningScore !== undefined
           ? { winningScore: parsed.winningScore }
           : {}),
+        ...(parsed.roomId !== undefined ? { roomId: parsed.roomId } : {}),
         ...(parsed.ruleset !== undefined ? { ruleset: parsed.ruleset } : {}),
         ...(parsed.options !== undefined ? { options: parsed.options } : {}),
       };

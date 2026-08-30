@@ -52,6 +52,35 @@ async function playXWinsTopRow(
   await room.waitForNextPatch();
 }
 
+// Shared setup: two players play out a match to a decisive win with the
+// queue OFF (so nothing auto-rotates), then the host turns the queue on and
+// a third client joins it — leaving a stable, concluded match with a seated
+// winner+loser and one queued challenger, ready for a deliberate manual
+// `rotate_seat` or an explicit `'leave'` in a test.
+async function concludedMatchWithQueue(roomId: string) {
+  const { key } = ticTacToeCreds('user-a', roomId);
+  const room = await colyseus.createRoom('match', {
+    roomKey: key,
+    game: 'tic-tac-toe',
+    queueEnabled: false,
+  });
+  const clientA = await colyseus.connectTo(room, {
+    token: ticTacToeCreds('user-a', roomId).token,
+    roomKey: key,
+  });
+  const clientB = await colyseus.connectTo(room, {
+    token: ticTacToeCreds('user-b', roomId).token,
+    roomKey: key,
+  });
+
+  await playXWinsTopRow(room, clientA, clientB);
+
+  clientA.send('toggle_queue', { enabled: true });
+  await room.waitForNextPatch();
+
+  return { room, key, clientA, clientB };
+}
+
 beforeAll(async () => {
   const gameServer = new Server({ transport: new WebSocketTransport() });
   gameServer.define('match', MatchRoom).filterBy(['roomKey']);
@@ -568,35 +597,6 @@ describe('MatchRoom', () => {
   });
 
   describe('rotate_seat', () => {
-    // Shared setup: two players play out a match to a decisive win with the
-    // queue OFF (so nothing auto-rotates), then the host turns the queue on
-    // and a third client joins it — leaving a stable, concluded match with a
-    // seated winner+loser and one queued challenger, ready for a deliberate
-    // manual `rotate_seat` in each test below.
-    async function concludedMatchWithQueue(roomId: string) {
-      const { key } = ticTacToeCreds('user-a', roomId);
-      const room = await colyseus.createRoom('match', {
-        roomKey: key,
-        game: 'tic-tac-toe',
-        queueEnabled: false,
-      });
-      const clientA = await colyseus.connectTo(room, {
-        token: ticTacToeCreds('user-a', roomId).token,
-        roomKey: key,
-      });
-      const clientB = await colyseus.connectTo(room, {
-        token: ticTacToeCreds('user-b', roomId).token,
-        roomKey: key,
-      });
-
-      await playXWinsTopRow(room, clientA, clientB);
-
-      clientA.send('toggle_queue', { enabled: true });
-      await room.waitForNextPatch();
-
-      return { room, key, clientA, clientB };
-    }
-
     it('rejects a request from someone who is not a seated player', async () => {
       const { room, key, clientA, clientB } =
         await concludedMatchWithQueue('ROOM36');
@@ -658,6 +658,94 @@ describe('MatchRoom', () => {
 
       clientA.leave();
       clientB.leave();
+      clientC.leave();
+    });
+
+    it('does not get reversed by a later broadcast for the same match', async () => {
+      // Regression test: a manual rotate_seat must also arm the
+      // rotatedForCurrentMatch guard, or the very next broadcast for this
+      // still-unrestarted match (here, a partial restart vote) would find
+      // the guard untouched, see the same winner still set, and
+      // auto-rotate the just-promoted player straight back out.
+      const { room, key, clientA, clientB } =
+        await concludedMatchWithQueue('ROOM39');
+      const clientC = await colyseus.connectTo(room, {
+        token: ticTacToeCreds('user-c', 'ROOM39').token,
+        roomKey: key,
+      });
+      const clientD = await colyseus.connectTo(room, {
+        token: ticTacToeCreds('user-d', 'ROOM39').token,
+        roomKey: key,
+      });
+
+      clientB.send('rotate_seat');
+      await room.waitForNextPatch();
+
+      const roomInternals = room as unknown as {
+        members: Array<{ userId: string; role: string }>;
+      };
+      expect(
+        roomInternals.members.find((m) => m.userId === 'user-c')?.role,
+      ).toBe('player');
+      expect(
+        roomInternals.members.find((m) => m.userId === 'user-d')?.role,
+      ).toBe('queued');
+
+      // The winner's restart vote is only 1 of the 2 now required — it
+      // still broadcasts `restart_status`, re-invoking the deferred
+      // rotation hook against the same still-set winner.
+      clientA.send('restart', {});
+      await room.waitForNextPatch();
+
+      expect(
+        roomInternals.members.find((m) => m.userId === 'user-c')?.role,
+      ).toBe('player');
+      expect(
+        roomInternals.members.find((m) => m.userId === 'user-d')?.role,
+      ).toBe('queued');
+      expect(
+        roomInternals.members.find((m) => m.userId === 'user-b')?.role,
+      ).toBe('queued');
+
+      clientA.leave();
+      clientB.leave();
+      clientC.leave();
+      clientD.leave();
+    });
+  });
+
+  describe("'leave' message after a match concludes", () => {
+    it("promotes the queue head into the departing player's vacated seat", async () => {
+      // TicTacToeSession.leave() -> detach() unconditionally removes the
+      // departing player from the session (forfeit-then-remove), even when
+      // the match had already concluded — so the queue hand-off has to be
+      // attempted BEFORE the adapter's own 'leave' handler runs, while the
+      // departing player's marker is still present for substitutePlayer()
+      // to find. This exercises that ordering: the match is already over
+      // (user-a won) before user-b, the loser, explicitly leaves.
+      const { room, key, clientA, clientB } =
+        await concludedMatchWithQueue('ROOM40');
+      const clientC = await colyseus.connectTo(room, {
+        token: ticTacToeCreds('user-c', 'ROOM40').token,
+        roomKey: key,
+      });
+
+      // user-b (the loser) sends the application-level 'leave' message
+      // rather than closing the socket.
+      clientB.send('leave');
+      await room.waitForNextPatch();
+
+      const roomInternals = room as unknown as {
+        members: Array<{ userId: string; role: string }>;
+      };
+      expect(
+        roomInternals.members.find((m) => m.userId === 'user-b'),
+      ).toBeUndefined();
+      expect(
+        roomInternals.members.find((m) => m.userId === 'user-c')?.role,
+      ).toBe('player');
+
+      clientA.leave();
       clientC.leave();
     });
   });

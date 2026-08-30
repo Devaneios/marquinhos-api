@@ -231,6 +231,16 @@ export class MatchRoom extends Room {
         const limiter = this.rateLimiters.get(type);
         if (limiter?.isOverLimit(client)) return;
         const auth = client.auth as WsSessionPayload;
+        // For a deliberate quit, try handing this seat straight to the
+        // queue head BEFORE the adapter's own handler runs. `substitutePlayer`
+        // requires the outgoing party to still be present in the session —
+        // every queue-eligible session's own leave/disconnect handling
+        // unconditionally drops that seat as part of processing the
+        // departure (TicTacToeSession.leave() -> detach() -> removePlayer()
+        // always runs, forfeit-and-remove, even when the match had already
+        // concluded), so attempting the hand-off *after* `handle()` runs is
+        // too late — there's no marker left to hand off by then.
+        if (type === 'leave') this.tryHandoffDepartingPlayer(auth.userId);
         handle(auth, client, payload);
         // A deliberate quit ('leave' — the same literal message name every
         // adapter uses for it) detaches the player inside the adapter's
@@ -311,6 +321,13 @@ export class MatchRoom extends Room {
         return;
       }
       this.rotateSeat(sender.userId, queueHead.userId);
+      // A manual rotation counts as "this match's rotation already
+      // happened" exactly like the automatic one does — otherwise a later
+      // broadcast for the same still-unrestarted match (e.g. a partial
+      // restart vote) would find the guard untouched, see the same winner
+      // still set, and auto-rotate the just-promoted player straight back
+      // out.
+      this.rotatedForCurrentMatch = true;
     });
   }
 
@@ -322,19 +339,19 @@ export class MatchRoom extends Room {
   }
 
   private maybeRotateAfterMatchEnd() {
-    if (
-      !this.queueEnabled ||
-      !this.adapter.getWinnerUserId ||
-      !this.adapter.substitutePlayer
-    ) {
+    if (!this.adapter.getWinnerUserId || !this.adapter.substitutePlayer) {
       return;
     }
     const winnerUserId = this.adapter.getWinnerUserId(this.session);
     if (!winnerUserId) {
-      this.rotatedForCurrentMatch = false; // engine reset — armed for this match's eventual conclusion
+      // Reset regardless of `queueEnabled` — otherwise toggling the queue
+      // off across a match's conclusion and back on before the next one
+      // would leave this guard stuck `true` from before, incorrectly
+      // blocking the very next match's legitimate rotation.
+      this.rotatedForCurrentMatch = false;
       return;
     }
-    if (this.rotatedForCurrentMatch) return; // already rotated for this match; waiting for a fresh one
+    if (!this.queueEnabled || this.rotatedForCurrentMatch) return; // queue off, or already rotated for this match
 
     const loser = this.members.find(
       (m) => m.role === 'player' && m.userId !== winnerUserId,
@@ -409,12 +426,78 @@ export class MatchRoom extends Room {
     const auth = client.auth as WsSessionPayload;
 
     for (const limiter of this.rateLimiters.values()) limiter.clear(client);
+
+    // Same ordering requirement as the 'leave'-message path below: a raw
+    // socket close for a player whose match already concluded routes
+    // through the adapter's own `onLeave` (TicTacToeSession.pauseForDisconnect,
+    // which detaches immediately once a winner/draw already exists) and
+    // that unconditionally drops the seat from the session — so the
+    // hand-off attempt has to run first, while the seat is still there. Only
+    // attempted when this is the userId's LAST tracked connection — a second
+    // tab closing while the first stays open must not hand the seat away out
+    // from under the tab that's still connected.
+    const member = this.members.find((m) => m.userId === auth.userId);
+    if (member && member.connections <= 1) {
+      this.tryHandoffDepartingPlayer(auth.userId);
+    }
     this.adapter.onLeave(this.session, auth, client);
 
-    const member = this.members.find((m) => m.userId === auth.userId);
     if (!member) return;
     member.connections -= 1;
     if (member.connections <= 0) this.handleMemberDeparture(auth.userId);
+  }
+
+  // Seats the queue head directly into a departing player's exact marker,
+  // in place of them, BEFORE the adapter's own leave/disconnect handler
+  // runs. This has to happen first: `substitutePlayer()` requires the
+  // outgoing party to still be present in the session, and every
+  // queue-eligible session's own departure handling (forfeit-then-remove)
+  // unconditionally drops that seat as part of processing the departure —
+  // by the time the adapter's handler returns, there's no marker left to
+  // hand off. Only eligible once a winner already exists, matching
+  // `substitutePlayer`'s own documented "between matches, never mid-match"
+  // contract: a still-in-progress match's forfeit-by-departure is left
+  // exactly as before (the opponent wins; the now-vacant seat is a
+  // different problem — see this method's known-limitation note in the
+  // task report — not one `substitutePlayer` can address, since there is no
+  // seated "loser" marker left to swap once the departure itself is what
+  // ended the match).
+  private tryHandoffDepartingPlayer(userId: string): boolean {
+    if (
+      !this.queueEnabled ||
+      !this.adapter.getWinnerUserId ||
+      !this.adapter.substitutePlayer
+    ) {
+      return false;
+    }
+    const departing = this.members.find((m) => m.userId === userId);
+    if (!departing || departing.role !== 'player') return false;
+
+    const winnerUserId = this.adapter.getWinnerUserId(this.session);
+    if (!winnerUserId || winnerUserId === userId) return false; // no concluded match to hand off, or the winner is the one leaving
+
+    const queueHead = this.members.find((m) => m.role === 'queued');
+    if (!queueHead) return false;
+    const queueHeadClient = this.clients.find(
+      (c) => (c.auth as WsSessionPayload)?.userId === queueHead.userId,
+    );
+    if (!queueHeadClient) return false;
+
+    const ok = this.adapter.substitutePlayer(
+      this.session,
+      userId,
+      queueHead.userId,
+      queueHeadClient,
+    );
+    if (!ok) return false;
+
+    // Not routed through the generic rotateSeat() helper: that helper
+    // assumes the outgoing party goes to the BACK of the queue, but this
+    // user is leaving the room entirely — handleMemberDeparture() filters
+    // them out below, they're never requeued.
+    queueHead.role = 'player';
+    this.rotatedForCurrentMatch = true;
+    return true;
   }
 
   // Shared by the real socket-close `onLeave` and the `'leave'`-message
@@ -432,7 +515,6 @@ export class MatchRoom extends Room {
       this.hostUserId = this.members[0]!.userId;
     }
     this.syncMetadata();
-    this.maybeRotateAfterMatchEnd();
   }
 
   override onDispose() {

@@ -1199,7 +1199,10 @@ export class MatchRoom extends Room {
     if (initialSession && options.game && initialSession.game !== options.game) {
       throw new Error('game mismatch between token and join options');
     }
-    const game = options.game ?? initialSession?.game;
+    // Signed token wins when present (Task 3's fix round — the token is
+    // trusted, the raw option is not); raw `options.game` is only a fallback
+    // for tests that create a room without minting a token.
+    const game = initialSession?.game ?? options.game;
     if (!game) throw new Error('Cannot determine which game this room is for');
     this.mode = initialSession?.mode ?? 'multi';
     this.queueEnabled = this.mode === 'multi' ? Boolean(options.queueEnabled) : false;

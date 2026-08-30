@@ -16,6 +16,8 @@
 
 Task 22 (final cutover) includes updating both spec documents to match both corrections.
 
+**Known, accepted limitation (ruled during Task 4's review, applies to all 6 queue-eligible games in Tasks 5-9 — do not attempt to fix per-adapter):** queue promotion only works when a departure happens AFTER a match has already concluded (natural win/draw, or while waiting between matches). A mid-match quit that itself forces the forfeit does NOT promote the queue head — by the time any handoff checkpoint could run, the session's own synchronous `detach()`/`forfeitTo()` (or equivalent) has already stripped the departing player's seat, leaving nothing to substitute. Fixing this properly would require giving `MatchRoom` a checkpoint INSIDE each session's forfeit path (not just around it), which is a materially larger, cross-cutting change than any single adapter task's scope. The mid-match quit still correctly forfeits to the remaining player (unaffected, pre-existing behavior) — the bounded consequence is an idle seat with a non-empty queue until a new joiner arrives. Relatedly, also deferred: a brand-new joiner can be seated as `'player'` ahead of anyone already waiting in the queue (`assignSeat()` only checks `playerCount < maxPlayers`, not queue order), and a queue member who joins after a match has already concluded has no trigger to get promoted until some unrelated broadcast happens. If either of these needs fixing, it needs a dedicated follow-up task addressing seat-assignment re-evaluation generically in `MatchRoom` — out of scope for this plan.
+
 ## Global Constraints
 
 - Existing per-game `Session`/`Engine` classes are not rewritten — only their Colyseus integration (`*Room.ts`) is replaced by an adapter wrapping the same session.

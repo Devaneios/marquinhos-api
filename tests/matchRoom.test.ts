@@ -233,4 +233,70 @@ describe('MatchRoom', () => {
     expect(aGotGameReady).toBe(true);
     expect(bGotGameReady).toBe(false);
   });
+
+  it('rotates the loser to the back of the queue and promotes the queue head', async () => {
+    const key = roomKey({
+      instanceId: 'inst-1',
+      game: 'tic-tac-toe',
+      mode: 'multi',
+      userId: 'user-a',
+      roomId: 'ROOM02',
+    });
+    const room = await colyseus.createRoom('match', {
+      roomKey: key,
+      game: 'tic-tac-toe',
+      queueEnabled: true,
+    });
+
+    const tokenFor = (userId: string) =>
+      mintWsSessionToken({
+        userId,
+        instanceId: 'inst-1',
+        guildId: 'guild-1',
+        mode: 'multi',
+        game: 'tic-tac-toe',
+        roomId: 'ROOM02',
+      });
+
+    const clientA = await colyseus.connectTo(room, {
+      token: tokenFor('user-a'),
+      roomKey: key,
+    });
+    const clientB = await colyseus.connectTo(room, {
+      token: tokenFor('user-b'),
+      roomKey: key,
+    });
+    const clientC = await colyseus.connectTo(room, {
+      token: tokenFor('user-c'),
+      roomKey: key,
+    });
+
+    // user-a is X, user-b is O, user-c queues. X wins top row; O (user-b)
+    // should rotate to the back of the queue and user-c should be promoted.
+    clientA.send('move', { row: 0, col: 0 });
+    await room.waitForNextPatch();
+    clientB.send('move', { row: 1, col: 0 });
+    await room.waitForNextPatch();
+    clientA.send('move', { row: 0, col: 1 });
+    await room.waitForNextPatch();
+    clientB.send('move', { row: 1, col: 1 });
+    await room.waitForNextPatch();
+    clientA.send('move', { row: 0, col: 2 });
+    await room.waitForNextPatch();
+
+    // Room-level "match ended, queue rotated" happens synchronously inside
+    // the room's message handler, driven off the same session state the
+    // move above already flushed — no further tick to wait for.
+    const roomInternals = room as unknown as {
+      members: Array<{ userId: string; role: string }>;
+    };
+    const b = roomInternals.members.find((m) => m.userId === 'user-b');
+    const c = roomInternals.members.find((m) => m.userId === 'user-c');
+    expect(b?.role).toBe('queued');
+    expect(c?.role).toBe('player');
+
+    clientA.leave();
+    clientB.leave();
+    clientC.leave();
+  });
 });

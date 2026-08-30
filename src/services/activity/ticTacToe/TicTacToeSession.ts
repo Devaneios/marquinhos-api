@@ -215,6 +215,37 @@ export class TicTacToeSession {
     this.detach(userId);
   }
 
+  getWinnerUserId(): string | null {
+    const winner = this.engine.getState().winner;
+    if (!winner) return null;
+    return this.players.find((p) => p.player === winner)?.userId ?? null;
+  }
+
+  // Reseats `incomingUserId` into whichever marker `outgoingUserId` held,
+  // without the forfeit/onSessionEnded side effects `detach`/`leave` carry —
+  // this runs between matches during queue rotation, never mid-match.
+  // addPlayer() can't be reused here: it assigns markers by array length
+  // (`players.length === 0 ? 'X' : 'O'`), which collides with the remaining
+  // player's marker once one seat is vacated and refilled.
+  substitutePlayer(
+    outgoingUserId: string,
+    incomingUserId: string,
+    connection: unknown,
+  ): boolean {
+    const outgoing = this.players.find((p) => p.userId === outgoingUserId);
+    if (!outgoing) return false;
+
+    this.players = this.players.filter((p) => p.userId !== outgoingUserId);
+    this.restartVotes.delete(outgoingUserId);
+    this.players.push({
+      userId: incomingUserId,
+      player: outgoing.player,
+      connected: true,
+      connections: new Set([connection]),
+    });
+    return true;
+  }
+
   // Returns the outcome instead of broadcasting a rejection — a rejected
   // move is feedback for the mover only, so the Room delivers it via
   // `client.send`, never a room-wide broadcast (§6.3, AP-1).

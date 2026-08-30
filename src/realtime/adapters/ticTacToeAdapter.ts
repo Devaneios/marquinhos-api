@@ -88,4 +88,15 @@ export const ticTacToeAdapter: GameRoomAdapter<TicTacToeSession> = {
   onDispose(session) {
     session.dispose();
   },
+
+  getWinnerUserId(session) {
+    return session.getWinnerUserId();
+  },
+  substitutePlayer(session, outgoingUserId, incomingUserId, incomingClient) {
+    return session.substitutePlayer(
+      outgoingUserId,
+      incomingUserId,
+      incomingClient,
+    );
+  },
 };

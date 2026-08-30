@@ -287,6 +287,7 @@ describe('ActivityController.getWsSessionToken', () => {
       game: 'cards',
       ruleset: 'truco',
       options: { seed: 7 },
+      roomId: 'ROOM01',
     });
     const res = makeRes();
 
@@ -303,6 +304,7 @@ describe('ActivityController.getWsSessionToken', () => {
       game: 'cards',
       ruleset: 'truco',
       options: { seed: 7 },
+      roomId: 'ROOM01',
     });
     expect(payload.data.roomKey).toBe(
       roomKey({
@@ -311,6 +313,7 @@ describe('ActivityController.getWsSessionToken', () => {
         mode: 'multi',
         userId: 'user-1',
         ruleset: 'truco',
+        roomId: 'ROOM01',
       }),
     );
   });

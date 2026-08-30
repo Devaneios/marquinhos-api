@@ -496,6 +496,7 @@ export interface GameRoomAdapter<TSession> {
     auth: WsSessionPayload,
     client: Client,
     seat: SeatRole,
+    ctx: AdapterContext,
   ): void;
   onLeave(session: TSession, auth: WsSessionPayload, client: Client): void;
   onDispose(session: TSession): void;
@@ -757,7 +758,7 @@ import {
   type WsSessionPayload,
 } from '../services/activity/wsSessionToken';
 import { ADAPTER_REGISTRY } from './adapters/registry';
-import type { GameRoomAdapter, SeatRole } from './GameRoomAdapter';
+import type { AdapterContext, GameRoomAdapter, SeatRole } from './GameRoomAdapter';
 
 interface Member {
   userId: string;
@@ -858,7 +859,7 @@ export class MatchRoom extends Room {
 
     const role = this.assignSeat();
     this.members.push({ userId: auth.userId, role });
-    this.adapter.onJoin(this.session, auth, client, role);
+    this.adapter.onJoin(this.session, auth, client, role, this.ctx);
   }
 
   override onLeave(client: Client) {
@@ -1130,7 +1131,7 @@ import {
   type WsSessionPayload,
 } from '../services/activity/wsSessionToken';
 import { ADAPTER_REGISTRY } from './adapters/registry';
-import type { GameRoomAdapter, SeatRole } from './GameRoomAdapter';
+import type { AdapterContext, GameRoomAdapter, SeatRole } from './GameRoomAdapter';
 
 interface Member {
   userId: string;
@@ -1144,6 +1145,7 @@ const SWITCHABLE_GAMES: ReadonlySet<GameId> = new Set(
 export class MatchRoom extends Room {
   private adapter!: GameRoomAdapter<unknown>;
   private session!: unknown;
+  private ctx!: AdapterContext;
   private members: Member[] = [];
   private hostUserId: string | null = null;
   private mode: 'single' | 'multi' | 'local' = 'multi';
@@ -1264,6 +1266,14 @@ export class MatchRoom extends Room {
       },
       onSessionEnded: () => this.disconnect(),
     };
+    // Stored so onJoin/switchGame can hand it to adapter.onJoin — a handful
+    // of adapters (RPS, Tower Unstable) need to broadcast from onJoin, and
+    // onJoin's own signature has no other way to reach it. Storing it on the
+    // MatchRoom instance (not a module-level variable in the adapter file)
+    // is what keeps this safe across concurrent rooms of the same game —
+    // see the corrected `capturedCtx` note on Tasks 7/16 below for the bug
+    // this replaces.
+    this.ctx = ctx;
 
     const { session, messageHandlers } = this.adapter.setup(ctx);
     this.session = session;
@@ -1392,7 +1402,7 @@ export class MatchRoom extends Room {
 
     const role = this.assignSeat();
     this.members.push({ userId: auth.userId, role });
-    this.adapter.onJoin(this.session, auth, client, role);
+    this.adapter.onJoin(this.session, auth, client, role, this.ctx);
     this.syncMetadata();
   }
 
@@ -1423,7 +1433,7 @@ export class MatchRoom extends Room {
       const auth = client.auth as WsSessionPayload;
       const role = this.assignSeat();
       this.members.push({ userId: auth.userId, role });
-      this.adapter.onJoin(this.session, auth, client, role);
+      this.adapter.onJoin(this.session, auth, client, role, this.ctx);
     }
     this.syncMetadata();
   }
@@ -1879,7 +1889,9 @@ Expected: PASS
 
 - [ ] **Step 5: Write the adapter**
 
-The original `RpsRoom.onJoin` also broadcasts `game_start`/`round_state` once `playerCount === 2 || mode === 'single'` — a room-wide broadcast the `GameRoomAdapter.onJoin(session, auth, client, seat)` signature has no direct path to, since it isn't handed `ctx`. Every other adapter's `onJoin` only ever needs `session`/`client`, but this is the one place among the 19 games where the original `Room.onJoin` also called `this.broadcast(...)` directly, so `rpsAdapter` is the one adapter that captures `ctx` at module scope:
+The original `RpsRoom.onJoin` also broadcasts `game_start`/`round_state` once `playerCount === 2 || mode === 'single'` — a room-wide broadcast `onJoin`'s `ctx` parameter (the 5th argument `GameRoomAdapter.onJoin` was given specifically for this) provides directly.
+
+**Do not use a module-level `let capturedCtx` here.** `ADAPTER_REGISTRY` holds one `rpsAdapter` object shared by every concurrent RPS room — a module-level variable set inside `setup()` gets overwritten by the second room's `setup()` call, so the first room's `onJoin` would broadcast into the second room's connections. This was a real bug caught during Task 3's review (Tic-Tac-Toe originally used this same pattern; it's fixed there and the `GameRoomAdapter.onJoin` interface now takes `ctx` as its 5th parameter specifically so this adapter — and Task 16's TowerUnstable — never need module-level state.
 
 ```ts
 import type { Client } from 'colyseus';
@@ -1889,15 +1901,12 @@ import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 const PICK_RATE_LIMIT_WINDOW_MS = 1000;
 const PICK_RATE_LIMIT_MAX = 10;
 
-let capturedCtx: AdapterContext;
-
 export const rpsAdapter: GameRoomAdapter<RpsSession> = {
   maxPlayers: 2,
   supportsBot: true,
   supportsQueue: true,
 
   setup(ctx: AdapterContext) {
-    capturedCtx = ctx;
     const session = new RpsSession(
       { sessionKey: ctx.roomKey, instanceId: ctx.instanceId, guildId: ctx.guildId, mode: ctx.mode },
       { broadcast: (_key, message) => ctx.broadcast(message.type, message.payload) },
@@ -1921,7 +1930,7 @@ export const rpsAdapter: GameRoomAdapter<RpsSession> = {
     };
   },
 
-  onJoin(session, auth, client, seat) {
+  onJoin(session, auth, client, seat, ctx) {
     if (seat !== 'player') return;
     const playerId = session.addPlayer(auth.userId, client);
     if (!playerId) {
@@ -1932,8 +1941,8 @@ export const rpsAdapter: GameRoomAdapter<RpsSession> = {
     client.send('init', { playerId, config: session.getPublicConfig() });
     if (auth.mode === 'single') session.enableBot(playerId);
     if (session.playerCount === 2 || auth.mode === 'single') {
-      capturedCtx.broadcast('game_start', {});
-      capturedCtx.broadcast('round_state', session.getRoundState());
+      ctx.broadcast('game_start', {});
+      ctx.broadcast('round_state', session.getRoundState());
     }
   },
   onLeave(session, auth, client) {
@@ -2983,10 +2992,9 @@ const PULL_RATE_LIMIT_MAX = 5;
 
 // The original TowerUnstableRoom broadcasts room-wide from onJoin
 // (`this.broadcast('game_ready', ...)`), not via `client.send` — the same
-// situation as Task 7's RPS adapter, and the same fix: capture `ctx` at
-// module scope so `onJoin` (which the GameRoomAdapter interface hands only
-// `session`/`client`) can still reach `ctx.broadcast`.
-let capturedCtx: AdapterContext;
+// situation as Task 7's RPS adapter. Use the `ctx` parameter GameRoomAdapter.onJoin
+// is given for exactly this — never a module-level captured variable, which
+// would be shared (and clobbered) across every concurrent room of this game.
 
 export const towerUnstableAdapter: GameRoomAdapter<TowerSession> = {
   maxPlayers: 2,
@@ -2994,7 +3002,6 @@ export const towerUnstableAdapter: GameRoomAdapter<TowerSession> = {
   supportsQueue: false,
 
   setup(ctx: AdapterContext) {
-    capturedCtx = ctx;
     const session = new TowerSession(
       { sessionKey: ctx.roomKey, instanceId: ctx.instanceId, guildId: ctx.guildId, mode: ctx.mode },
       { broadcast: (_key, message) => ctx.broadcast(message.type, message.payload) },
@@ -3019,13 +3026,13 @@ export const towerUnstableAdapter: GameRoomAdapter<TowerSession> = {
     };
   },
 
-  onJoin(session, auth, client, seat) {
+  onJoin(session, auth, client, seat, ctx) {
     if (seat !== 'player') return;
     const joined = session.addPlayer(auth.userId, client);
     if (joined && auth.mode === 'single') session.enableBot();
     client.send('init', { joined, state: session.getPublicState() });
     if (session.playerCount === 2) {
-      capturedCtx.broadcast('game_ready', { state: session.getPublicState() });
+      ctx.broadcast('game_ready', { state: session.getPublicState() });
     }
   },
   onLeave(session, auth, client) {

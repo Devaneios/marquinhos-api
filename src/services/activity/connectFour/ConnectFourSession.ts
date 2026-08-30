@@ -167,6 +167,31 @@ export class ConnectFourSession {
     this.detach(userId);
   }
 
+  getWinnerUserId(): string | null {
+    const winner = this.engine.getState().winner;
+    if (!winner) return null;
+    return this.players.find((p) => p.disc === winner)?.userId ?? null;
+  }
+
+  substitutePlayer(
+    outgoingUserId: string,
+    incomingUserId: string,
+    connection: unknown,
+  ): boolean {
+    const outgoing = this.players.find((p) => p.userId === outgoingUserId);
+    if (!outgoing) return false;
+
+    this.players = this.players.filter((p) => p.userId !== outgoingUserId);
+    this.restartVotes.delete(outgoingUserId);
+    this.players.push({
+      userId: incomingUserId,
+      disc: outgoing.disc,
+      connected: true,
+      connections: new Set([connection]),
+    });
+    return true;
+  }
+
   enableBot(humanDisc?: Disc) {
     if (humanDisc) {
       this.botDisc = humanDisc === 'p1' ? 'p2' : 'p1';

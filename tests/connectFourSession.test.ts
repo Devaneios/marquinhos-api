@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import type { ActivityMode } from '../src/services/activity/gameId';
 import {
   ConnectFourSession,
   type ConnectFourSessionIdentity,
 } from '../src/services/activity/connectFour/ConnectFourSession';
+import type { ActivityMode } from '../src/services/activity/gameId';
 
 function identity(mode: ActivityMode = 'multi'): ConnectFourSessionIdentity {
   return {
@@ -93,8 +93,8 @@ describe('ConnectFourSession', () => {
     const forfeitMsg = broadcaster.messages.find(
       (m) =>
         (m.message as { type: string }).type === 'state' &&
-        (m.message as { payload: { winner: string | null } }).payload
-          .winner === 'p2',
+        (m.message as { payload: { winner: string | null } }).payload.winner ===
+          'p2',
     );
     expect(forfeitMsg).toBeDefined();
     expect(session.playerCount).toBe(1);
@@ -102,9 +102,14 @@ describe('ConnectFourSession', () => {
 
   it('single-player mode makes the bot move after the human', async () => {
     const broadcaster = fakeBroadcaster();
-    const session = new ConnectFourSession(identity('single'), broadcaster, undefined, {
-      botMoveDelayMs: 5,
-    });
+    const session = new ConnectFourSession(
+      identity('single'),
+      broadcaster,
+      undefined,
+      {
+        botMoveDelayMs: 5,
+      },
+    );
     const disc = session.addPlayer('u1', {});
     expect(disc).toBe('p1');
     session.enableBot(disc!);
@@ -119,9 +124,14 @@ describe('ConnectFourSession', () => {
 
   it('pauses (not forfeits) on disconnect in multi mode, forfeits after grace expires', async () => {
     const broadcaster = fakeBroadcaster();
-    const session = new ConnectFourSession(identity('multi'), broadcaster, undefined, {
-      disconnectGraceMs: 20,
-    });
+    const session = new ConnectFourSession(
+      identity('multi'),
+      broadcaster,
+      undefined,
+      {
+        disconnectGraceMs: 20,
+      },
+    );
     const conn1 = {};
     session.addPlayer('u1', conn1);
     session.addPlayer('u2', {});
@@ -131,5 +141,59 @@ describe('ConnectFourSession', () => {
 
     await wait(40);
     expect(session.playerCount).toBe(1);
+  });
+});
+
+describe('ConnectFourSession.getWinnerUserId', () => {
+  it('returns null before a winner exists', () => {
+    const broadcaster = fakeBroadcaster();
+    const session = new ConnectFourSession(identity(), broadcaster);
+    session.addPlayer('user-p1', {});
+    session.addPlayer('user-p2', {});
+    expect(session.getWinnerUserId()).toBe(null);
+  });
+
+  it('resolves the winning disc back to the winning userId', () => {
+    const broadcaster = fakeBroadcaster();
+    const session = new ConnectFourSession(identity(), broadcaster);
+    session.addPlayer('user-p1', {}); // p1
+    session.addPlayer('user-p2', {}); // p2
+
+    session.dropDisc('user-p1', 0);
+    session.dropDisc('user-p2', 1);
+    session.dropDisc('user-p1', 0);
+    session.dropDisc('user-p2', 1);
+    session.dropDisc('user-p1', 0);
+    session.dropDisc('user-p2', 1);
+    session.dropDisc('user-p1', 0); // p1 completes a vertical line in col 0
+
+    expect(session.getWinnerUserId()).toBe('user-p1');
+  });
+});
+
+describe('ConnectFourSession.substitutePlayer', () => {
+  it("reseats the incoming player into the outgoing player's exact disc", () => {
+    const broadcaster = fakeBroadcaster();
+    const session = new ConnectFourSession(identity(), broadcaster);
+    session.addPlayer('user-p1', {}); // p1
+    session.addPlayer('user-p2', {}); // p2
+
+    const ok = session.substitutePlayer('user-p2', 'user-new', {});
+    expect(ok).toBe(true);
+
+    // 'user-new' now owns p2's seat: a move from 'user-p2' is no longer valid...
+    session.dropDisc('user-p1', 0);
+    const rejected = session.dropDisc('user-p2', 1);
+    expect(rejected).toBe(false);
+    // ...but the same move from 'user-new' plays as p2.
+    const accepted = session.dropDisc('user-new', 1);
+    expect(accepted).toBe(true);
+  });
+
+  it('returns false when the outgoing userId is not seated', () => {
+    const broadcaster = fakeBroadcaster();
+    const session = new ConnectFourSession(identity(), broadcaster);
+    session.addPlayer('user-p1', {});
+    expect(session.substitutePlayer('nobody', 'user-new', {})).toBe(false);
   });
 });

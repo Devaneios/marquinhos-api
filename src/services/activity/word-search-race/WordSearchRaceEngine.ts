@@ -127,8 +127,8 @@ export class WordSearchRaceEngine {
     ) {
       const direction =
         DIRECTIONS[Math.floor(Math.random() * DIRECTIONS.length)]!;
-      const endRow = 0 + direction.row * (word.length - 1);
-      const endCol = 0 + direction.col * (word.length - 1);
+      const endRow = direction.row * (word.length - 1);
+      const endCol = direction.col * (word.length - 1);
 
       const minRow = Math.max(0, -endRow);
       const maxRow = Math.min(this.size - 1, this.size - 1 - endRow);

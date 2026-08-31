@@ -323,7 +323,7 @@ describe('user_roast_provocation: disdain over generic humor', () => {
 
   it('keeps the asymmetry: rough with the group, never cruel to the individual', () => {
     const instruction = buildResponsePrompt('user_roast_provocation', []);
-    expect(instruction.toLowerCase()).toMatch(/nunca (é|e) cruel|nunca cruel/);
+    expect(instruction.toLowerCase()).toMatch(/nunca [ée] cruel|nunca cruel/);
   });
 });
 

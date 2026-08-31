@@ -140,3 +140,7 @@ ehthumbs_vista.db
 *.pem
 *.crt
 *.key.worktrees/
+!.idea/
+.idea/*
+!.idea/inspectionProfiles/
+!.idea/inspectionProfiles/Project_Default.xml

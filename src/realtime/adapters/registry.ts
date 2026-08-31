@@ -1,4 +1,4 @@
-import type { GameId } from '../../services/activity/gameId';
+import type { GameId } from 'services/activity/gameId';
 import type { GameRoomAdapter } from '../GameRoomAdapter';
 import { connectFourAdapter } from './connectFourAdapter';
 import { hangmanAdapter } from './hangmanAdapter';

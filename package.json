@@ -17,6 +17,7 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
     "morgan": "^1.11.0",
+    "nanoid": "^6.0.1",
     "openai": "^6.48.0",
     "spotify-web-api-node": "^5.0.2",
     "tslib": "^2.8.1",

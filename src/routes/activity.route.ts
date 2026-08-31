@@ -3,6 +3,7 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { validateRequest } from 'middlewares/validateRequest';
 import {
+  activityCreateRoomSchema,
   activityTokenExchangeSchema,
   activityWsSessionSchema,
 } from 'schemas/activity.schema';
@@ -31,6 +32,12 @@ router.post(
   activityLimiter,
   validateRequest(activityWsSessionSchema),
   activity.getWsSessionToken,
+);
+router.post(
+  '/rooms',
+  activityLimiter,
+  validateRequest(activityCreateRoomSchema),
+  activity.createRoom,
 );
 
 export default router;

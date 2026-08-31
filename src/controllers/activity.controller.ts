@@ -1,10 +1,13 @@
 import type { Request, Response } from 'express';
+import { customAlphabet } from 'nanoid';
 import type { ActivityMode, GameId } from 'services/activity/gameId';
 import type { BotDifficulty } from 'services/activity/pong/PongBotAI';
 import { roomKey } from 'services/activity/roomKey';
 import { mintWsSessionToken } from 'services/activity/wsSessionToken';
 import { DiscordService } from 'services/discord';
 import { logger } from 'utils/logger';
+
+const generateRoomId = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 6);
 
 class ActivityController {
   private discordService: DiscordService;
@@ -38,6 +41,7 @@ class ActivityController {
         winningScore,
         ruleset,
         options,
+        roomId,
       } = req.body as {
         accessToken: string;
         instanceId: string;
@@ -48,6 +52,7 @@ class ActivityController {
         winningScore?: number;
         ruleset?: string;
         options?: Record<string, unknown>;
+        roomId?: string;
       };
       const user = await this.discordService.getDiscordUser(accessToken);
       if (!user?.id) {
@@ -79,6 +84,7 @@ class ActivityController {
         ...(winningScore !== undefined ? { winningScore } : {}),
         ...(ruleset !== undefined ? { ruleset } : {}),
         ...(options !== undefined ? { options } : {}),
+        ...(roomId !== undefined ? { roomId } : {}),
       });
       const key = roomKey({
         instanceId,
@@ -86,10 +92,48 @@ class ActivityController {
         mode,
         userId: user.id,
         ...(ruleset !== undefined ? { ruleset } : {}),
+        ...(roomId !== undefined ? { roomId } : {}),
       });
       return res.status(200).json({ data: { token, roomKey: key } });
     } catch (error) {
       logger.error('activity.controller.ws_session_failed', { error });
+      return res.status(500).json({ message: 'Unknown Error' });
+    }
+  };
+
+  createRoom = async (req: Request, res: Response) => {
+    try {
+      const { accessToken, instanceId, guildId, game } = req.body as {
+        accessToken: string;
+        instanceId: string;
+        guildId: string;
+        game: GameId;
+        queueEnabled: boolean;
+      };
+      const user = await this.discordService.getDiscordUser(accessToken);
+      if (!user?.id) {
+        return res.status(401).json({ message: 'Invalid access token' });
+      }
+
+      const roomId = generateRoomId();
+      const token = mintWsSessionToken({
+        userId: user.id,
+        instanceId,
+        guildId,
+        mode: 'multi',
+        game,
+        roomId,
+      });
+      const key = roomKey({
+        instanceId,
+        game,
+        mode: 'multi',
+        userId: user.id,
+        roomId,
+      });
+      return res.status(200).json({ data: { roomId, token, roomKey: key } });
+    } catch (error) {
+      logger.error('activity.controller.create_room_failed', { error });
       return res.status(500).json({ message: 'Unknown Error' });
     }
   };

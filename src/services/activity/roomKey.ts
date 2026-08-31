@@ -5,6 +5,9 @@ export interface ActivityScope {
   game: GameId;
   mode: ActivityMode;
   userId: string;
+  // Required for mode 'multi' (a room subdivides a Discord instance);
+  // absent for 'single'/'local', which stay scoped per-user as before.
+  roomId?: string;
   // Only meaningful for games that host more than one pluggable ruleset
   // (cards). Appended when present so two people in the same Activity
   // instance choosing different rulesets never collide on room key; absent
@@ -27,11 +30,17 @@ export function roomKey({
   game,
   mode,
   userId,
+  roomId,
   ruleset,
 }: ActivityScope): string {
-  const base =
-    mode === 'multi'
-      ? `${instanceId}:${game}:multi`
-      : `${instanceId}:${game}:${mode}:${userId}`;
+  let base: string;
+  if (mode === 'multi') {
+    if (!roomId) {
+      throw new Error('roomKey: roomId is required for mode "multi"');
+    }
+    base = `${instanceId}:${roomId}:${game}:multi`;
+  } else {
+    base = `${instanceId}:${game}:${mode}:${userId}`;
+  }
   return ruleset ? `${base}:${ruleset}` : base;
 }

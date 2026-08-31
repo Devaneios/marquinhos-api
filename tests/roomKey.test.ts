@@ -9,16 +9,18 @@ describe('roomKey', () => {
         game: 'pong',
         mode: 'multi',
         userId: 'user-1',
+        roomId: 'ABC123',
       }),
-    ).toBe('inst-1:pong:multi');
+    ).toBe('inst-1:ABC123:pong:multi');
     expect(
       roomKey({
         instanceId: 'inst-1',
         game: 'pong',
         mode: 'multi',
         userId: 'user-2',
+        roomId: 'ABC123',
       }),
-    ).toBe('inst-1:pong:multi');
+    ).toBe('inst-1:ABC123:pong:multi');
   });
 
   it('scopes single/local mode sessions per user', () => {
@@ -58,8 +60,9 @@ describe('roomKey', () => {
         game: 'pong',
         mode: 'multi',
         userId: 'user-1',
+        roomId: 'ABC123',
       }),
-    ).toBe('inst-1:pong:multi');
+    ).toBe('inst-1:ABC123:pong:multi');
   });
 
   it('appends the ruleset to a multi-mode key so two different card games in the same instance never collide', () => {
@@ -69,9 +72,10 @@ describe('roomKey', () => {
         game: 'cards',
         mode: 'multi',
         userId: 'user-1',
+        roomId: 'ABC123',
         ruleset: 'truco',
       }),
-    ).toBe('inst-1:cards:multi:truco');
+    ).toBe('inst-1:ABC123:cards:multi:truco');
   });
 
   it('appends the ruleset to a private-mode key after the userId', () => {
@@ -84,5 +88,41 @@ describe('roomKey', () => {
         ruleset: 'truco',
       }),
     ).toBe('inst-1:cards:single:user-1:truco');
+  });
+
+  it('requires a roomId for multi-mode sessions and scopes the key to it', () => {
+    expect(
+      roomKey({
+        instanceId: 'inst-1',
+        game: 'pong',
+        mode: 'multi',
+        userId: 'user-1',
+        roomId: 'ABC123',
+      }),
+    ).toBe('inst-1:ABC123:pong:multi');
+  });
+
+  it('throws when mode is multi and roomId is missing', () => {
+    expect(() =>
+      roomKey({
+        instanceId: 'inst-1',
+        game: 'pong',
+        mode: 'multi',
+        userId: 'user-1',
+      }),
+    ).toThrow();
+  });
+
+  it('appends the ruleset after the roomId-scoped multi-mode base', () => {
+    expect(
+      roomKey({
+        instanceId: 'inst-1',
+        game: 'cards',
+        mode: 'multi',
+        userId: 'user-1',
+        roomId: 'ABC123',
+        ruleset: 'truco',
+      }),
+    ).toBe('inst-1:ABC123:cards:multi:truco');
   });
 });

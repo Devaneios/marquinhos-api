@@ -287,6 +287,7 @@ describe('ActivityController.getWsSessionToken', () => {
       game: 'cards',
       ruleset: 'truco',
       options: { seed: 7 },
+      roomId: 'ROOM01',
     });
     const res = makeRes();
 
@@ -303,6 +304,7 @@ describe('ActivityController.getWsSessionToken', () => {
       game: 'cards',
       ruleset: 'truco',
       options: { seed: 7 },
+      roomId: 'ROOM01',
     });
     expect(payload.data.roomKey).toBe(
       roomKey({
@@ -311,6 +313,7 @@ describe('ActivityController.getWsSessionToken', () => {
         mode: 'multi',
         userId: 'user-1',
         ruleset: 'truco',
+        roomId: 'ROOM01',
       }),
     );
   });
@@ -335,5 +338,36 @@ describe('ActivityController.getWsSessionToken', () => {
     await controller.getWsSessionToken(req, res as any);
 
     expect(res.getStatus()).toBe(500);
+  });
+});
+
+describe('ActivityController.createRoom', () => {
+  it('mints a roomId and a multi-mode token/roomKey', async () => {
+    const fakeService = {
+      getDiscordUser: async () => ({ id: 'user-1' }),
+    } as unknown as DiscordService;
+    const controller = new ActivityController(fakeService);
+
+    const req = makeReq({
+      accessToken: 'token',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      game: 'tic-tac-toe',
+      queueEnabled: true,
+    });
+    const res = makeRes();
+
+    await controller.createRoom(req, res as any);
+
+    expect(res.getStatus()).toBe(200);
+    const payload = res.getPayload() as {
+      data: { roomId: string; token: string; roomKey: string };
+    };
+    expect(typeof payload.data.roomId).toBe('string');
+    expect(payload.data.roomId.length).toBeGreaterThan(0);
+    expect(typeof payload.data.token).toBe('string');
+    expect(payload.data.roomKey).toBe(
+      `inst-1:${payload.data.roomId}:tic-tac-toe:multi`,
+    );
   });
 });

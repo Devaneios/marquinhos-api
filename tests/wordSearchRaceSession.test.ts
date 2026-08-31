@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import type { ActivityMode } from '../src/services/activity/gameId';
+import type { ActivityMode } from 'services/activity/gameId';
 import {
   WordSearchRaceSession,
   type WordSearchRaceSessionIdentity,
-} from '../src/services/activity/word-search-race/WordSearchRaceSession';
-import type { GamificationService } from '../src/services/gamification';
+} from 'services/activity/word-search-race/WordSearchRaceSession';
+import type { GamificationService } from 'services/gamification';
 
 function identity(mode: ActivityMode = 'multi'): WordSearchRaceSessionIdentity {
   return {

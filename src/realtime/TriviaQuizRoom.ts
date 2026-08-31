@@ -1,13 +1,13 @@
 import { Room, type Client } from 'colyseus';
-import { roomKey } from '../services/activity/roomKey';
-import type { ActivityBroadcaster } from '../services/activity/shared/ActivityBroadcaster';
-import { RateLimiter } from '../services/activity/shared/RateLimiter';
-import { TriviaQuizSession } from '../services/activity/trivia-quiz/TriviaQuizSession';
+import { roomKey } from 'services/activity/roomKey';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import { RateLimiter } from 'services/activity/shared/RateLimiter';
+import { TriviaQuizSession } from 'services/activity/trivia-quiz/TriviaQuizSession';
 import {
   verifyWsSessionToken,
   type WsSessionPayload,
-} from '../services/activity/wsSessionToken';
-import { GamificationService } from '../services/gamification/GamificationService';
+} from 'services/activity/wsSessionToken';
+import { GamificationService } from 'services/gamification/GamificationService';
 
 const ANSWER_RATE_LIMIT_WINDOW_MS = 1000;
 const ANSWER_RATE_LIMIT_MAX = 1;
@@ -32,7 +32,7 @@ export class TriviaQuizRoom extends Room {
   }
 
   override onCreate(options: { roomKey: string; token?: string }) {
-    this.setMetadata({ roomKey: options.roomKey });
+    void this.setMetadata({ roomKey: options.roomKey });
 
     const initialSession = options.token
       ? verifyWsSessionToken(options.token)

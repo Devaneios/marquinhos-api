@@ -1,14 +1,14 @@
 import { Room, type Client } from 'colyseus';
-import { CardTableSession } from '../services/activity/cards/CardTableSession';
-import type { PerClientBroadcaster } from '../services/activity/cards/PerClientBroadcaster';
-import { cardGameRegistry } from '../services/activity/cards/registry';
-import { roomKey } from '../services/activity/roomKey';
-import { RateLimiter } from '../services/activity/shared/RateLimiter';
+import { CardTableSession } from 'services/activity/cards/CardTableSession';
+import type { PerClientBroadcaster } from 'services/activity/cards/PerClientBroadcaster';
+import { cardGameRegistry } from 'services/activity/cards/registry';
+import { roomKey } from 'services/activity/roomKey';
+import { RateLimiter } from 'services/activity/shared/RateLimiter';
 import {
   verifyWsSessionToken,
   type WsSessionPayload,
-} from '../services/activity/wsSessionToken';
-import { GamificationService } from '../services/gamification/GamificationService';
+} from 'services/activity/wsSessionToken';
+import { GamificationService } from 'services/gamification/GamificationService';
 
 const MOVE_RATE_LIMIT_WINDOW_MS = 1000;
 // Looser than Pong's input limiter — card moves are human-paced (clicks),
@@ -35,7 +35,7 @@ export class CardTableRoom extends Room {
   }
 
   override onCreate(options: { roomKey: string; token?: string }) {
-    this.setMetadata({ roomKey: options.roomKey });
+    void this.setMetadata({ roomKey: options.roomKey });
 
     const initialSession = options.token
       ? verifyWsSessionToken(options.token)

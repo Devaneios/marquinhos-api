@@ -1,4 +1,4 @@
-import { logger } from '../../utils/logger';
+import { logger } from 'utils/logger';
 
 const REQUEST_TIMEOUT_MS = 4000;
 

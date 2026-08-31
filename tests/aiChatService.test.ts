@@ -1,15 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
-import { AgentToolLoopService } from '../src/services/aiChat/AgentToolLoopService';
-import { AiChatService } from '../src/services/aiChat/AiChatService';
-import type { AiTraceRecorder } from '../src/services/aiChat/AiTraceRecorder';
-import { GuardrailService } from '../src/services/aiChat/GuardrailService';
-import type { OpenAiClient } from '../src/services/aiChat/OpenAiClient';
+import { AgentToolLoopService } from 'services/aiChat/AgentToolLoopService';
+import { AiChatService } from 'services/aiChat/AiChatService';
+import type { AiTraceRecorder } from 'services/aiChat/AiTraceRecorder';
+import { GuardrailService } from 'services/aiChat/GuardrailService';
+import type { OpenAiClient } from 'services/aiChat/OpenAiClient';
 import {
   MAIN_CLASSIFY_SYSTEM_PROMPT,
   SUB_CLASSIFIERS,
-} from '../src/services/aiChat/prompts';
-import type { RateLimitService } from '../src/services/aiChat/RateLimitService';
-import type { AiChatResult } from '../src/services/aiChat/types';
+} from 'services/aiChat/prompts';
+import type { RateLimitService } from 'services/aiChat/RateLimitService';
+import type { AiChatResult } from 'services/aiChat/types';
 
 function fakeRateLimitService(allowed: boolean): RateLimitService {
   return { checkAndIncrement: () => allowed } as unknown as RateLimitService;

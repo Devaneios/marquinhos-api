@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
-import { EmojiReactionService } from '../services/aiChat/EmojiReactionService';
-import { logger } from '../utils/logger';
+import { EmojiReactionService } from 'services/aiChat/EmojiReactionService';
+import { logger } from 'utils/logger';
 
 class EmojiReactionController {
   private service: EmojiReactionService;

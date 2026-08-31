@@ -1,8 +1,8 @@
-import { GamificationService } from '../../gamification';
-import type { ActivityMode } from '../gameId';
-import type { ActionResult } from '../shared/ActionResult';
-import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
-import { WordleRaceEngine } from './WordleRaceEngine';
+import type { ActivityMode } from 'services/activity/gameId';
+import type { ActionResult } from 'services/activity/shared/ActionResult';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import { WordleRaceEngine } from 'services/activity/wordle-race/WordleRaceEngine';
+import { GamificationService } from 'services/gamification';
 
 interface WordleRaceSessionIdentity {
   sessionKey: string;
@@ -24,10 +24,10 @@ export interface WordleRaceSessionOptions {
 export class WordleRaceSession {
   private engine: WordleRaceEngine;
   private players: WordleRacePlayer[] = [];
-  private roomKey: string;
+  private readonly roomKey: string;
   private gamification: GamificationService;
   private resultRecorded = false;
-  private onSessionEnded?: () => void;
+  private readonly onSessionEnded?: () => void;
   private endGameTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(

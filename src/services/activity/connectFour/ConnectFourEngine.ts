@@ -40,7 +40,7 @@ const DIRECTIONS: Array<[[number, number], [number, number]]> = [
 ];
 
 export class ConnectFourEngine {
-  private grid: (Disc | null)[][];
+  private readonly grid: (Disc | null)[][];
   private currentTurn: Disc = 'p1';
   private winner: Disc | null = null;
   private winningLine: Array<{ row: number; col: number }> | null = null;

@@ -1,10 +1,10 @@
 import type { Request, Response } from 'express';
-import type { ActivityMode, GameId } from '../services/activity/gameId';
-import type { BotDifficulty } from '../services/activity/pong/PongBotAI';
-import { roomKey } from '../services/activity/roomKey';
-import { mintWsSessionToken } from '../services/activity/wsSessionToken';
-import { DiscordService } from '../services/discord';
-import { logger } from '../utils/logger';
+import type { ActivityMode, GameId } from 'services/activity/gameId';
+import type { BotDifficulty } from 'services/activity/pong/PongBotAI';
+import { roomKey } from 'services/activity/roomKey';
+import { mintWsSessionToken } from 'services/activity/wsSessionToken';
+import { DiscordService } from 'services/discord';
+import { logger } from 'utils/logger';
 
 class ActivityController {
   private discordService: DiscordService;

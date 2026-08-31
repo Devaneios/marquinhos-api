@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from 'bun:test';
-import { BingoSpeedSession } from '../src/services/activity/bingoSpeed/BingoSpeedSession';
-import type { ActivityBroadcaster } from '../src/services/activity/shared/ActivityBroadcaster';
+import { BingoSpeedSession } from 'services/activity/bingoSpeed/BingoSpeedSession';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
 
 describe('BingoSpeedSession', () => {
   function createMockBroadcaster() {

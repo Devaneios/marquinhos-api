@@ -1,8 +1,8 @@
-import { logger } from '../../../utils/logger';
-import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
-import type { GameDefinition } from './core/GameDefinition';
-import { SeededRng } from './core/rng';
-import type { PerClientBroadcaster } from './PerClientBroadcaster';
+import type { GameDefinition } from 'services/activity/cards/core/GameDefinition';
+import { SeededRng } from 'services/activity/cards/core/rng';
+import type { PerClientBroadcaster } from 'services/activity/cards/PerClientBroadcaster';
+import { DisconnectGraceTimer } from 'services/activity/shared/DisconnectGraceTimer';
+import { logger } from 'utils/logger';
 
 export interface CardTableIdentity {
   sessionKey: string;
@@ -55,8 +55,8 @@ export class CardTableSession<TState> {
   private turnClock = new DisconnectGraceTimer<string>();
   private roundAnnounced = false;
   private seed: number;
-  private onSessionEnded?: () => void;
-  private disconnectGraceMs: number;
+  private readonly onSessionEnded?: () => void;
+  private readonly disconnectGraceMs: number;
 
   constructor(
     private identity: CardTableIdentity,

@@ -3,7 +3,7 @@ import type {
   PaddleSide,
   PongEngineConfig,
   PongState,
-} from './PongEngine';
+} from 'services/activity/pong/PongEngine';
 
 export type BotDifficulty = 'easy' | 'normal' | 'hard';
 

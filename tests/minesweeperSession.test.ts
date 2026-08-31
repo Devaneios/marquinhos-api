@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from 'bun:test';
-import { MinesweeperSession } from '../src/services/activity/minesweeper/MinesweeperSession';
-import type { GameResultInput } from '../src/services/gamification/types';
+import { MinesweeperSession } from 'services/activity/minesweeper/MinesweeperSession';
+import type { GameResultInput } from 'services/gamification/types';
 
 function fakeBroadcaster() {
   const messages: {

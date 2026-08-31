@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   SnakeSession,
   type SnakeSessionIdentity,
-} from '../src/services/activity/snake-game/SnakeSession';
+} from 'services/activity/snake-game/SnakeSession';
 
 const MOCK_IDENTITY: SnakeSessionIdentity = {
   sessionKey: 'test:snake-game:multi:user1',

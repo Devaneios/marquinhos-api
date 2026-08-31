@@ -1,4 +1,7 @@
-import type { CellValue, Player } from './TicTacToeEngine';
+import type {
+  CellValue,
+  Player,
+} from 'services/activity/ticTacToe/TicTacToeEngine';
 
 const LINES = [
   [0, 1, 2],

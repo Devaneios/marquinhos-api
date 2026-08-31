@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
-import { KnowledgeBaseClient } from '../src/services/aiChat/KnowledgeBaseClient';
+import { KnowledgeBaseClient } from 'services/aiChat/KnowledgeBaseClient';
 
 const ORIGINAL_ENV = { ...process.env };
 

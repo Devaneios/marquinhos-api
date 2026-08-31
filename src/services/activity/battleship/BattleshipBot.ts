@@ -5,7 +5,7 @@ import {
   type Orientation,
   type ShipPlacement,
   type ShipType,
-} from './BattleshipEngine';
+} from 'services/activity/battleship/BattleshipEngine';
 
 const SHIP_TYPES = Object.keys(SHIP_SIZES) as ShipType[];
 

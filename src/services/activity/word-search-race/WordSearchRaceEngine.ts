@@ -75,7 +75,7 @@ function pickRandomWords(bank: string[], count: number): string[] {
 export class WordSearchRaceEngine {
   private readonly size: number;
   private readonly words: string[];
-  private grid: string[][];
+  private readonly grid: string[][];
   private remaining: Set<string>;
   private found: FoundWord[] = [];
   private scores = new Map<string, number>();

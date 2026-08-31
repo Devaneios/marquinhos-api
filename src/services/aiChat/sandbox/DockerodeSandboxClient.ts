@@ -3,7 +3,7 @@ import type {
   ContainerCreateConfig,
   DockerClient,
   DockerExecResult,
-} from './DockerClient';
+} from 'services/aiChat/sandbox/DockerClient';
 
 const TIMEOUT_EXIT_CODE = 124;
 

@@ -1,5 +1,5 @@
-import type { Card } from '../../core/card';
-import { SPANISH_RANKS } from '../../core/deckFactory';
+import type { Card } from 'services/activity/cards/core/card';
+import { SPANISH_RANKS } from 'services/activity/cards/core/deckFactory';
 
 // Card-strength ranking is Truco-specific rule logic, not a universal baralho
 // concept — it lives only in this ruleset, not in core/. Weakest to strongest.

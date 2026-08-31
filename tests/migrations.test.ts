@@ -40,7 +40,7 @@ describe(MIGRATION, () => {
       ['agent_daily_limit', 5],
     ]);
 
-    db.exec(migrationSql());
+    db.run(migrationSql());
 
     expect(configValues(db)).toEqual({
       user_daily_limit: 100,
@@ -56,7 +56,7 @@ describe(MIGRATION, () => {
       ['agent_daily_limit', 3],
     ]);
 
-    db.exec(migrationSql());
+    db.run(migrationSql());
 
     expect(configValues(db)).toEqual({
       user_daily_limit: 25,

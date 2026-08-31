@@ -30,7 +30,7 @@ export interface SnakeGameState {
 }
 
 export class SnakeEngine {
-  private config: Required<SnakeEngineConfig>;
+  private readonly config: Required<SnakeEngineConfig>;
   private state: SnakeGameState;
 
   constructor(config: SnakeEngineConfig = {}) {

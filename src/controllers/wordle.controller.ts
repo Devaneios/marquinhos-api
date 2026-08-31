@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { WordleService } from '../services/wordle';
+import { WordleService } from 'services/wordle';
 
 const service = new WordleService();
 

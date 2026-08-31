@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { DisconnectGraceTimer } from '../src/services/activity/shared/DisconnectGraceTimer';
+import { DisconnectGraceTimer } from 'services/activity/shared/DisconnectGraceTimer';
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

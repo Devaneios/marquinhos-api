@@ -1,52 +1,52 @@
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import { Server as ColyseusServer } from 'colyseus';
 import cors from 'cors';
+import 'database/sqlite';
 import dotenv from 'dotenv';
 import type { Express, NextFunction, Request, Response } from 'express';
 import express from 'express';
 import http from 'http';
 import morgan from 'morgan';
-import './database/sqlite';
-import { BattleshipRoom } from './realtime/BattleshipRoom';
-import { BingoSpeedRoom } from './realtime/BingoSpeedRoom';
-import { BoggleRoom } from './realtime/BoggleRoom';
-import { CardTableRoom } from './realtime/CardTableRoom';
-import { CheckersRoom } from './realtime/CheckersRoom';
-import { ConnectFourRoom } from './realtime/ConnectFourRoom';
-import { DominoesBlockRoom } from './realtime/DominoesBlockRoom';
-import { HangmanRoom } from './realtime/HangmanRoom';
-import { MinesweeperRoom } from './realtime/MinesweeperRoom';
-import { PongRoom } from './realtime/PongRoom';
-import { RpsRoom } from './realtime/RpsRoom';
-import { SnakeRoom } from './realtime/SnakeRoom';
-import { TicTacToeRoom } from './realtime/TicTacToeRoom';
-import { TowerUnstableRoom } from './realtime/TowerUnstableRoom';
-import { TriviaQuizRoom } from './realtime/TriviaQuizRoom';
-import { WordChainRoom } from './realtime/WordChainRoom';
-import { WordleRaceRoom } from './realtime/WordleRaceRoom';
-import { WordleRoom } from './realtime/WordleRoom';
-import { WordSearchRaceRoom } from './realtime/WordSearchRaceRoom';
-import activityRouter from './routes/activity.route';
-import aiChatRouter from './routes/aiChat.route';
-import * as auth from './routes/auth.route';
-import emojiReactionRouter from './routes/emojiReaction.route';
-import evolutiveAchievementsRouter from './routes/evolutiveAchievements.route';
-import gamificationRouter from './routes/gamification.route';
-import mazeRouter from './routes/maze.route';
-import * as privacyPolicy from './routes/privacyPolicy.route';
-import * as scrobble from './routes/scrobble.route';
-import * as user from './routes/user.route';
-import wordleRouter from './routes/wordle.route';
-import { AgentRateLimitService } from './services/aiChat/AgentRateLimitService';
-import { describeStaticPrompts } from './services/aiChat/promptRegistry';
-import { RateLimitService } from './services/aiChat/RateLimitService';
-import { ResearchOrchestrator } from './services/aiChat/research/ResearchOrchestrator';
-import { ResearchRateLimitService } from './services/aiChat/research/ResearchRateLimitService';
-import { DockerodeSandboxClient } from './services/aiChat/sandbox/DockerodeSandboxClient';
-import { SandboxManager } from './services/aiChat/sandbox/SandboxManager';
-import { GamificationService } from './services/gamification';
-import { getValidationSet } from './services/wordle';
-import { logger } from './utils/logger';
+import { BattleshipRoom } from 'realtime/BattleshipRoom';
+import { BingoSpeedRoom } from 'realtime/BingoSpeedRoom';
+import { BoggleRoom } from 'realtime/BoggleRoom';
+import { CardTableRoom } from 'realtime/CardTableRoom';
+import { CheckersRoom } from 'realtime/CheckersRoom';
+import { ConnectFourRoom } from 'realtime/ConnectFourRoom';
+import { DominoesBlockRoom } from 'realtime/DominoesBlockRoom';
+import { HangmanRoom } from 'realtime/HangmanRoom';
+import { MinesweeperRoom } from 'realtime/MinesweeperRoom';
+import { PongRoom } from 'realtime/PongRoom';
+import { RpsRoom } from 'realtime/RpsRoom';
+import { SnakeRoom } from 'realtime/SnakeRoom';
+import { TicTacToeRoom } from 'realtime/TicTacToeRoom';
+import { TowerUnstableRoom } from 'realtime/TowerUnstableRoom';
+import { TriviaQuizRoom } from 'realtime/TriviaQuizRoom';
+import { WordChainRoom } from 'realtime/WordChainRoom';
+import { WordleRaceRoom } from 'realtime/WordleRaceRoom';
+import { WordleRoom } from 'realtime/WordleRoom';
+import { WordSearchRaceRoom } from 'realtime/WordSearchRaceRoom';
+import activityRouter from 'routes/activity.route';
+import aiChatRouter from 'routes/aiChat.route';
+import * as auth from 'routes/auth.route';
+import emojiReactionRouter from 'routes/emojiReaction.route';
+import evolutiveAchievementsRouter from 'routes/evolutiveAchievements.route';
+import gamificationRouter from 'routes/gamification.route';
+import mazeRouter from 'routes/maze.route';
+import * as privacyPolicy from 'routes/privacyPolicy.route';
+import * as scrobble from 'routes/scrobble.route';
+import * as user from 'routes/user.route';
+import wordleRouter from 'routes/wordle.route';
+import { AgentRateLimitService } from 'services/aiChat/AgentRateLimitService';
+import { describeStaticPrompts } from 'services/aiChat/promptRegistry';
+import { RateLimitService } from 'services/aiChat/RateLimitService';
+import { ResearchOrchestrator } from 'services/aiChat/research/ResearchOrchestrator';
+import { ResearchRateLimitService } from 'services/aiChat/research/ResearchRateLimitService';
+import { DockerodeSandboxClient } from 'services/aiChat/sandbox/DockerodeSandboxClient';
+import { SandboxManager } from 'services/aiChat/sandbox/SandboxManager';
+import { GamificationService } from 'services/gamification';
+import { getValidationSet } from 'services/wordle';
+import { logger } from 'utils/logger';
 
 dotenv.config();
 
@@ -154,7 +154,7 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 
 // Startup initialisation — failures crash the process instead of silently
 // serving with empty XP config or missing wordle word list.
-import { runMigrations } from './database/migrate';
+import { runMigrations } from 'database/migrate';
 
 try {
   runMigrations();
@@ -216,4 +216,4 @@ gameServer.define('boggle-word-race', BoggleRoom).filterBy(['roomKey']);
 gameServer.define('word-chain', WordChainRoom).filterBy(['roomKey']);
 gameServer.define('snake-game', SnakeRoom).filterBy(['roomKey']);
 
-gameServer.listen(Number(process.env.HTTP_PORT) || 3000);
+void gameServer.listen(Number(process.env.HTTP_PORT) || 3000);

@@ -1,7 +1,10 @@
-import type { Question, TriviaQuizState } from './types';
+import type {
+  Question,
+  TriviaQuizState,
+} from 'services/activity/trivia-quiz/types';
 
 export class TriviaQuizEngine {
-  private state: TriviaQuizState;
+  private readonly state: TriviaQuizState;
 
   constructor(questions: readonly Question[]) {
     this.state = {

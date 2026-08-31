@@ -1,7 +1,11 @@
+import { AGENT_CAPABILITIES } from 'services/aiChat/capabilities';
+import { CUSTOM_EMOJIS, STANDARD_EMOJIS } from 'services/aiChat/emojiCatalog';
+import type {
+  MainCategory,
+  ResponseCategory,
+  ResponseFormat,
+} from 'services/aiChat/types';
 import { z } from 'zod';
-import { AGENT_CAPABILITIES } from './capabilities';
-import { CUSTOM_EMOJIS, STANDARD_EMOJIS } from './emojiCatalog';
-import type { MainCategory, ResponseCategory, ResponseFormat } from './types';
 
 export const mainClassificationSchema = z.object({
   category: z.enum([

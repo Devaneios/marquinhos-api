@@ -1,8 +1,8 @@
 import OpenAI from 'openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
+import { NOOP_TRACE, type TraceContext } from 'services/aiChat/AiTraceRecorder';
+import { summarizeMessages } from 'services/aiChat/promptRegistry';
 import type { ZodType } from 'zod';
-import { NOOP_TRACE, type TraceContext } from './AiTraceRecorder';
-import { summarizeMessages } from './promptRegistry';
 
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.4-mini';
 const REQUEST_TIMEOUT_MS = 30000;

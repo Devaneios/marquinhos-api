@@ -1,4 +1,7 @@
-import type { SnakeDirection, SnakeGameState } from './SnakeEngine';
+import type {
+  SnakeDirection,
+  SnakeGameState,
+} from 'services/activity/snake-game/SnakeEngine';
 
 interface Point {
   x: number;

@@ -2,11 +2,11 @@ import { describe, expect, it } from 'bun:test';
 import {
   activityTokenExchangeSchema,
   activityWsSessionSchema,
-} from '../src/schemas/activity.schema';
+} from 'schemas/activity.schema';
 
 describe('activityTokenExchangeSchema', () => {
   it('accepts a payload with a code', async () => {
-    await expect(
+    expect(
       activityTokenExchangeSchema.parseAsync({
         body: { code: 'auth-code-abc' },
         query: {},
@@ -16,7 +16,7 @@ describe('activityTokenExchangeSchema', () => {
   });
 
   it('rejects a payload missing code', async () => {
-    await expect(
+    expect(
       activityTokenExchangeSchema.parseAsync({
         body: {},
         query: {},
@@ -26,7 +26,7 @@ describe('activityTokenExchangeSchema', () => {
   });
 
   it('rejects an empty code string', async () => {
-    await expect(
+    expect(
       activityTokenExchangeSchema.parseAsync({
         body: { code: '' },
         query: {},
@@ -38,7 +38,7 @@ describe('activityTokenExchangeSchema', () => {
 
 describe('activityWsSessionSchema', () => {
   it('accepts a payload with accessToken, instanceId, guildId, mode and game', async () => {
-    await expect(
+    expect(
       activityWsSessionSchema.parseAsync({
         body: {
           accessToken: 'tok_abc',
@@ -54,7 +54,7 @@ describe('activityWsSessionSchema', () => {
   });
 
   it('accepts mode "single"', async () => {
-    await expect(
+    expect(
       activityWsSessionSchema.parseAsync({
         body: {
           accessToken: 'tok_abc',
@@ -70,7 +70,7 @@ describe('activityWsSessionSchema', () => {
   });
 
   it('rejects a payload missing instanceId', async () => {
-    await expect(
+    expect(
       activityWsSessionSchema.parseAsync({
         body: {
           accessToken: 'tok_abc',
@@ -85,7 +85,7 @@ describe('activityWsSessionSchema', () => {
   });
 
   it('rejects a payload missing accessToken', async () => {
-    await expect(
+    expect(
       activityWsSessionSchema.parseAsync({
         body: {
           instanceId: 'inst-1',
@@ -100,7 +100,7 @@ describe('activityWsSessionSchema', () => {
   });
 
   it('rejects a payload missing guildId', async () => {
-    await expect(
+    expect(
       activityWsSessionSchema.parseAsync({
         body: {
           accessToken: 'tok_abc',
@@ -115,7 +115,7 @@ describe('activityWsSessionSchema', () => {
   });
 
   it('rejects a payload missing mode', async () => {
-    await expect(
+    expect(
       activityWsSessionSchema.parseAsync({
         body: {
           accessToken: 'tok_abc',
@@ -130,7 +130,7 @@ describe('activityWsSessionSchema', () => {
   });
 
   it('rejects an invalid mode value', async () => {
-    await expect(
+    expect(
       activityWsSessionSchema.parseAsync({
         body: {
           accessToken: 'tok_abc',
@@ -146,7 +146,7 @@ describe('activityWsSessionSchema', () => {
   });
 
   it('rejects a payload missing game', async () => {
-    await expect(
+    expect(
       activityWsSessionSchema.parseAsync({
         body: {
           accessToken: 'tok_abc',
@@ -161,7 +161,7 @@ describe('activityWsSessionSchema', () => {
   });
 
   it('accepts an optional difficulty value', async () => {
-    await expect(
+    expect(
       activityWsSessionSchema.parseAsync({
         body: {
           accessToken: 'tok_abc',
@@ -178,7 +178,7 @@ describe('activityWsSessionSchema', () => {
   });
 
   it('accepts a payload without a difficulty', async () => {
-    await expect(
+    expect(
       activityWsSessionSchema.parseAsync({
         body: {
           accessToken: 'tok_abc',
@@ -194,7 +194,7 @@ describe('activityWsSessionSchema', () => {
   });
 
   it('rejects an invalid difficulty value', async () => {
-    await expect(
+    expect(
       activityWsSessionSchema.parseAsync({
         body: {
           accessToken: 'tok_abc',
@@ -211,7 +211,7 @@ describe('activityWsSessionSchema', () => {
   });
 
   it('accepts game "cards"', async () => {
-    await expect(
+    expect(
       activityWsSessionSchema.parseAsync({
         body: {
           accessToken: 'tok_abc',
@@ -227,7 +227,7 @@ describe('activityWsSessionSchema', () => {
   });
 
   it('rejects an invalid game value', async () => {
-    await expect(
+    expect(
       activityWsSessionSchema.parseAsync({
         body: {
           accessToken: 'tok_abc',

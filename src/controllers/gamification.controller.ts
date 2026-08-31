@@ -3,8 +3,8 @@ import type {
   AddXpResult,
   UserAchievement,
   UserLevel,
-} from '../services/gamification';
-import { GamificationService } from '../services/gamification';
+} from 'services/gamification';
+import { GamificationService } from 'services/gamification';
 
 interface UserGuildParams {
   userId: string;

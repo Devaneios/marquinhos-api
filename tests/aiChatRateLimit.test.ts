@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { RateLimitService } from '../src/services/aiChat/RateLimitService';
+import { RateLimitService } from 'services/aiChat/RateLimitService';
 
 function setupDb(): Database {
   const db = new Database(':memory:');

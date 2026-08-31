@@ -6,7 +6,7 @@ import {
   isValidPath,
   scoreForLength,
   type Cell,
-} from '../src/services/activity/boggle/BoggleEngine';
+} from 'services/activity/boggle/BoggleEngine';
 
 const GRID = [
   ['C', 'A', 'T', 'S'],
@@ -15,9 +15,12 @@ const GRID = [
   ['A', 'B', 'C', 'D'],
 ];
 
-function makeEngine(overrides: Partial<{ wordSet: Set<string>; durationMs: number }> = {}) {
+function makeEngine(
+  overrides: Partial<{ wordSet: Set<string>; durationMs: number }> = {},
+) {
   return new BoggleEngine({
-    wordSet: overrides.wordSet ?? new Set(['cat', 'car', 'care', 'dog', 'cats']),
+    wordSet:
+      overrides.wordSet ?? new Set(['cat', 'car', 'care', 'dog', 'cats']),
     grid: GRID,
     durationMs: overrides.durationMs,
   });
@@ -44,17 +47,28 @@ describe('generateGrid', () => {
 
 describe('isValidPath', () => {
   it('accepts a straight horizontal path', () => {
-    const path: Cell[] = [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }];
+    const path: Cell[] = [
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+      { row: 0, col: 2 },
+    ];
     expect(isValidPath(path)).toBe(true);
   });
 
   it('accepts a diagonal path', () => {
-    const path: Cell[] = [{ row: 0, col: 0 }, { row: 1, col: 1 }, { row: 2, col: 2 }];
+    const path: Cell[] = [
+      { row: 0, col: 0 },
+      { row: 1, col: 1 },
+      { row: 2, col: 2 },
+    ];
     expect(isValidPath(path)).toBe(true);
   });
 
   it('rejects a path with a non-adjacent jump', () => {
-    const path: Cell[] = [{ row: 0, col: 0 }, { row: 0, col: 2 }];
+    const path: Cell[] = [
+      { row: 0, col: 0 },
+      { row: 0, col: 2 },
+    ];
     expect(isValidPath(path)).toBe(false);
   });
 
@@ -68,7 +82,10 @@ describe('isValidPath', () => {
   });
 
   it('rejects a path with an out-of-bounds cell', () => {
-    const path: Cell[] = [{ row: 0, col: 0 }, { row: -1, col: 0 }];
+    const path: Cell[] = [
+      { row: 0, col: 0 },
+      { row: -1, col: 0 },
+    ];
     expect(isValidPath(path)).toBe(false);
   });
 
@@ -83,13 +100,21 @@ describe('isValidPath', () => {
 
 describe('extractWord', () => {
   it('spells out the letters along the path in order', () => {
-    const path: Cell[] = [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }];
+    const path: Cell[] = [
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+      { row: 0, col: 2 },
+    ];
     expect(extractWord(GRID, path)).toBe('CAT');
   });
 
   it('follows a diagonal path correctly', () => {
     // C(0,0) -> R(1,1) -> G(2,2)
-    const path: Cell[] = [{ row: 0, col: 0 }, { row: 1, col: 1 }, { row: 2, col: 2 }];
+    const path: Cell[] = [
+      { row: 0, col: 0 },
+      { row: 1, col: 1 },
+      { row: 2, col: 2 },
+    ];
     expect(extractWord(GRID, path)).toBe('CRG');
   });
 });
@@ -121,7 +146,11 @@ describe('BoggleEngine.submitWord', () => {
   it('rejects submissions before the game has started', () => {
     const engine = makeEngine();
     engine.addPlayer('u1');
-    const path: Cell[] = [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }];
+    const path: Cell[] = [
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+      { row: 0, col: 2 },
+    ];
     const result = engine.submitWord('u1', path);
     expect(result).toEqual({ accepted: false, reason: 'not_started' });
   });
@@ -129,7 +158,11 @@ describe('BoggleEngine.submitWord', () => {
   it('rejects an unknown player', () => {
     const engine = makeEngine();
     engine.start(0);
-    const path: Cell[] = [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }];
+    const path: Cell[] = [
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+      { row: 0, col: 2 },
+    ];
     const result = engine.submitWord('ghost', path, 1000);
     expect(result).toEqual({ accepted: false, reason: 'unknown_player' });
   });
@@ -144,7 +177,10 @@ describe('BoggleEngine.submitWord', () => {
     engine.addPlayer('u1');
     // C(0,0) and O(1,0) are adjacent normally; force a non-adjacent pair:
     // C(0,0) -> O(2,1) is not adjacent (row diff 2).
-    const path: Cell[] = [{ row: 0, col: 0 }, { row: 2, col: 1 }];
+    const path: Cell[] = [
+      { row: 0, col: 0 },
+      { row: 2, col: 1 },
+    ];
     const result = engine.submitWord('u1', path, 1000);
     expect(result).toEqual({ accepted: false, reason: 'invalid_path' });
   });
@@ -166,7 +202,10 @@ describe('BoggleEngine.submitWord', () => {
     const engine = makeEngine({ wordSet: new Set(['ca']) });
     engine.start(0);
     engine.addPlayer('u1');
-    const path: Cell[] = [{ row: 0, col: 0 }, { row: 0, col: 1 }];
+    const path: Cell[] = [
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+    ];
     const result = engine.submitWord('u1', path, 1000);
     expect(result).toEqual({ accepted: false, reason: 'too_short' });
   });
@@ -176,7 +215,11 @@ describe('BoggleEngine.submitWord', () => {
     engine.start(0);
     engine.addPlayer('u1');
     // C(0,0) -> O(1,0) -> D(2,0) spells "COD", not in the word set.
-    const path: Cell[] = [{ row: 0, col: 0 }, { row: 1, col: 0 }, { row: 2, col: 0 }];
+    const path: Cell[] = [
+      { row: 0, col: 0 },
+      { row: 1, col: 0 },
+      { row: 2, col: 0 },
+    ];
     const result = engine.submitWord('u1', path, 1000);
     expect(result).toEqual({ accepted: false, reason: 'not_a_word' });
   });
@@ -185,7 +228,11 @@ describe('BoggleEngine.submitWord', () => {
     const engine = makeEngine();
     engine.start(0);
     engine.addPlayer('u1');
-    const path: Cell[] = [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }];
+    const path: Cell[] = [
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+      { row: 0, col: 2 },
+    ];
     const result = engine.submitWord('u1', path, 1000);
     expect(result).toEqual({
       accepted: true,
@@ -199,7 +246,11 @@ describe('BoggleEngine.submitWord', () => {
     const engine = makeEngine();
     engine.start(0);
     engine.addPlayer('u1');
-    const path: Cell[] = [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }];
+    const path: Cell[] = [
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+      { row: 0, col: 2 },
+    ];
     engine.submitWord('u1', path, 1000);
     const result = engine.submitWord('u1', path, 1001);
     expect(result).toEqual({ accepted: false, reason: 'already_found' });
@@ -210,18 +261,36 @@ describe('BoggleEngine.submitWord', () => {
     engine.start(0);
     engine.addPlayer('u1');
     engine.addPlayer('u2');
-    const path: Cell[] = [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }];
+    const path: Cell[] = [
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+      { row: 0, col: 2 },
+    ];
     const r1 = engine.submitWord('u1', path, 1000);
     const r2 = engine.submitWord('u2', path, 1000);
-    expect(r1).toEqual({ accepted: true, word: 'cat', points: 1, totalScore: 1 });
-    expect(r2).toEqual({ accepted: true, word: 'cat', points: 1, totalScore: 1 });
+    expect(r1).toEqual({
+      accepted: true,
+      word: 'cat',
+      points: 1,
+      totalScore: 1,
+    });
+    expect(r2).toEqual({
+      accepted: true,
+      word: 'cat',
+      points: 1,
+      totalScore: 1,
+    });
   });
 
   it('rejects submissions once the timer has expired', () => {
     const engine = makeEngine({ durationMs: 1000 });
     engine.start(0);
     engine.addPlayer('u1');
-    const path: Cell[] = [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }];
+    const path: Cell[] = [
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+      { row: 0, col: 2 },
+    ];
     const result = engine.submitWord('u1', path, 5000);
     expect(result).toEqual({ accepted: false, reason: 'already_ended' });
   });
@@ -230,13 +299,30 @@ describe('BoggleEngine.submitWord', () => {
     const engine = makeEngine({ wordSet: new Set(['cat', 'car']) });
     engine.start(0);
     engine.addPlayer('u1');
-    engine.submitWord('u1', [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }], 1000);
+    engine.submitWord(
+      'u1',
+      [
+        { row: 0, col: 0 },
+        { row: 0, col: 1 },
+        { row: 0, col: 2 },
+      ],
+      1000,
+    );
     const result = engine.submitWord(
       'u1',
-      [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 1 }],
+      [
+        { row: 0, col: 0 },
+        { row: 0, col: 1 },
+        { row: 1, col: 1 },
+      ],
       1001,
     );
-    expect(result).toEqual({ accepted: true, word: 'car', points: 1, totalScore: 2 });
+    expect(result).toEqual({
+      accepted: true,
+      word: 'car',
+      points: 1,
+      totalScore: 2,
+    });
   });
 });
 
@@ -262,10 +348,22 @@ describe('BoggleEngine.getFinalResults', () => {
     engine.start(0);
     engine.addPlayer('u1');
     engine.addPlayer('u2');
-    engine.submitWord('u1', [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }], 1000);
+    engine.submitWord(
+      'u1',
+      [
+        { row: 0, col: 0 },
+        { row: 0, col: 1 },
+        { row: 0, col: 2 },
+      ],
+      1000,
+    );
     engine.submitWord(
       'u2',
-      [{ row: 2, col: 1 }, { row: 2, col: 2 }, { row: 2, col: 0 }],
+      [
+        { row: 2, col: 1 },
+        { row: 2, col: 2 },
+        { row: 2, col: 0 },
+      ],
       1000,
     );
     // path above doesn't spell 'dog', use a valid one instead

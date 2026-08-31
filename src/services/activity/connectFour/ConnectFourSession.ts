@@ -1,13 +1,13 @@
-import { GamificationService } from '../../gamification';
-import type { ActivityMode } from '../gameId';
-import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
-import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
-import { ConnectFourBot } from './ConnectFourBot';
+import { ConnectFourBot } from 'services/activity/connectFour/ConnectFourBot';
 import {
   ConnectFourEngine,
   type ConnectFourState,
   type Disc,
-} from './ConnectFourEngine';
+} from 'services/activity/connectFour/ConnectFourEngine';
+import type { ActivityMode } from 'services/activity/gameId';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import { DisconnectGraceTimer } from 'services/activity/shared/DisconnectGraceTimer';
+import { GamificationService } from 'services/gamification';
 
 interface ConnectFourPlayer {
   userId: string;
@@ -40,9 +40,9 @@ export class ConnectFourSession {
   private bot: ConnectFourBot | null = null;
   private restartVotes = new Set<string>();
   private disconnectGrace = new DisconnectGraceTimer<string>();
-  private onSessionEnded?: () => void;
-  private disconnectGraceMs: number;
-  private botMoveDelayMs: number;
+  private readonly onSessionEnded?: () => void;
+  private readonly disconnectGraceMs: number;
+  private readonly botMoveDelayMs: number;
   private botTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(

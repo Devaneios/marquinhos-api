@@ -2,8 +2,8 @@ import { describe, expect, it } from 'bun:test';
 import {
   mintWsSessionToken,
   verifyWsSessionToken,
-} from '../src/services/activity/wsSessionToken';
-import { encryptToken } from '../src/utils/crypto';
+} from 'services/activity/wsSessionToken';
+import { encryptToken } from 'utils/crypto';
 
 describe('mintWsSessionToken / verifyWsSessionToken', () => {
   it('round-trips the userId, instanceId, guildId, mode and game', () => {

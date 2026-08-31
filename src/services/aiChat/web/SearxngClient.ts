@@ -79,8 +79,8 @@ function parseUnresponsive(payload: {
 }
 
 export class SearxngClient {
-  private fetchFn: SearxngFetchFn;
-  private baseUrl: string;
+  private readonly fetchFn: SearxngFetchFn;
+  private readonly baseUrl: string;
 
   constructor(deps: SearxngClientDeps = {}) {
     this.fetchFn = deps.fetchFn ?? fetch;

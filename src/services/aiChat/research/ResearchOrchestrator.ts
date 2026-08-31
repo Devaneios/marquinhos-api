@@ -1,14 +1,14 @@
-import { logger } from '../../../utils/logger';
-import { AiTraceRecorder } from '../AiTraceRecorder';
-import { GuardrailService } from '../GuardrailService';
-import { ThreadSessionStore } from '../thread/ThreadSessionStore';
-import { DeepResearchService } from './DeepResearchService';
+import { AiTraceRecorder } from 'services/aiChat/AiTraceRecorder';
+import { GuardrailService } from 'services/aiChat/GuardrailService';
+import { DeepResearchService } from 'services/aiChat/research/DeepResearchService';
 import {
   ResearchJobStore,
   type ResearchJob,
   type ResearchProgressEvent,
-} from './ResearchJobStore';
-import { ResearchRateLimitService } from './ResearchRateLimitService';
+} from 'services/aiChat/research/ResearchJobStore';
+import { ResearchRateLimitService } from 'services/aiChat/research/ResearchRateLimitService';
+import { ThreadSessionStore } from 'services/aiChat/thread/ThreadSessionStore';
+import { logger } from 'utils/logger';
 
 export interface StartResearchInput {
   threadId: string;

@@ -1,11 +1,11 @@
 import { Database } from 'bun:sqlite';
 import { describe, expect, it, mock, spyOn } from 'bun:test';
-import type { DockerClient } from '../src/services/aiChat/sandbox/DockerClient';
+import type { DockerClient } from 'services/aiChat/sandbox/DockerClient';
 import {
   SandboxCapacityError,
   SandboxManager,
-} from '../src/services/aiChat/sandbox/SandboxManager';
-import { logger } from '../src/utils/logger';
+} from 'services/aiChat/sandbox/SandboxManager';
+import { logger } from 'utils/logger';
 
 function setupDb(): Database {
   const db = new Database(':memory:');
@@ -127,7 +127,7 @@ describe('SandboxManager.getOrCreateSession', () => {
     const docker = fakeDocker({ isRunning: mock(async () => true) });
     const manager = new SandboxManager(docker, db);
 
-    await expect(
+    expect(
       manager.getOrCreateSession('new-user', 'g1', 'new-channel'),
     ).rejects.toThrow(SandboxCapacityError);
     expect(docker.createContainer).not.toHaveBeenCalled();
@@ -165,7 +165,7 @@ describe('SandboxManager.getOrCreateSession', () => {
     });
     const manager = new SandboxManager(docker, db);
 
-    await expect(manager.getOrCreateSession('u1', 'g1', 'c1')).rejects.toThrow(
+    expect(manager.getOrCreateSession('u1', 'g1', 'c1')).rejects.toThrow(
       'start failed',
     );
 
@@ -342,7 +342,7 @@ describe('SandboxManager lifecycle logging', () => {
     }
     const { events, restore } = captureLogs();
     try {
-      await expect(
+      expect(
         new SandboxManager(fakeDocker(), db).getOrCreateSession(
           'new',
           'g1',

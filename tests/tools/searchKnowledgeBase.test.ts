@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from 'bun:test';
-import { createSearchKnowledgeBaseTool } from '../../src/services/aiChat/tools/searchKnowledgeBase';
-import type { AgentToolContext } from '../../src/services/aiChat/tools/types';
+import { createSearchKnowledgeBaseTool } from 'services/aiChat/tools/searchKnowledgeBase';
+import type { AgentToolContext } from 'services/aiChat/tools/types';
 
 const ctx: AgentToolContext = {
   containerId: 'c1',

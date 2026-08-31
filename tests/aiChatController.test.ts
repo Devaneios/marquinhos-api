@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import AiChatController from '../src/controllers/aiChat.controller';
-import type { AiChatService } from '../src/services/aiChat/AiChatService';
+import AiChatController from 'controllers/aiChat.controller';
+import type { AiChatService } from 'services/aiChat/AiChatService';
 
 function makeReq(body: Record<string, unknown>) {
   return { body } as any;

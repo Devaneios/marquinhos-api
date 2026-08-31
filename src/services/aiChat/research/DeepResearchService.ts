@@ -1,13 +1,9 @@
-import { logger } from '../../../utils/logger';
-import { NOOP_TRACE, type TraceContext } from '../AiTraceRecorder';
-import { ResponsesClient } from '../llm/ResponsesClient';
-import {
-  createPageFetcher,
-  FetchPageError,
-  type PageFetcher,
-} from '../web/fetchPage';
-import { SearxngClient, type SearchHit } from '../web/SearxngClient';
-import type { ResearchSource, ResearchStats } from './ResearchJobStore';
+import { NOOP_TRACE, type TraceContext } from 'services/aiChat/AiTraceRecorder';
+import { ResponsesClient } from 'services/aiChat/llm/ResponsesClient';
+import type {
+  ResearchSource,
+  ResearchStats,
+} from 'services/aiChat/research/ResearchJobStore';
 import {
   buildAnalysisInput,
   buildExtractionInput,
@@ -29,8 +25,22 @@ import {
   type NumberedExtraction,
   type ResearchAnalysis,
   type ResearchPlan,
-} from './researchPrompts';
-import { normalizeUrl, rankHits, type RankedHit } from './sourceRanking';
+} from 'services/aiChat/research/researchPrompts';
+import {
+  normalizeUrl,
+  rankHits,
+  type RankedHit,
+} from 'services/aiChat/research/sourceRanking';
+import {
+  createPageFetcher,
+  FetchPageError,
+  type PageFetcher,
+} from 'services/aiChat/web/fetchPage';
+import {
+  SearxngClient,
+  type SearchHit,
+} from 'services/aiChat/web/SearxngClient';
+import { logger } from 'utils/logger';
 
 export const MAX_ROUNDS = Number(process.env.AI_RESEARCH_MAX_ROUNDS ?? 5);
 export const MAX_SEARCHES = Number(process.env.AI_RESEARCH_MAX_SEARCHES ?? 30);

@@ -1,10 +1,10 @@
 import type { Request, Response } from 'express';
-import { AiChatService } from '../services/aiChat/AiChatService';
-import { AiTraceQuery } from '../services/aiChat/AiTraceQuery';
-import { ResearchOrchestrator } from '../services/aiChat/research/ResearchOrchestrator';
-import { AiThreadService } from '../services/aiChat/thread/AiThreadService';
-import type { ThreadMode } from '../services/aiChat/thread/ThreadSessionStore';
-import { logger } from '../utils/logger';
+import { AiChatService } from 'services/aiChat/AiChatService';
+import { AiTraceQuery } from 'services/aiChat/AiTraceQuery';
+import { ResearchOrchestrator } from 'services/aiChat/research/ResearchOrchestrator';
+import { AiThreadService } from 'services/aiChat/thread/AiThreadService';
+import type { ThreadMode } from 'services/aiChat/thread/ThreadSessionStore';
+import { logger } from 'utils/logger';
 
 class AiChatController {
   private service: AiChatService;

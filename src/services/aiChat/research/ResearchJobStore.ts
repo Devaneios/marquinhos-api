@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { randomUUID } from 'crypto';
-import { db as defaultDb } from '../../../database/sqlite';
+import { db as defaultDb } from 'database/sqlite';
 
 export type ResearchJobStatus = 'queued' | 'running' | 'done' | 'error';
 

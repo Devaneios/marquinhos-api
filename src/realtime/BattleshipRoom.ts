@@ -1,13 +1,13 @@
 import { Room, type Client } from 'colyseus';
-import type { ShipPlacement } from '../services/activity/battleship/BattleshipEngine';
-import { BattleshipSession } from '../services/activity/battleship/BattleshipSession';
-import type { PerClientBroadcaster } from '../services/activity/cards/PerClientBroadcaster';
-import { roomKey } from '../services/activity/roomKey';
-import { RateLimiter } from '../services/activity/shared/RateLimiter';
+import type { ShipPlacement } from 'services/activity/battleship/BattleshipEngine';
+import { BattleshipSession } from 'services/activity/battleship/BattleshipSession';
+import type { PerClientBroadcaster } from 'services/activity/cards/PerClientBroadcaster';
+import { roomKey } from 'services/activity/roomKey';
+import { RateLimiter } from 'services/activity/shared/RateLimiter';
 import {
   verifyWsSessionToken,
   type WsSessionPayload,
-} from '../services/activity/wsSessionToken';
+} from 'services/activity/wsSessionToken';
 
 const FIRE_RATE_LIMIT_WINDOW_MS = 1000;
 const FIRE_RATE_LIMIT_MAX = 5;
@@ -38,7 +38,7 @@ export class BattleshipRoom extends Room {
   }
 
   override onCreate(options: { roomKey: string; token?: string }) {
-    this.setMetadata({ roomKey: options.roomKey });
+    void this.setMetadata({ roomKey: options.roomKey });
 
     const initialSession = options.token
       ? verifyWsSessionToken(options.token)

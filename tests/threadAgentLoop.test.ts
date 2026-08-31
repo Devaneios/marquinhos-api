@@ -3,14 +3,14 @@ import {
   THREAD_DEADLINE_MS,
   ThreadAgentLoop,
   WRAP_UP_FALLBACK,
-} from '../src/services/aiChat/agent/ThreadAgentLoop';
-import { ToolDispatcher } from '../src/services/aiChat/agent/ToolDispatcher';
+} from 'services/aiChat/agent/ThreadAgentLoop';
+import { ToolDispatcher } from 'services/aiChat/agent/ToolDispatcher';
 import type {
   ConversationItem,
   ResponsesClient,
   ResponsesResult,
-} from '../src/services/aiChat/llm/ResponsesClient';
-import type { SandboxManager } from '../src/services/aiChat/sandbox/SandboxManager';
+} from 'services/aiChat/llm/ResponsesClient';
+import type { SandboxManager } from 'services/aiChat/sandbox/SandboxManager';
 
 function fakeSandbox(stdout = 'index.ts\nfoo.ts'): SandboxManager {
   return {

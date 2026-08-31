@@ -1,8 +1,5 @@
 import { describe, expect, it, mock } from 'bun:test';
-import {
-  SearxngClient,
-  SearxngError,
-} from '../../src/services/aiChat/web/SearxngClient';
+import { SearxngClient, SearxngError } from 'services/aiChat/web/SearxngClient';
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -160,8 +157,8 @@ describe('SearxngClient.search', () => {
 
     const promise = client.search('x');
 
-    await expect(promise).rejects.toThrow(SearxngError);
-    await expect(promise).rejects.toThrow('503');
+    expect(promise).rejects.toThrow(SearxngError);
+    expect(promise).rejects.toThrow('503');
   });
 
   it('throws a SearxngError when the body is not valid json', async () => {
@@ -174,7 +171,7 @@ describe('SearxngClient.search', () => {
     );
     const client = new SearxngClient({ fetchFn });
 
-    await expect(client.search('x')).rejects.toThrow(SearxngError);
+    expect(client.search('x')).rejects.toThrow(SearxngError);
   });
 
   it('returns an empty list when the instance has no results for the query', async () => {

@@ -24,6 +24,7 @@ SOFTWARE.
 
 import axios from 'axios';
 import crypto from 'crypto';
+import { db } from 'database/sqlite';
 import { getUnixTime, parseISO } from 'date-fns';
 import type {
   LastfmSessionResponse,
@@ -32,7 +33,6 @@ import type {
   Track,
 } from 'types';
 import { URLSearchParams } from 'url';
-import { db } from '../database/sqlite';
 // URLSearchParams is available globally in Node.js >= 15 but we import for clarity
 
 const logger = {

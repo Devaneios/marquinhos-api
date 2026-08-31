@@ -1,23 +1,23 @@
 import { describe, expect, it, mock } from 'bun:test';
-import type { AgentRateLimitService } from '../src/services/aiChat/AgentRateLimitService';
+import type { AgentRateLimitService } from 'services/aiChat/AgentRateLimitService';
 import {
   AGENT_DEADLINE_MS,
   AgentToolLoopService,
   MAX_ITERATIONS,
   MAX_TOOL_CALLS_TOTAL,
-} from '../src/services/aiChat/AgentToolLoopService';
+} from 'services/aiChat/AgentToolLoopService';
 import type {
   TraceExecEvent,
   TraceSandboxEvent,
   TraceSummary,
   TraceToolEvent,
-} from '../src/services/aiChat/AiTraceRecorder';
-import { GuardrailService } from '../src/services/aiChat/GuardrailService';
-import type { OpenAiClient } from '../src/services/aiChat/OpenAiClient';
+} from 'services/aiChat/AiTraceRecorder';
+import { GuardrailService } from 'services/aiChat/GuardrailService';
+import type { OpenAiClient } from 'services/aiChat/OpenAiClient';
 import {
   SandboxCapacityError,
   type SandboxManager,
-} from '../src/services/aiChat/sandbox/SandboxManager';
+} from 'services/aiChat/sandbox/SandboxManager';
 
 function fakeAgentRateLimitService(allowed: boolean): AgentRateLimitService {
   return {

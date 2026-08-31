@@ -1,11 +1,11 @@
+import ActivityController from 'controllers/activity.controller';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import ActivityController from '../controllers/activity.controller';
-import { validateRequest } from '../middlewares/validateRequest';
+import { validateRequest } from 'middlewares/validateRequest';
 import {
   activityTokenExchangeSchema,
   activityWsSessionSchema,
-} from '../schemas/activity.schema';
+} from 'schemas/activity.schema';
 
 const router = express.Router();
 const activity = new ActivityController();

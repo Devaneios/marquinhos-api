@@ -1,5 +1,5 @@
-import customEmojisData from '../../data/customEmojis.json';
-import standardEmojisData from '../../data/standardEmojis.json';
+import customEmojisData from 'data/customEmojis.json';
+import standardEmojisData from 'data/standardEmojis.json';
 
 export interface StandardEmojiEntry {
   name: string;

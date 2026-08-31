@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { AGENT_CAPABILITIES } from '../src/services/aiChat/capabilities';
+import { AGENT_CAPABILITIES } from 'services/aiChat/capabilities';
 import {
   AGENT_TASK_SYSTEM_PROMPT,
   buildResponsePrompt,
@@ -13,9 +13,9 @@ import {
   revisionSchema,
   SIGNATURE_LINES,
   SUB_CLASSIFIERS,
-} from '../src/services/aiChat/prompts';
-import { AGENT_TOOLS } from '../src/services/aiChat/tools/registry';
-import type { ResponseCategory } from '../src/services/aiChat/types';
+} from 'services/aiChat/prompts';
+import { AGENT_TOOLS } from 'services/aiChat/tools/registry';
+import type { ResponseCategory } from 'services/aiChat/types';
 
 const ALL_CATEGORIES: ResponseCategory[] = [
   'general_question',
@@ -318,7 +318,7 @@ describe('praise_thanks: inversion pattern', () => {
 describe('user_roast_provocation: disdain over generic humor', () => {
   it('leads with dry authoritarian disdain rather than "tirada afiada e bem-humorada"', () => {
     const instruction = buildResponsePrompt('user_roast_provocation', []);
-    expect(instruction.toLowerCase()).toMatch(/desd[ée]m/);
+    expect(instruction.toLowerCase()).toMatch(/desd[eé]m/);
   });
 
   it('keeps the asymmetry: rough with the group, never cruel to the individual', () => {

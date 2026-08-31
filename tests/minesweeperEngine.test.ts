@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { MinesweeperEngine } from '../src/services/activity/minesweeper/MinesweeperEngine';
+import { MinesweeperEngine } from 'services/activity/minesweeper/MinesweeperEngine';
 
 // A hand-laid 4x4 board with a single mine at (3,0) lets every test assert
 // on exact tile coordinates instead of fighting a random layout. Engine
@@ -11,9 +11,16 @@ function engineWithFixedMines(
   minePositions: [number, number][],
 ): MinesweeperEngine {
   const engine = new MinesweeperEngine({ width, height, mineCount: 0 });
-  const grid = (engine as unknown as { grid: {
-    mine: boolean; adjacent: number; revealed: boolean; revealedBy: string | null;
-  }[][] }).grid;
+  const grid = (
+    engine as unknown as {
+      grid: {
+        mine: boolean;
+        adjacent: number;
+        revealed: boolean;
+        revealedBy: string | null;
+      }[][];
+    }
+  ).grid;
 
   for (const [x, y] of minePositions) grid[y]![x]!.mine = true;
   for (let y = 0; y < height; y++) {
@@ -70,14 +77,18 @@ describe('MinesweeperEngine', () => {
   describe('reveal', () => {
     it('rejects out-of-bounds coordinates', () => {
       const engine = engineWithFixedMines(4, 4, [[3, 0]]);
-      expect(engine.reveal('user-a', -1, 0)).toEqual({ error: 'out_of_bounds' });
+      expect(engine.reveal('user-a', -1, 0)).toEqual({
+        error: 'out_of_bounds',
+      });
       expect(engine.reveal('user-a', 4, 0)).toEqual({ error: 'out_of_bounds' });
     });
 
     it('rejects revealing an already-revealed tile', () => {
       const engine = engineWithFixedMines(4, 4, [[3, 0]]);
       engine.reveal('user-a', 3, 0);
-      expect(engine.reveal('user-b', 3, 0)).toEqual({ error: 'already_revealed' });
+      expect(engine.reveal('user-b', 3, 0)).toEqual({
+        error: 'already_revealed',
+      });
     });
 
     it('costs the revealing player points for hitting a mine, without affecting others', () => {
@@ -132,7 +143,9 @@ describe('MinesweeperEngine', () => {
       const result = engine.reveal('user-a', 0, 0);
       if ('error' in result) throw new Error('unexpected error');
 
-      expect(engine.getScores()).toEqual({ 'user-a': result.revealedTiles.length });
+      expect(engine.getScores()).toEqual({
+        'user-a': result.revealedTiles.length,
+      });
       for (const tile of result.revealedTiles) {
         expect(tile.revealedBy).toBe('user-a');
       }
@@ -142,7 +155,11 @@ describe('MinesweeperEngine', () => {
       // Mines at (2,0) and (0,2) isolate (0,0) from most of the board:
       // (0,0) has adjacent=0 only if none of its neighbors are mines, so
       // pick a layout where the cascade from (0,0) is small and bounded.
-      const engine = engineWithFixedMines(5, 5, [[2, 0], [0, 2], [4, 4]]);
+      const engine = engineWithFixedMines(5, 5, [
+        [2, 0],
+        [0, 2],
+        [4, 4],
+      ]);
       const result = engine.reveal('user-a', 0, 0);
       if ('error' in result) throw new Error('unexpected error');
 
@@ -172,7 +189,10 @@ describe('MinesweeperEngine', () => {
     });
 
     it('the highest score wins when scores diverge', () => {
-      const engine = engineWithFixedMines(4, 4, [[3, 3], [0, 3]]);
+      const engine = engineWithFixedMines(4, 4, [
+        [3, 3],
+        [0, 3],
+      ]);
       // user-a triggers the large cascade; user-b then hits the remaining
       // mine and loses points, so user-a should have the higher score.
       const first = engine.reveal('user-a', 0, 0);

@@ -1,5 +1,5 @@
-import type { Card } from './card';
-import type { SeededRng } from './rng';
+import type { Card } from 'services/activity/cards/core/card';
+import type { SeededRng } from 'services/activity/cards/core/rng';
 
 // THE ordered-pile-of-cards data structure. Every Zone composes one, so there
 // is exactly one implementation of "pile" in the engine — a hand, a discard, a

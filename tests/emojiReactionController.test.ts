@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import EmojiReactionController from '../src/controllers/emojiReaction.controller';
-import type { EmojiReactionService } from '../src/services/aiChat/EmojiReactionService';
+import EmojiReactionController from 'controllers/emojiReaction.controller';
+import type { EmojiReactionService } from 'services/aiChat/EmojiReactionService';
 
 function makeReq(body: Record<string, unknown>) {
   return { body } as any;

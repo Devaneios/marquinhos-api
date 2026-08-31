@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import { emojiReactionChooseSchema } from '../src/schemas/emojiReaction.schema';
+import { emojiReactionChooseSchema } from 'schemas/emojiReaction.schema';
 
 describe('emojiReactionChooseSchema', () => {
   it('accepts a payload with just content', async () => {
-    await expect(
+    expect(
       emojiReactionChooseSchema.parseAsync({
         body: { content: 'kkkkk mano que hilário' },
         query: {},
@@ -13,7 +13,7 @@ describe('emojiReactionChooseSchema', () => {
   });
 
   it('accepts a payload with recentMessages', async () => {
-    await expect(
+    expect(
       emojiReactionChooseSchema.parseAsync({
         body: {
           content: 'kkkkk',
@@ -26,7 +26,7 @@ describe('emojiReactionChooseSchema', () => {
   });
 
   it('rejects a payload missing content', async () => {
-    await expect(
+    expect(
       emojiReactionChooseSchema.parseAsync({
         body: {},
         query: {},
@@ -36,7 +36,7 @@ describe('emojiReactionChooseSchema', () => {
   });
 
   it('rejects an empty content string', async () => {
-    await expect(
+    expect(
       emojiReactionChooseSchema.parseAsync({
         body: { content: '' },
         query: {},
@@ -50,7 +50,7 @@ describe('emojiReactionChooseSchema', () => {
       author: `user${i}`,
       content: 'msg',
     }));
-    await expect(
+    expect(
       emojiReactionChooseSchema.parseAsync({
         body: { content: 'oi', recentMessages },
         query: {},

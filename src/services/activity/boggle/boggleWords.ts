@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { stripDiacritics } from '../../wordle';
+import { stripDiacritics } from 'services/wordle';
 
 // Boggle needs 3+ letter words, but wordlist.txt (the Wordle answer bank) is
 // curated for 5-6 letter answers only. This file layers a small curated set

@@ -1,10 +1,13 @@
-import { GamificationService } from '../../gamification';
-import type { ActivityMode } from '../gameId';
-import type { ActionResult } from '../shared/ActionResult';
-import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
-import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
-import { TicTacToeBot } from './TicTacToeBot';
-import { TicTacToeEngine, type Player } from './TicTacToeEngine';
+import type { ActivityMode } from 'services/activity/gameId';
+import type { ActionResult } from 'services/activity/shared/ActionResult';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import { DisconnectGraceTimer } from 'services/activity/shared/DisconnectGraceTimer';
+import { TicTacToeBot } from 'services/activity/ticTacToe/TicTacToeBot';
+import {
+  TicTacToeEngine,
+  type Player,
+} from 'services/activity/ticTacToe/TicTacToeEngine';
+import { GamificationService } from 'services/gamification';
 
 interface TicTacToePlayer {
   userId: string;
@@ -35,10 +38,10 @@ export class TicTacToeSession {
   private resultRecorded = false;
   private restartVotes = new Set<string>();
   private disconnectGrace = new DisconnectGraceTimer<string>();
-  private onSessionEnded?: () => void;
-  private disconnectGraceMs: number;
+  private readonly onSessionEnded?: () => void;
+  private readonly disconnectGraceMs: number;
   private bot: TicTacToeBot | null = null;
-  private botMoveDelayMs: number;
+  private readonly botMoveDelayMs: number;
   private botTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(

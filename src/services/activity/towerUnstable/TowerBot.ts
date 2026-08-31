@@ -1,4 +1,4 @@
-import type { TowerState } from './TowerEngine';
+import type { TowerState } from 'services/activity/towerUnstable/TowerEngine';
 
 // Sentinel seat id for the bot — never a real Discord snowflake, so it
 // can't collide with an actual player.

@@ -38,7 +38,7 @@ function clamp(value: number, min: number, max: number): number {
 const PADDLE_SIDES = ['left', 'right'] as const;
 
 export class PongEngine {
-  private config: Required<PongEngineConfig>;
+  private readonly config: Required<PongEngineConfig>;
   private state: PongState;
   private input: { left: PaddleInput; right: PaddleInput } = {
     left: 0,

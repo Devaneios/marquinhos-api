@@ -1,10 +1,10 @@
+import { db } from 'database/sqlite';
 import dotenv from 'dotenv';
+import { DiscordService } from 'services/discord';
+import { LastfmService } from 'services/lastfm';
+import { SpotifyService } from 'services/spotify';
 import type { LastfmTopListenedPeriod, Track } from 'types';
-import { db } from '../database/sqlite';
-import { decryptToken, encryptToken } from '../utils/crypto';
-import { DiscordService } from './discord';
-import { LastfmService } from './lastfm';
-import { SpotifyService } from './spotify';
+import { decryptToken, encryptToken } from 'utils/crypto';
 
 dotenv.config();
 

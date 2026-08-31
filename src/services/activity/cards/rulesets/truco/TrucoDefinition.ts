@@ -1,29 +1,36 @@
-import type { Card } from '../../core/card';
-import { spanishSuitedDeck } from '../../core/deckFactory';
+import type { Card } from 'services/activity/cards/core/card';
+import { spanishSuitedDeck } from 'services/activity/cards/core/deckFactory';
 import {
   MOVE_OK,
   moveRejected,
   type GameDefinition,
   type LegalMove,
   type ScoreboardEntry,
-} from '../../core/GameDefinition';
-import { maskZones, type ZoneView } from '../../core/masking';
+} from 'services/activity/cards/core/GameDefinition';
+import { maskZones, type ZoneView } from 'services/activity/cards/core/masking';
 import {
   opposingTeamSeats,
   owesResponse,
   type PendingResponse,
-} from '../../core/pendingResponse';
-import { SeededRng } from '../../core/rng';
-import { isSeatActive, TurnOrder, type Seat } from '../../core/seating';
-import { Visibility } from '../../core/zone';
-import { ZoneSet } from '../../core/zoneSet';
+} from 'services/activity/cards/core/pendingResponse';
+import { SeededRng } from 'services/activity/cards/core/rng';
+import {
+  isSeatActive,
+  TurnOrder,
+  type Seat,
+} from 'services/activity/cards/core/seating';
+import { Visibility } from 'services/activity/cards/core/zone';
+import { ZoneSet } from 'services/activity/cards/core/zoneSet';
 import {
   decisiveWinner,
   resolveHandWinner,
   type Team,
   type TrickResult,
-} from './handResolution';
-import { cardStrength, manilhaRank } from './ranking';
+} from 'services/activity/cards/rulesets/truco/handResolution';
+import {
+  cardStrength,
+  manilhaRank,
+} from 'services/activity/cards/rulesets/truco/ranking';
 
 const SEAT_COUNT = 4;
 const DEFAULT_WINNING_SCORE = 12;

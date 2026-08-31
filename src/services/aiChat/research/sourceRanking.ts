@@ -1,4 +1,4 @@
-import type { SearchHit } from '../web/SearxngClient';
+import type { SearchHit } from 'services/aiChat/web/SearxngClient';
 
 /** Params that identify a campaign, not a document — dropping them dedupes more. */
 const TRACKING_PARAMS = [

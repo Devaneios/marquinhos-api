@@ -1,15 +1,19 @@
-import { GamificationService } from '../../gamification';
-import type { ActivityMode } from '../gameId';
-import type { BinaryActivityBroadcaster } from '../shared/ActivityBroadcaster';
-import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
-import { BOT_TUNING, PongBot, type BotDifficulty } from './PongBotAI';
+import type { ActivityMode } from 'services/activity/gameId';
+import {
+  BOT_TUNING,
+  PongBot,
+  type BotDifficulty,
+} from 'services/activity/pong/PongBotAI';
 import {
   PongEngine,
   type PaddleSide,
   type PongEngineConfig,
   type PongState,
-} from './PongEngine';
-import { encodeStateSnapshot } from './pongProtocol';
+} from 'services/activity/pong/PongEngine';
+import { encodeStateSnapshot } from 'services/activity/pong/pongProtocol';
+import type { BinaryActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import { DisconnectGraceTimer } from 'services/activity/shared/DisconnectGraceTimer';
+import { GamificationService } from 'services/gamification';
 
 export type ActivityBroadcaster = BinaryActivityBroadcaster;
 
@@ -62,8 +66,8 @@ export class PongSession {
   private lastLoopHr: bigint | null = null;
   private accumulatorMs = 0;
   private disconnectGrace = new DisconnectGraceTimer<string>();
-  private onSessionEnded?: () => void;
-  private disconnectGraceMs: number;
+  private readonly onSessionEnded?: () => void;
+  private readonly disconnectGraceMs: number;
 
   constructor(
     private identity: PongSessionIdentity,

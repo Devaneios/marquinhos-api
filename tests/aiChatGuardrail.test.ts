@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { GuardrailService } from '../src/services/aiChat/GuardrailService';
+import { GuardrailService } from 'services/aiChat/GuardrailService';
 
 describe('GuardrailService.isInjectionAttempt', () => {
   const service = new GuardrailService();

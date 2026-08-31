@@ -1,9 +1,9 @@
+import type { AgentTool } from 'services/aiChat/tools/types';
 import {
   createPageFetcher,
   FetchPageError,
   type FetchPageDeps,
-} from '../web/fetchPage';
-import type { AgentTool } from './types';
+} from 'services/aiChat/web/fetchPage';
 
 export {
   MAX_BODY_BYTES,
@@ -11,7 +11,7 @@ export {
   MAX_REDIRECTS,
   type FetchFn,
   type LookupFn,
-} from '../web/fetchPage';
+} from 'services/aiChat/web/fetchPage';
 
 export const MAX_TEXT_CHARS = 3000;
 

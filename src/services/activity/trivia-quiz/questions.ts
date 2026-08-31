@@ -1,4 +1,4 @@
-import type { Question } from './types';
+import type { Question } from 'services/activity/trivia-quiz/types';
 
 const QUESTIONS: Question[] = [
   {

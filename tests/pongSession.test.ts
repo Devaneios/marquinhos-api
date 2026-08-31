@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test';
-import type { ActivityMode } from '../src/services/activity/gameId';
-import { BOT_TUNING } from '../src/services/activity/pong/PongBotAI';
+import type { ActivityMode } from 'services/activity/gameId';
+import { BOT_TUNING } from 'services/activity/pong/PongBotAI';
 import {
   PongSession,
   type PongSessionIdentity,
-} from '../src/services/activity/pong/PongSession';
-import type { GamificationService } from '../src/services/gamification';
+} from 'services/activity/pong/PongSession';
+import type { GamificationService } from 'services/gamification';
 
 function identity(mode: ActivityMode = 'multi'): PongSessionIdentity {
   return {

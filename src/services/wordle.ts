@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
+import { db } from 'database/sqlite';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { db } from '../database/sqlite';
 
 const logger = {
   warn: (...args: unknown[]) => console.warn('[wordle]', ...args),

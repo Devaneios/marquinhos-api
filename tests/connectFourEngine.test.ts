@@ -4,7 +4,7 @@ import {
   ConnectFourEngine,
   ROWS,
   type Disc,
-} from '../src/services/activity/connectFour/ConnectFourEngine';
+} from 'services/activity/connectFour/ConnectFourEngine';
 
 describe('ConnectFourEngine', () => {
   it('starts empty with p1 to move and no winner', () => {
@@ -158,8 +158,7 @@ describe('ConnectFourEngine', () => {
     const order = [0, 1, 2, 3, 4, 5, 6];
     for (let row = 0; row < ROWS; row++) {
       for (const col of order) {
-        const player: 'p1' | 'p2' =
-          (row + col) % 2 === 0 ? 'p1' : 'p2';
+        const player: 'p1' | 'p2' = (row + col) % 2 === 0 ? 'p1' : 'p2';
         pattern.push([col, player]);
       }
     }

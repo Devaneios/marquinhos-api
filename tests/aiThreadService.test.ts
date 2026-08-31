@@ -1,20 +1,20 @@
 import { Database } from 'bun:sqlite';
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
-import type { ThreadAgentLoop } from '../src/services/aiChat/agent/ThreadAgentLoop';
-import type { AgentRateLimitService } from '../src/services/aiChat/AgentRateLimitService';
-import type { AiTraceRecorder } from '../src/services/aiChat/AiTraceRecorder';
-import { GuardrailService } from '../src/services/aiChat/GuardrailService';
+import type { ThreadAgentLoop } from 'services/aiChat/agent/ThreadAgentLoop';
+import type { AgentRateLimitService } from 'services/aiChat/AgentRateLimitService';
+import type { AiTraceRecorder } from 'services/aiChat/AiTraceRecorder';
+import { GuardrailService } from 'services/aiChat/GuardrailService';
 import type {
   ConversationItem,
   ResponsesClient,
-} from '../src/services/aiChat/llm/ResponsesClient';
-import type { RateLimitService } from '../src/services/aiChat/RateLimitService';
+} from 'services/aiChat/llm/ResponsesClient';
+import type { RateLimitService } from 'services/aiChat/RateLimitService';
 import {
   SandboxCapacityError,
   type SandboxManager,
-} from '../src/services/aiChat/sandbox/SandboxManager';
-import { AiThreadService } from '../src/services/aiChat/thread/AiThreadService';
-import { ThreadSessionStore } from '../src/services/aiChat/thread/ThreadSessionStore';
+} from 'services/aiChat/sandbox/SandboxManager';
+import { AiThreadService } from 'services/aiChat/thread/AiThreadService';
+import { ThreadSessionStore } from 'services/aiChat/thread/ThreadSessionStore';
 
 function freshDb(): Database {
   const db = new Database(':memory:');

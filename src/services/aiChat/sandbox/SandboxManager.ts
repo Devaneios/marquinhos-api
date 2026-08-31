@@ -1,7 +1,7 @@
 import { Database } from 'bun:sqlite';
-import { db as defaultDb } from '../../../database/sqlite';
-import { logger } from '../../../utils/logger';
-import type { DockerClient } from './DockerClient';
+import { db as defaultDb } from 'database/sqlite';
+import type { DockerClient } from 'services/aiChat/sandbox/DockerClient';
+import { logger } from 'utils/logger';
 
 const SANDBOX_IMAGE = 'marquinhos-sandbox:latest';
 const MEMORY_BYTES = 256 * 1024 * 1024;

@@ -1,9 +1,9 @@
 import { describe, expect, it, mock } from 'bun:test';
 import type OpenAI from 'openai';
+import type { TraceLlmEvent } from 'services/aiChat/AiTraceRecorder';
+import { ResponsesClient } from 'services/aiChat/llm/ResponsesClient';
+import { AGENT_TASK_SYSTEM_PROMPT } from 'services/aiChat/prompts';
 import { z } from 'zod';
-import type { TraceLlmEvent } from '../src/services/aiChat/AiTraceRecorder';
-import { ResponsesClient } from '../src/services/aiChat/llm/ResponsesClient';
-import { AGENT_TASK_SYSTEM_PROMPT } from '../src/services/aiChat/prompts';
 
 function fakeSdk(create: (...args: unknown[]) => unknown) {
   return {
@@ -318,7 +318,7 @@ describe('ResponsesClient.create result', () => {
   it('throws when the API returns no output items at all', async () => {
     const sdk = fakeSdk(async () => ({ output: [] }));
 
-    await expect(
+    expect(
       new ResponsesClient(sdk).create({
         input: userInput,
         maxOutputTokens: 100,
@@ -366,7 +366,7 @@ describe('ResponsesClient.structured', () => {
   it('throws when the model returns json that does not satisfy the schema', async () => {
     const sdk = fakeSdk(async () => textResponse('{"category":"z"}'));
 
-    await expect(
+    expect(
       new ResponsesClient(sdk).structured({
         input: userInput,
         schema,
@@ -379,7 +379,7 @@ describe('ResponsesClient.structured', () => {
   it('throws when the model returns text that is not json at all', async () => {
     const sdk = fakeSdk(async () => textResponse('desculpa, não sei'));
 
-    await expect(
+    expect(
       new ResponsesClient(sdk).structured({
         input: userInput,
         schema,
@@ -429,7 +429,7 @@ describe('ResponsesClient truncated structured output', () => {
   it('says the output was truncated when the retry is truncated too', async () => {
     const sdk = fakeSdk(async () => truncatedResponse());
 
-    await expect(
+    expect(
       new ResponsesClient(sdk).structured({
         input: userInput,
         schema,
@@ -452,7 +452,7 @@ describe('ResponsesClient truncated structured output', () => {
       output_text: '',
     }));
 
-    await expect(
+    expect(
       new ResponsesClient(sdk).structured({
         input: userInput,
         schema,
@@ -465,7 +465,7 @@ describe('ResponsesClient truncated structured output', () => {
   it('does not retry a response that came back complete but unparseable', async () => {
     const sdk = fakeSdk(async () => textResponse('não é json'));
 
-    await expect(
+    expect(
       new ResponsesClient(sdk).structured({
         input: userInput,
         schema,
@@ -560,7 +560,7 @@ describe('ResponsesClient tracing', () => {
     });
     const trace = recordingTrace();
 
-    await expect(
+    expect(
       new ResponsesClient(sdk).create({
         input: userInput,
         maxOutputTokens: 100,

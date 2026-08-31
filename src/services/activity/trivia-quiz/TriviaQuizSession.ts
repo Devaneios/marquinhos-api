@@ -1,9 +1,9 @@
-import { GamificationService } from '../../gamification';
-import type { ActivityMode } from '../gameId';
-import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
-import { getQuestions } from './questions';
-import { TriviaQuizEngine } from './TriviaQuizEngine';
-import type { TriviaQuizState } from './types';
+import type { ActivityMode } from 'services/activity/gameId';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import { getQuestions } from 'services/activity/trivia-quiz/questions';
+import { TriviaQuizEngine } from 'services/activity/trivia-quiz/TriviaQuizEngine';
+import type { TriviaQuizState } from 'services/activity/trivia-quiz/types';
+import { GamificationService } from 'services/gamification';
 
 export interface TriviaQuizSessionIdentity {
   sessionKey: string;

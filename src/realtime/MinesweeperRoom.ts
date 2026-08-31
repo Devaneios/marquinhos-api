@@ -1,12 +1,12 @@
 import { Room, type Client } from 'colyseus';
-import { MinesweeperSession } from '../services/activity/minesweeper/MinesweeperSession';
-import { roomKey } from '../services/activity/roomKey';
-import type { ActivityBroadcaster } from '../services/activity/shared/ActivityBroadcaster';
-import { RateLimiter } from '../services/activity/shared/RateLimiter';
+import { MinesweeperSession } from 'services/activity/minesweeper/MinesweeperSession';
+import { roomKey } from 'services/activity/roomKey';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import { RateLimiter } from 'services/activity/shared/RateLimiter';
 import {
   verifyWsSessionToken,
   type WsSessionPayload,
-} from '../services/activity/wsSessionToken';
+} from 'services/activity/wsSessionToken';
 
 const REVEAL_RATE_LIMIT_WINDOW_MS = 1000;
 const REVEAL_RATE_LIMIT_MAX = 20;
@@ -31,7 +31,7 @@ export class MinesweeperRoom extends Room {
   }
 
   override onCreate(options: { roomKey: string; token?: string }) {
-    this.setMetadata({ roomKey: options.roomKey });
+    void this.setMetadata({ roomKey: options.roomKey });
 
     const initialSession = options.token
       ? verifyWsSessionToken(options.token)

@@ -1,7 +1,7 @@
-import type { Card } from './card';
-import { Deck } from './deck';
-import type { SeededRng } from './rng';
-import type { Seat } from './seating';
+import type { Card } from 'services/activity/cards/core/card';
+import { Deck } from 'services/activity/cards/core/deck';
+import type { SeededRng } from 'services/activity/cards/core/rng';
+import type { Seat } from 'services/activity/cards/core/seating';
 
 // How much of a zone a given viewer may see. Deliberately not "boolean
 // visible": the count of cards in an opponent's hand is public in every card

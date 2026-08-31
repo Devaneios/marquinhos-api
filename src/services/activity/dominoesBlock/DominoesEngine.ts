@@ -116,7 +116,7 @@ function pickStartingPlayer(
 }
 
 export class DominoesEngine {
-  private state: DominoesState;
+  private readonly state: DominoesState;
 
   constructor(players: string[], options: DominoesEngineOptions = {}) {
     if (players.length < MIN_PLAYERS || players.length > MAX_PLAYERS) {

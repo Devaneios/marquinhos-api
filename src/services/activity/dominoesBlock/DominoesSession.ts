@@ -1,13 +1,16 @@
-import { logger } from '../../../utils/logger';
-import { GamificationService } from '../../gamification';
-import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
-import { DOMINOES_BOT_USER_ID, DominoesBot } from './DominoesBot';
+import {
+  DOMINOES_BOT_USER_ID,
+  DominoesBot,
+} from 'services/activity/dominoesBlock/DominoesBot';
 import {
   DominoesEngine,
   type ChainEnd,
   type DominoesState,
   type Tile,
-} from './DominoesEngine';
+} from 'services/activity/dominoesBlock/DominoesEngine';
+import { DisconnectGraceTimer } from 'services/activity/shared/DisconnectGraceTimer';
+import { GamificationService } from 'services/gamification';
+import { logger } from 'utils/logger';
 
 // Per-player addressing, same rationale as cards' PerClientBroadcaster: each
 // player's view hides everyone else's hand, so a single public broadcast
@@ -108,13 +111,13 @@ export class DominoesSession {
   private resultRecorded = false;
   private restartVotes = new Set<string>();
   private disconnectGrace = new DisconnectGraceTimer<string>();
-  private onSessionEnded?: () => void;
-  private disconnectGraceMs: number;
-  private minPlayers: number;
-  private maxPlayers: number;
+  private readonly onSessionEnded?: () => void;
+  private readonly disconnectGraceMs: number;
+  private readonly minPlayers: number;
+  private readonly maxPlayers: number;
   private botUserId: string | null = null;
   private bot: DominoesBot | null = null;
-  private botMoveDelayMs: number;
+  private readonly botMoveDelayMs: number;
   private botTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   decisiveWinner,
   resolveHandWinner,
-} from '../../src/services/activity/cards/rulesets/truco/handResolution';
+} from 'services/activity/cards/rulesets/truco/handResolution';
 
 describe('decisiveWinner', () => {
   it('returns null until a team has 2 non-tied trick wins', () => {

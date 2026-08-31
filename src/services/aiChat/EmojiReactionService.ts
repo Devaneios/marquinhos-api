@@ -1,7 +1,13 @@
-import { logger } from '../../utils/logger';
-import { DEFAULT_FALLBACK_REACTABLE, resolveReactable } from './emojiCatalog';
-import { OpenAiClient } from './OpenAiClient';
-import { EMOJI_REACTION_SYSTEM_PROMPT, emojiChoiceSchema } from './prompts';
+import {
+  DEFAULT_FALLBACK_REACTABLE,
+  resolveReactable,
+} from 'services/aiChat/emojiCatalog';
+import { OpenAiClient } from 'services/aiChat/OpenAiClient';
+import {
+  EMOJI_REACTION_SYSTEM_PROMPT,
+  emojiChoiceSchema,
+} from 'services/aiChat/prompts';
+import { logger } from 'utils/logger';
 
 export interface EmojiReactionRequest {
   content: string;

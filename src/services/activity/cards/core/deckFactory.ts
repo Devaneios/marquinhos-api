@@ -1,4 +1,4 @@
-import type { Card } from './card';
+import type { Card } from 'services/activity/cards/core/card';
 
 // The shared rank/suit vocabulary. Exported because a ruleset's ordering must
 // be built from the *same* vocabulary the deck is built from — truco's

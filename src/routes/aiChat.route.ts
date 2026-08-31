@@ -1,12 +1,12 @@
+import AiChatController from 'controllers/aiChat.controller';
 import express from 'express';
-import AiChatController from '../controllers/aiChat.controller';
-import { checkToken } from '../middlewares/botAuth';
-import { validateRequest } from '../middlewares/validateRequest';
+import { checkToken } from 'middlewares/botAuth';
+import { validateRequest } from 'middlewares/validateRequest';
 import {
   aiChatRespondSchema,
   aiResearchStartSchema,
   aiThreadAskSchema,
-} from '../schemas/aiChat.schema';
+} from 'schemas/aiChat.schema';
 
 const router = express.Router();
 const aiChat = new AiChatController();

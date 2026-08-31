@@ -1,5 +1,5 @@
-import type { LetterFeedback } from '../../wordle';
-import { computeFeedback, resolveCanonical } from '../../wordle';
+import type { LetterFeedback } from 'services/wordle';
+import { computeFeedback, resolveCanonical } from 'services/wordle';
 
 export interface PlayerState {
   userId: string;

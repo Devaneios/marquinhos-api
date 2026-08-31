@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import type { ActivityBroadcaster } from '../src/services/activity/shared/ActivityBroadcaster';
-import { WordChainSession } from '../src/services/activity/word-chain/WordChainSession';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import { WordChainSession } from 'services/activity/word-chain/WordChainSession';
 
 type BroadcastMessage = { type: string; payload?: unknown };
 

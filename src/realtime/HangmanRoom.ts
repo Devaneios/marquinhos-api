@@ -1,13 +1,13 @@
 import { Room, type Client } from 'colyseus';
-import { HangmanSession } from '../services/activity/hangman/HangmanSession';
-import { getHangmanWord } from '../services/activity/hangman/wordList';
-import { roomKey } from '../services/activity/roomKey';
-import type { ActivityBroadcaster } from '../services/activity/shared/ActivityBroadcaster';
-import { RateLimiter } from '../services/activity/shared/RateLimiter';
+import { HangmanSession } from 'services/activity/hangman/HangmanSession';
+import { getHangmanWord } from 'services/activity/hangman/wordList';
+import { roomKey } from 'services/activity/roomKey';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import { RateLimiter } from 'services/activity/shared/RateLimiter';
 import {
   verifyWsSessionToken,
   type WsSessionPayload,
-} from '../services/activity/wsSessionToken';
+} from 'services/activity/wsSessionToken';
 
 const GUESS_RATE_LIMIT_WINDOW_MS = 1000;
 const GUESS_RATE_LIMIT_MAX = 3;
@@ -32,7 +32,7 @@ export class HangmanRoom extends Room {
   }
 
   override onCreate(options: { roomKey: string; token?: string }) {
-    this.setMetadata({ roomKey: options.roomKey });
+    void this.setMetadata({ roomKey: options.roomKey });
 
     const initialSession = options.token
       ? verifyWsSessionToken(options.token)

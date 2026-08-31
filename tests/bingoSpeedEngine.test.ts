@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { BingoSpeedEngine } from '../src/services/activity/bingoSpeed/BingoSpeedEngine';
+import { BingoSpeedEngine } from 'services/activity/bingoSpeed/BingoSpeedEngine';
 
 describe('BingoSpeedEngine', () => {
   describe('Card Generation', () => {

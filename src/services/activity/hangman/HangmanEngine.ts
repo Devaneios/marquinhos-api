@@ -9,7 +9,7 @@ export interface HangmanState {
 
 export class HangmanEngine {
   private originalWord: string;
-  private wordLower: string;
+  private readonly wordLower: string;
   private guessedLetters: Set<string> = new Set();
   private strikes: number = 0;
   private maxStrikes: number = 6;

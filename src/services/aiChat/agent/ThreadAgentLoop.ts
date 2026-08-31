@@ -1,12 +1,12 @@
-import { logger } from '../../../utils/logger';
-import { NOOP_TRACE, type TraceContext } from '../AiTraceRecorder';
+import { ToolDispatcher } from 'services/aiChat/agent/ToolDispatcher';
+import { NOOP_TRACE, type TraceContext } from 'services/aiChat/AiTraceRecorder';
 import {
   ResponsesClient,
   type ConversationItem,
   type FunctionToolSpec,
-} from '../llm/ResponsesClient';
-import { AGENT_TOOLS } from '../tools/registry';
-import { ToolDispatcher } from './ToolDispatcher';
+} from 'services/aiChat/llm/ResponsesClient';
+import { AGENT_TOOLS } from 'services/aiChat/tools/registry';
+import { logger } from 'utils/logger';
 
 export const THREAD_MAX_ITERATIONS = 12;
 export const THREAD_MAX_TOOL_CALLS = 24;

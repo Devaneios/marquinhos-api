@@ -4,7 +4,7 @@ import type {
   CheckersState,
   Color,
   Position,
-} from './CheckersEngine';
+} from 'services/activity/checkers/CheckersEngine';
 
 // A jump chain is mandatory move-by-move, so "prefer the biggest capture"
 // means simulating each candidate jump forward on a scratch engine and

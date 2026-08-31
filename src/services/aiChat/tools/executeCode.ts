@@ -1,4 +1,4 @@
-import type { AgentTool } from './types';
+import type { AgentTool } from 'services/aiChat/tools/types';
 
 const LANGUAGE_COMMANDS: Record<string, (code: string) => string[]> = {
   python: (code) => ['python3', '-c', code],

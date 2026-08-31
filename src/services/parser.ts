@@ -22,8 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
 
+import { SpotifyService } from 'services/spotify';
 import type { PlaybackData, Track } from 'types';
-import { SpotifyService } from './spotify';
 
 export class ParserService {
   spotifyService: SpotifyService;

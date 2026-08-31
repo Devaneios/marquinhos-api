@@ -1,9 +1,9 @@
 import { describe, expect, it, mock } from 'bun:test';
 import type OpenAI from 'openai';
+import type { TraceLlmEvent } from 'services/aiChat/AiTraceRecorder';
+import { OpenAiClient } from 'services/aiChat/OpenAiClient';
+import { MAIN_CLASSIFY_SYSTEM_PROMPT } from 'services/aiChat/prompts';
 import { z } from 'zod';
-import type { TraceLlmEvent } from '../src/services/aiChat/AiTraceRecorder';
-import { OpenAiClient } from '../src/services/aiChat/OpenAiClient';
-import { MAIN_CLASSIFY_SYSTEM_PROMPT } from '../src/services/aiChat/prompts';
 
 function fakeSdkClient(overrides: {
   create?: (...args: unknown[]) => unknown;
@@ -65,7 +65,7 @@ describe('OpenAiClient.chat', () => {
     });
 
     const client = new OpenAiClient(sdk);
-    await expect(
+    expect(
       client.chat({
         messages: [{ role: 'user', content: 'oi' }],
         temperature: 0.5,
@@ -131,7 +131,7 @@ describe('OpenAiClient.structured', () => {
     });
 
     const client = new OpenAiClient(sdk);
-    await expect(
+    expect(
       client.structured(
         [{ role: 'system', content: 'classify' }],
         schema,
@@ -253,7 +253,7 @@ describe('OpenAiClient.chatWithTools', () => {
     const sdk = fakeSdkClient({ create: async () => ({ choices: [] }) });
     const client = new OpenAiClient(sdk);
 
-    await expect(
+    expect(
       client.chatWithTools([{ role: 'user', content: 'oi' }], [], {
         temperature: 0.5,
         maxTokens: 50,
@@ -342,7 +342,7 @@ describe('OpenAiClient tracing', () => {
     });
     const trace = recordingTrace();
 
-    await expect(
+    expect(
       new OpenAiClient(sdk).chat({
         messages: [{ role: 'user', content: 'oi' }],
         temperature: 0.5,

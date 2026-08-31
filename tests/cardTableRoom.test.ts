@@ -93,7 +93,7 @@ describe('CardTableRoom', () => {
       token: session.token,
     });
 
-    await expect(
+    expect(
       colyseus.connectTo(room, { token: 'garbage', roomKey: session.roomKey }),
     ).rejects.toBeTruthy();
   });

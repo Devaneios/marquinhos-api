@@ -2,8 +2,8 @@ import { describe, expect, it } from 'bun:test';
 import {
   BattleshipEngine,
   type ShipPlacement,
-} from '../src/services/activity/battleship/BattleshipEngine';
-import { maskBoard, viewFor } from '../src/services/activity/battleship/masking';
+} from 'services/activity/battleship/BattleshipEngine';
+import { maskBoard, viewFor } from 'services/activity/battleship/masking';
 
 const VALID_FLEET: ShipPlacement[] = [
   { type: 'carrier', x: 0, y: 0, orientation: 'horizontal' },

@@ -79,7 +79,7 @@ function directionsFor(piece: Piece): Array<[number, number]> {
 }
 
 export class CheckersEngine {
-  private board: Board;
+  private readonly board: Board;
   private turn: Color = 'black';
   private winner: Color | null = null;
   private mustContinueFrom: Position | null = null;

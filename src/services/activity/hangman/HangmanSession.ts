@@ -1,8 +1,8 @@
-import { GamificationService } from '../../gamification';
-import type { ActivityMode } from '../gameId';
-import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
-import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
-import { HangmanEngine } from './HangmanEngine';
+import type { ActivityMode } from 'services/activity/gameId';
+import { HangmanEngine } from 'services/activity/hangman/HangmanEngine';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import { DisconnectGraceTimer } from 'services/activity/shared/DisconnectGraceTimer';
+import { GamificationService } from 'services/gamification';
 
 interface HangmanPlayer {
   userId: string;
@@ -29,8 +29,8 @@ export class HangmanSession {
   private players: HangmanPlayer[] = [];
   private resultRecorded = false;
   private disconnectGrace = new DisconnectGraceTimer<string>();
-  private onSessionEnded?: () => void;
-  private disconnectGraceMs: number;
+  private readonly onSessionEnded?: () => void;
+  private readonly disconnectGraceMs: number;
 
   constructor(
     private identity: HangmanSessionIdentity,

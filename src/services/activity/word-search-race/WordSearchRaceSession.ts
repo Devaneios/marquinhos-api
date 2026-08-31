@@ -1,8 +1,11 @@
-import { GamificationService } from '../../gamification';
-import type { ActivityMode } from '../gameId';
-import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
-import type { Cell, FoundWord } from './WordSearchRaceEngine';
-import { WordSearchRaceEngine } from './WordSearchRaceEngine';
+import type { ActivityMode } from 'services/activity/gameId';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import type {
+  Cell,
+  FoundWord,
+} from 'services/activity/word-search-race/WordSearchRaceEngine';
+import { WordSearchRaceEngine } from 'services/activity/word-search-race/WordSearchRaceEngine';
+import { GamificationService } from 'services/gamification';
 
 interface WordSearchRacePlayer {
   userId: string;
@@ -41,12 +44,12 @@ export class WordSearchRaceSession {
   private engine: WordSearchRaceEngine;
   private players: WordSearchRacePlayer[] = [];
   private timer: ReturnType<typeof setTimeout> | null = null;
-  private startedAt: number;
-  private timeLimitMs: number;
+  private readonly startedAt: number;
+  private readonly timeLimitMs: number;
   private ended = false;
   private resultRecorded = false;
-  private onSessionEnded?: () => void;
-  private emptyRoomGraceMs: number;
+  private readonly onSessionEnded?: () => void;
+  private readonly emptyRoomGraceMs: number;
   private emptyRoomTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(

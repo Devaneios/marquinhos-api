@@ -1,8 +1,12 @@
-import { GamificationService } from '../../gamification';
-import type { ActivityMode } from '../gameId';
-import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
-import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
-import { RpsEngine, type RpsEngineConfig, type RpsPick } from './RpsEngine';
+import type { ActivityMode } from 'services/activity/gameId';
+import {
+  RpsEngine,
+  type RpsEngineConfig,
+  type RpsPick,
+} from 'services/activity/rps/RpsEngine';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import { DisconnectGraceTimer } from 'services/activity/shared/DisconnectGraceTimer';
+import { GamificationService } from 'services/gamification';
 
 const BOT_PICKS: RpsPick[] = ['rock', 'paper', 'scissors'];
 const DEFAULT_BOT_PICK_DELAY_MS = 600;
@@ -34,10 +38,10 @@ export class RpsSession {
   private players: RpsPlayer[] = [];
   private resultRecorded = false;
   private disconnectGrace = new DisconnectGraceTimer<string>();
-  private onSessionEnded?: () => void;
-  private disconnectGraceMs: number;
+  private readonly onSessionEnded?: () => void;
+  private readonly disconnectGraceMs: number;
   private botPlayerId: 'player1' | 'player2' | null = null;
-  private botPickDelayMs: number;
+  private readonly botPickDelayMs: number;
   private botTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(

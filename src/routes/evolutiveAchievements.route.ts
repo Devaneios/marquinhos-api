@@ -1,7 +1,7 @@
+import { evolutiveAchievements } from 'controllers/evolutiveAchievements.controller';
 import type express from 'express';
 import { Router } from 'express';
-import { evolutiveAchievements } from '../controllers/evolutiveAchievements.controller';
-import { checkToken } from '../middlewares/botAuth';
+import { checkToken } from 'middlewares/botAuth';
 
 const router = Router();
 

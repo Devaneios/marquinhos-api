@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { SnakeRoom } from '../src/realtime/SnakeRoom';
+import { SnakeRoom } from 'realtime/SnakeRoom';
 
 describe('SnakeRoom', () => {
   it('initializes room properly', () => {

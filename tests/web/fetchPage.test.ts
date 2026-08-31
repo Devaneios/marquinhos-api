@@ -3,7 +3,7 @@ import {
   createPageFetcher,
   FetchPageError,
   MAX_BODY_BYTES,
-} from '../../src/services/aiChat/web/fetchPage';
+} from 'services/aiChat/web/fetchPage';
 
 function publicLookup() {
   return mock(async () => [{ address: '93.184.216.34', family: 4 }]);
@@ -121,9 +121,9 @@ describe('fetchPage result shape', () => {
       Math.ceil(MAX_BODY_BYTES / 20),
     )}</nav><main><p>o conteúdo de verdade</p></main></body></html>`;
 
-    await expect(
-      fetcherFor(navHeavy)('https://example.com/docs'),
-    ).rejects.toThrow(/grande|cap|truncad/i);
+    expect(fetcherFor(navHeavy)('https://example.com/docs')).rejects.toThrow(
+      /grande|cap|truncad/i,
+    );
   });
 
   it('reads a pdf by extracting its text', async () => {
@@ -161,7 +161,7 @@ describe('fetchPage result shape', () => {
     );
     const extractPdfText = mock(async () => ({ text: 'x', title: '' }));
 
-    await expect(
+    expect(
       createPageFetcher({
         fetchFn,
         lookupFn: publicLookup(),
@@ -189,7 +189,7 @@ describe('fetchPage result shape', () => {
       extractPdfText,
     })('https://example.com/broken.pdf');
 
-    await expect(promise).rejects.toBeInstanceOf(FetchPageError);
+    expect(promise).rejects.toBeInstanceOf(FetchPageError);
   });
 
   it('asks for html first but accepts anything, so servers do not answer 406', async () => {
@@ -241,8 +241,8 @@ describe('fetchPage failures', () => {
 
     const promise = fetchPage(url);
 
-    await expect(promise).rejects.toThrow(FetchPageError);
-    await expect(promise).rejects.toThrow(expected);
+    expect(promise).rejects.toThrow(FetchPageError);
+    expect(promise).rejects.toThrow(expected);
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
@@ -253,9 +253,7 @@ describe('fetchPage failures', () => {
       lookupFn: mock(async () => [{ address: '169.254.169.254', family: 4 }]),
     });
 
-    await expect(fetchPage('https://metadata.internal')).rejects.toThrow(
-      'interno',
-    );
+    expect(fetchPage('https://metadata.internal')).rejects.toThrow('interno');
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
@@ -271,7 +269,7 @@ describe('fetchPage failures', () => {
       lookupFn: publicLookup(),
     });
 
-    await expect(fetchPage('https://example.com/404')).rejects.toThrow('404');
+    expect(fetchPage('https://example.com/404')).rejects.toThrow('404');
   });
 
   it('throws FetchPageError for a content type it cannot read', async () => {
@@ -286,9 +284,7 @@ describe('fetchPage failures', () => {
       lookupFn: publicLookup(),
     });
 
-    await expect(fetchPage('https://example.com/x.png')).rejects.toThrow(
-      'image/png',
-    );
+    expect(fetchPage('https://example.com/x.png')).rejects.toThrow('image/png');
   });
 
   it('throws FetchPageError when links mode is asked of a non-html page', async () => {
@@ -303,7 +299,7 @@ describe('fetchPage failures', () => {
       lookupFn: publicLookup(),
     });
 
-    await expect(
+    expect(
       fetchPage('https://example.com/api', { mode: 'links' }),
     ).rejects.toThrow('não é HTML');
   });
@@ -318,7 +314,7 @@ describe('fetchPage failures', () => {
       lookupFn: publicLookup(),
     });
 
-    await expect(
+    expect(
       fetchPage('https://slow.example.com', { timeoutMs: 2000 }),
     ).rejects.toThrow('2s');
   });

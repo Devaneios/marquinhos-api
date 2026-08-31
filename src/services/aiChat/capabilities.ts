@@ -1,4 +1,4 @@
-import { AGENT_TOOLS } from './tools/registry';
+import { AGENT_TOOLS } from 'services/aiChat/tools/registry';
 
 const ENVIRONMENT_LIMITS = [
   'O sandbox onde seu código roda não tem acesso à rede. Quem acessa a internet são as ferramentas search_web (busca) e fetch_url (leitura de página), que rodam fora do sandbox; fetch_url só aceita URLs https de hosts públicos.',

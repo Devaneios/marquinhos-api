@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
-import { DiscordService } from '../services/discord';
-import { UserService } from '../services/user';
-import { decryptTokenFull } from '../utils/crypto';
+import { DiscordService } from 'services/discord';
+import { UserService } from 'services/user';
+import { decryptTokenFull } from 'utils/crypto';
 
 const logger = {
   error: (...args: unknown[]) => console.error('[userAuth]', ...args),

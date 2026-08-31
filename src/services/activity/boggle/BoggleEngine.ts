@@ -143,7 +143,7 @@ export function scoreForLength(length: number): number {
 export class BoggleEngine {
   readonly grid: string[][];
   private wordSet: Set<string>;
-  private durationMs: number;
+  private readonly durationMs: number;
   private players = new Map<string, PlayerState>();
   private startedAt: number | null = null;
   private ended = false;

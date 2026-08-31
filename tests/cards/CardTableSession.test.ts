@@ -1,11 +1,11 @@
 import { describe, expect, it, mock } from 'bun:test';
-import { CardTableSession } from '../../src/services/activity/cards/CardTableSession';
+import { CardTableSession } from 'services/activity/cards/CardTableSession';
 import {
   MOVE_OK,
   moveRejected,
   type GameDefinition,
-} from '../../src/services/activity/cards/core/GameDefinition';
-import type { PerClientBroadcaster } from '../../src/services/activity/cards/PerClientBroadcaster';
+} from 'services/activity/cards/core/GameDefinition';
+import type { PerClientBroadcaster } from 'services/activity/cards/PerClientBroadcaster';
 
 interface StubState {
   players: string[];

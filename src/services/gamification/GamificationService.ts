@@ -1,19 +1,19 @@
-import { db } from '../../database/sqlite';
-import { EvolutiveAchievementsService } from '../evolutiveAchievements';
-import { AchievementService } from './AchievementService';
-import { LevelingService } from './LevelingService';
+import { db } from 'database/sqlite';
+import { EvolutiveAchievementsService } from 'services/evolutiveAchievements';
+import { AchievementService } from 'services/gamification/AchievementService';
+import { LevelingService } from 'services/gamification/LevelingService';
 import type {
   AddXpResult,
   GameResultInput,
   UserLevel,
   UserStats,
   XpConfig,
-} from './types';
+} from 'services/gamification/types';
 
 const evolutiveService = new EvolutiveAchievementsService();
 
 export class GamificationService {
-  private levelingService: LevelingService;
+  private readonly levelingService: LevelingService;
   private achievementService: AchievementService;
 
   constructor() {

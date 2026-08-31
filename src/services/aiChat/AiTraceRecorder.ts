@@ -1,8 +1,8 @@
 import { Database } from 'bun:sqlite';
 import { randomUUID } from 'crypto';
-import { db as defaultDb } from '../../database/sqlite';
-import { isLevelEnabled, logger, type LogFields } from '../../utils/logger';
-import type { AiChatRequest } from './types';
+import { db as defaultDb } from 'database/sqlite';
+import type { AiChatRequest } from 'services/aiChat/types';
+import { isLevelEnabled, logger, type LogFields } from 'utils/logger';
 
 export interface TraceUsage {
   promptTokens: number;

@@ -1,4 +1,4 @@
-import { isSeatActive, type Seat } from './seating';
+import { isSeatActive, type Seat } from 'services/activity/cards/core/seating';
 
 // After "move a card", the most common mechanic in card games is that the turn
 // *leaves the rotation* while a specific set of players owes an answer:

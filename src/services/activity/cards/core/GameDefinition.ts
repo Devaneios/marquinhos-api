@@ -26,7 +26,7 @@
 //
 // Getting this wrong fails silently rather than loudly, which is why it is
 // spelled out here and why every primitive that holds cards has a clone().
-import type { LegalMove } from './legalMove';
+import type { LegalMove } from 'services/activity/cards/core/legalMove';
 
 export type { LegalMove };
 

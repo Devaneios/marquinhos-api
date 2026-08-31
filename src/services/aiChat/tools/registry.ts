@@ -1,11 +1,11 @@
 import type OpenAI from 'openai';
-import { executeCodeTool } from './executeCode';
-import { fetchUrlTool } from './fetchUrl';
-import { grepSearchTool } from './grepSearch';
-import { listDirectoryTool } from './listDirectory';
-import { readFileTool } from './readFile';
-import { searchWebTool } from './searchWeb';
-import type { AgentTool } from './types';
+import { executeCodeTool } from 'services/aiChat/tools/executeCode';
+import { fetchUrlTool } from 'services/aiChat/tools/fetchUrl';
+import { grepSearchTool } from 'services/aiChat/tools/grepSearch';
+import { listDirectoryTool } from 'services/aiChat/tools/listDirectory';
+import { readFileTool } from 'services/aiChat/tools/readFile';
+import { searchWebTool } from 'services/aiChat/tools/searchWeb';
+import type { AgentTool } from 'services/aiChat/tools/types';
 
 export const AGENT_TOOLS: AgentTool[] = [
   listDirectoryTool,

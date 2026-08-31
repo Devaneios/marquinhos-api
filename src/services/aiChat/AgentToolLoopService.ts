@@ -1,15 +1,21 @@
 import type OpenAI from 'openai';
-import { logger } from '../../utils/logger';
-import { ToolDispatcher } from './agent/ToolDispatcher';
-import { AgentRateLimitService } from './AgentRateLimitService';
-import { NOOP_TRACE, type TraceContext } from './AiTraceRecorder';
-import { GuardrailService } from './GuardrailService';
-import { OpenAiClient, type OpenAiToolMessage } from './OpenAiClient';
-import { AGENT_TASK_SYSTEM_PROMPT } from './prompts';
-import { DockerodeSandboxClient } from './sandbox/DockerodeSandboxClient';
-import { SandboxCapacityError, SandboxManager } from './sandbox/SandboxManager';
-import { toOpenAiTools } from './tools/registry';
-import type { AiChatRequest, AiChatResult } from './types';
+import { ToolDispatcher } from 'services/aiChat/agent/ToolDispatcher';
+import { AgentRateLimitService } from 'services/aiChat/AgentRateLimitService';
+import { NOOP_TRACE, type TraceContext } from 'services/aiChat/AiTraceRecorder';
+import { GuardrailService } from 'services/aiChat/GuardrailService';
+import {
+  OpenAiClient,
+  type OpenAiToolMessage,
+} from 'services/aiChat/OpenAiClient';
+import { AGENT_TASK_SYSTEM_PROMPT } from 'services/aiChat/prompts';
+import { DockerodeSandboxClient } from 'services/aiChat/sandbox/DockerodeSandboxClient';
+import {
+  SandboxCapacityError,
+  SandboxManager,
+} from 'services/aiChat/sandbox/SandboxManager';
+import { toOpenAiTools } from 'services/aiChat/tools/registry';
+import type { AiChatRequest, AiChatResult } from 'services/aiChat/types';
+import { logger } from 'utils/logger';
 
 export const MAX_ITERATIONS = 15;
 export const MAX_TOOL_CALLS_TOTAL = 30;

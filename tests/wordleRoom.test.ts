@@ -53,7 +53,7 @@ describe('WordleRoom', () => {
       roomKey: 'inst-1:wordle:single:user-a',
     });
 
-    await expect(
+    expect(
       colyseus.connectTo(room, {
         token: 'garbage',
         roomKey: 'inst-1:wordle:single:user-a',
@@ -67,7 +67,7 @@ describe('WordleRoom', () => {
       roomKey: session.roomKey,
     });
 
-    await expect(
+    expect(
       colyseus.connectTo(room, {
         token: session.token,
         roomKey: 'inst-1:wordle:single:someone-else',

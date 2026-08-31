@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { PongEngine } from '../src/services/activity/pong/PongEngine';
+import { PongEngine } from 'services/activity/pong/PongEngine';
 
 const CONFIG = {
   width: 800,

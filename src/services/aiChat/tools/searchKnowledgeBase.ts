@@ -1,5 +1,5 @@
-import { KnowledgeBaseClient } from '../KnowledgeBaseClient';
-import type { AgentTool } from './types';
+import { KnowledgeBaseClient } from 'services/aiChat/KnowledgeBaseClient';
+import type { AgentTool } from 'services/aiChat/tools/types';
 
 const NOT_FOUND_MESSAGE =
   'Não encontrei nada nos registros do servidor sobre isso.';

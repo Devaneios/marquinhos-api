@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import type { Card } from '../../src/services/activity/cards/core/card';
-import {
-  isHidden,
-  maskZones,
-} from '../../src/services/activity/cards/core/masking';
-import type { Seat } from '../../src/services/activity/cards/core/seating';
-import { Visibility } from '../../src/services/activity/cards/core/zone';
-import { ZoneSet } from '../../src/services/activity/cards/core/zoneSet';
+import type { Card } from 'services/activity/cards/core/card';
+import { isHidden, maskZones } from 'services/activity/cards/core/masking';
+import type { Seat } from 'services/activity/cards/core/seating';
+import { Visibility } from 'services/activity/cards/core/zone';
+import { ZoneSet } from 'services/activity/cards/core/zoneSet';
 
 // maskZones is the engine's only security boundary, so it gets a truth table
 // rather than a couple of happy-path cases: every visibility level crossed with

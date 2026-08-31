@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite';
-import { db as defaultDb } from '../../database/sqlite';
+import { db as defaultDb } from 'database/sqlite';
 
 interface AiChatConfigRow {
   key: string;

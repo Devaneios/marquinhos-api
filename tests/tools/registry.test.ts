@@ -3,7 +3,7 @@ import {
   AGENT_TOOLS,
   findTool,
   toOpenAiTools,
-} from '../../src/services/aiChat/tools/registry';
+} from 'services/aiChat/tools/registry';
 
 describe('registry', () => {
   it('registers exactly the six expected tools', () => {

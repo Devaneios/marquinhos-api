@@ -1,9 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { afterEach, describe, expect, it } from 'bun:test';
-import {
-  AiTraceRecorder,
-  NOOP_TRACE,
-} from '../src/services/aiChat/AiTraceRecorder';
+import { AiTraceRecorder, NOOP_TRACE } from 'services/aiChat/AiTraceRecorder';
 
 function setupDb(): Database {
   const db = new Database(':memory:');

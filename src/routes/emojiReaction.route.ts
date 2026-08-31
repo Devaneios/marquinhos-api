@@ -1,8 +1,8 @@
+import EmojiReactionController from 'controllers/emojiReaction.controller';
 import express from 'express';
-import EmojiReactionController from '../controllers/emojiReaction.controller';
-import { checkToken } from '../middlewares/botAuth';
-import { validateRequest } from '../middlewares/validateRequest';
-import { emojiReactionChooseSchema } from '../schemas/emojiReaction.schema';
+import { checkToken } from 'middlewares/botAuth';
+import { validateRequest } from 'middlewares/validateRequest';
+import { emojiReactionChooseSchema } from 'schemas/emojiReaction.schema';
 
 const router = express.Router();
 const emojiReaction = new EmojiReactionController();

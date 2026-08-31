@@ -1,12 +1,12 @@
 import { Room, type Client } from 'colyseus';
-import { roomKey } from '../services/activity/roomKey';
-import { ACTION_REJECTED } from '../services/activity/shared/ActionResult';
-import { RateLimiter } from '../services/activity/shared/RateLimiter';
-import { WordChainSession } from '../services/activity/word-chain/WordChainSession';
+import { roomKey } from 'services/activity/roomKey';
+import { ACTION_REJECTED } from 'services/activity/shared/ActionResult';
+import { RateLimiter } from 'services/activity/shared/RateLimiter';
+import { WordChainSession } from 'services/activity/word-chain/WordChainSession';
 import {
   verifyWsSessionToken,
   type WsSessionPayload,
-} from '../services/activity/wsSessionToken';
+} from 'services/activity/wsSessionToken';
 
 const WORD_RATE_LIMIT_WINDOW_MS = 1000;
 const WORD_RATE_LIMIT_MAX = 3;
@@ -31,7 +31,7 @@ export class WordChainRoom extends Room {
   }
 
   override onCreate(options: { roomKey: string; token?: string }) {
-    this.setMetadata({ roomKey: options.roomKey });
+    void this.setMetadata({ roomKey: options.roomKey });
 
     const initialSession = options.token
       ? verifyWsSessionToken(options.token)

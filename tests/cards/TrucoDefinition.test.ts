@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'bun:test';
-import type { Card } from '../../src/services/activity/cards/core/card';
-import { isHidden } from '../../src/services/activity/cards/core/masking';
-import type { Seat } from '../../src/services/activity/cards/core/seating';
-import { TurnOrder } from '../../src/services/activity/cards/core/seating';
-import { Visibility } from '../../src/services/activity/cards/core/zone';
-import { ZoneSet } from '../../src/services/activity/cards/core/zoneSet';
+import type { Card } from 'services/activity/cards/core/card';
+import { isHidden } from 'services/activity/cards/core/masking';
+import type { Seat } from 'services/activity/cards/core/seating';
+import { TurnOrder } from 'services/activity/cards/core/seating';
+import { Visibility } from 'services/activity/cards/core/zone';
+import { ZoneSet } from 'services/activity/cards/core/zoneSet';
 import {
   truco1v1Definition,
   trucoDefinition,
   type TrucoState,
-} from '../../src/services/activity/cards/rulesets/truco/TrucoDefinition';
+} from 'services/activity/cards/rulesets/truco/TrucoDefinition';
 
 const PLAYERS = [
   { userId: 'p1', seatIndex: 0 },

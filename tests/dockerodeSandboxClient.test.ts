@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import type { SpawnExec } from '../src/services/aiChat/sandbox/DockerodeSandboxClient';
-import { DockerodeSandboxClient } from '../src/services/aiChat/sandbox/DockerodeSandboxClient';
+import type { SpawnExec } from 'services/aiChat/sandbox/DockerodeSandboxClient';
+import { DockerodeSandboxClient } from 'services/aiChat/sandbox/DockerodeSandboxClient';
 
 const TIMEOUT_EXIT_CODE = 124;
 

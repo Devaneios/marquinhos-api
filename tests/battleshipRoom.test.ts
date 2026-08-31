@@ -36,7 +36,7 @@ describe('BattleshipRoom', () => {
       roomKey: 'inst-1:battleship:multi',
     });
 
-    await expect(
+    expect(
       colyseus.connectTo(room, {
         token: 'garbage',
         roomKey: 'inst-1:battleship:multi',
@@ -45,9 +45,8 @@ describe('BattleshipRoom', () => {
   });
 
   it('rejects a join whose roomKey does not match its token identity', async () => {
-    const { mintWsSessionToken } = await import(
-      '../src/services/activity/wsSessionToken'
-    );
+    const { mintWsSessionToken } =
+      await import('../src/services/activity/wsSessionToken');
     // A token minted for a currently-valid GameId ('wordle') still proves
     // onAuth's roomKey cross-check runs before anything game-specific: the
     // room key derived from this token can never equal the mismatched one
@@ -63,7 +62,7 @@ describe('BattleshipRoom', () => {
       roomKey: 'inst-1:battleship:multi',
     });
 
-    await expect(
+    expect(
       colyseus.connectTo(room, {
         token,
         roomKey: 'inst-1:battleship:multi',

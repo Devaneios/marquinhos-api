@@ -1,13 +1,13 @@
 import { Room, type Client } from 'colyseus';
-import type { PaddleSide } from '../services/activity/pong/PongEngine';
-import type { ActivityBroadcaster } from '../services/activity/pong/PongSession';
-import { PongSession } from '../services/activity/pong/PongSession';
-import { roomKey } from '../services/activity/roomKey';
-import { RateLimiter } from '../services/activity/shared/RateLimiter';
+import type { PaddleSide } from 'services/activity/pong/PongEngine';
+import type { ActivityBroadcaster } from 'services/activity/pong/PongSession';
+import { PongSession } from 'services/activity/pong/PongSession';
+import { roomKey } from 'services/activity/roomKey';
+import { RateLimiter } from 'services/activity/shared/RateLimiter';
 import {
   verifyWsSessionToken,
   type WsSessionPayload,
-} from '../services/activity/wsSessionToken';
+} from 'services/activity/wsSessionToken';
 
 const INPUT_RATE_LIMIT_WINDOW_MS = 1000;
 const INPUT_RATE_LIMIT_MAX = 120;
@@ -32,7 +32,7 @@ export class PongRoom extends Room {
   }
 
   override onCreate(options: { roomKey: string; token?: string }) {
-    this.setMetadata({ roomKey: options.roomKey });
+    void this.setMetadata({ roomKey: options.roomKey });
 
     // `onCreate` receives the same join options the first client passed to
     // `joinOrCreate` — before that client's own `onAuth` has run. Decoding

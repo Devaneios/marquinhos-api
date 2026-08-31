@@ -1,10 +1,10 @@
+import type { AgentTool } from 'services/aiChat/tools/types';
 import {
   SearxngClient,
   SearxngError,
   type SearchHit,
   type SearchOptions,
-} from '../web/SearxngClient';
-import type { AgentTool } from './types';
+} from 'services/aiChat/web/SearxngClient';
 
 const MAX_RESULTS = 8;
 const MAX_SNIPPET_CHARS = 240;

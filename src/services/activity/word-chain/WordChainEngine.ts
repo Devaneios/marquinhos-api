@@ -11,8 +11,8 @@ export interface WordChainState {
 }
 
 export class WordChainEngine {
-  private wordlist: Set<string>;
-  private state: WordChainState;
+  private readonly wordlist: Set<string>;
+  private readonly state: WordChainState;
   private turnOrder: string[] = [];
   private currentTurnIndex = 0;
 

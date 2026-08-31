@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { SnakeBot } from '../src/services/activity/snake-game/SnakeBotAI';
-import type { SnakeGameState } from '../src/services/activity/snake-game/SnakeEngine';
+import { SnakeBot } from 'services/activity/snake-game/SnakeBotAI';
+import type { SnakeGameState } from 'services/activity/snake-game/SnakeEngine';
 
 function makeState(overrides: Partial<SnakeGameState> = {}): SnakeGameState {
   return {

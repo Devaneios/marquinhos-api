@@ -6,7 +6,7 @@ import {
   SUB_CLASSIFIERS,
   THREAD_ASK_SYSTEM_PROMPT,
   THREAD_COMPACTION_PROMPT,
-} from './prompts';
+} from 'services/aiChat/prompts';
 
 export interface PromptRef {
   promptId: string;

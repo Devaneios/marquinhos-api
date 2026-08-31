@@ -1,11 +1,11 @@
 import { Room, type Client } from 'colyseus';
-import { roomKey } from '../services/activity/roomKey';
-import { RpsSession } from '../services/activity/rps/RpsSession';
-import { RateLimiter } from '../services/activity/shared/RateLimiter';
+import { roomKey } from 'services/activity/roomKey';
+import { RpsSession } from 'services/activity/rps/RpsSession';
+import { RateLimiter } from 'services/activity/shared/RateLimiter';
 import {
   verifyWsSessionToken,
   type WsSessionPayload,
-} from '../services/activity/wsSessionToken';
+} from 'services/activity/wsSessionToken';
 
 const PICK_RATE_LIMIT_WINDOW_MS = 1000;
 const PICK_RATE_LIMIT_MAX = 10;
@@ -30,7 +30,7 @@ export class RpsRoom extends Room {
   }
 
   override onCreate(options: { roomKey: string; token?: string }) {
-    this.setMetadata({ roomKey: options.roomKey });
+    void this.setMetadata({ roomKey: options.roomKey });
 
     const initialSession = options.token
       ? verifyWsSessionToken(options.token)

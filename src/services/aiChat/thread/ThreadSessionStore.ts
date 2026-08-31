@@ -1,7 +1,7 @@
 import { Database } from 'bun:sqlite';
-import { db as defaultDb } from '../../../database/sqlite';
-import { logger } from '../../../utils/logger';
-import type { ConversationItem } from '../llm/ResponsesClient';
+import { db as defaultDb } from 'database/sqlite';
+import type { ConversationItem } from 'services/aiChat/llm/ResponsesClient';
+import { logger } from 'utils/logger';
 
 /**
  * Rough chars-per-token ratio. Deliberately conservative: overestimating the

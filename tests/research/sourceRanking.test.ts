@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import {
-  normalizeUrl,
-  rankHits,
-} from '../../src/services/aiChat/research/sourceRanking';
-import type { SearchHit } from '../../src/services/aiChat/web/SearxngClient';
+import { normalizeUrl, rankHits } from 'services/aiChat/research/sourceRanking';
+import type { SearchHit } from 'services/aiChat/web/SearxngClient';
 
 function hit(url: string, overrides: Partial<SearchHit> = {}): SearchHit {
   return {

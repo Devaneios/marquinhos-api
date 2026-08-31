@@ -55,7 +55,7 @@ describe('PongRoom', () => {
       roomKey: 'inst-1:pong:multi',
     });
 
-    await expect(
+    expect(
       colyseus.connectTo(room, {
         token: 'garbage',
         roomKey: 'inst-1:pong:multi',

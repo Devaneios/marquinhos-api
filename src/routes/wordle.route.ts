@@ -1,6 +1,6 @@
+import WordleController from 'controllers/wordle.controller';
 import express from 'express';
-import WordleController from '../controllers/wordle.controller';
-import { checkToken } from '../middlewares/botAuth';
+import { checkToken } from 'middlewares/botAuth';
 
 const router = express.Router();
 const wordle = new WordleController();

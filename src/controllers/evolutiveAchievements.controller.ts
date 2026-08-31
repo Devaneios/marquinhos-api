@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { EvolutiveAchievementsService } from '../services/evolutiveAchievements';
+import { EvolutiveAchievementsService } from 'services/evolutiveAchievements';
 
 const service = new EvolutiveAchievementsService();
 

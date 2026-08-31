@@ -1,4 +1,4 @@
-import type { WordChainState } from './WordChainEngine';
+import type { WordChainState } from 'services/activity/word-chain/WordChainEngine';
 
 // Sentinel seat id for the bot — never a real Discord snowflake, so it
 // can't collide with an actual player.

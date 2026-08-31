@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { HangmanEngine } from '../src/services/activity/hangman/HangmanEngine';
+import { HangmanEngine } from 'services/activity/hangman/HangmanEngine';
 
 describe('HangmanEngine', () => {
   it('initializes with word, no guessed letters, and 6 strikes remaining', () => {

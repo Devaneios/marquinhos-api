@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from 'bun:test';
-import { EmojiReactionService } from '../src/services/aiChat/EmojiReactionService';
-import type { OpenAiClient } from '../src/services/aiChat/OpenAiClient';
+import { EmojiReactionService } from 'services/aiChat/EmojiReactionService';
+import type { OpenAiClient } from 'services/aiChat/OpenAiClient';
 
 function fakeOpenAiClient(result: unknown | Error): OpenAiClient {
   return {

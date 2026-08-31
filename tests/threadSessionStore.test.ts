@@ -1,7 +1,7 @@
 import { Database } from 'bun:sqlite';
 import { beforeEach, describe, expect, it } from 'bun:test';
-import type { ConversationItem } from '../src/services/aiChat/llm/ResponsesClient';
-import { ThreadSessionStore } from '../src/services/aiChat/thread/ThreadSessionStore';
+import type { ConversationItem } from 'services/aiChat/llm/ResponsesClient';
+import { ThreadSessionStore } from 'services/aiChat/thread/ThreadSessionStore';
 
 function freshDb(): Database {
   const db = new Database(':memory:');

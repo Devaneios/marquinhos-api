@@ -1,12 +1,12 @@
 import { Room, type Client } from 'colyseus';
-import { roomKey } from '../services/activity/roomKey';
-import { ACTION_REJECTED } from '../services/activity/shared/ActionResult';
-import { RateLimiter } from '../services/activity/shared/RateLimiter';
-import { TowerSession } from '../services/activity/towerUnstable/TowerSession';
+import { roomKey } from 'services/activity/roomKey';
+import { ACTION_REJECTED } from 'services/activity/shared/ActionResult';
+import { RateLimiter } from 'services/activity/shared/RateLimiter';
+import { TowerSession } from 'services/activity/towerUnstable/TowerSession';
 import {
   verifyWsSessionToken,
   type WsSessionPayload,
-} from '../services/activity/wsSessionToken';
+} from 'services/activity/wsSessionToken';
 
 const PULL_RATE_LIMIT_WINDOW_MS = 1000;
 const PULL_RATE_LIMIT_MAX = 5;
@@ -31,7 +31,7 @@ export class TowerUnstableRoom extends Room {
   }
 
   override onCreate(options: { roomKey: string; token?: string }) {
-    this.setMetadata({ roomKey: options.roomKey });
+    void this.setMetadata({ roomKey: options.roomKey });
 
     const initialSession = options.token
       ? verifyWsSessionToken(options.token)

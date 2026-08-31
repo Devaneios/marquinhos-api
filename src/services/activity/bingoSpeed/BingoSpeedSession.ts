@@ -1,8 +1,11 @@
-import { GamificationService } from '../../gamification';
-import type { ActivityMode } from '../gameId';
-import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
-import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
-import { BingoSpeedEngine, type BingoCard } from './BingoSpeedEngine';
+import {
+  BingoSpeedEngine,
+  type BingoCard,
+} from 'services/activity/bingoSpeed/BingoSpeedEngine';
+import type { ActivityMode } from 'services/activity/gameId';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import { DisconnectGraceTimer } from 'services/activity/shared/DisconnectGraceTimer';
+import { GamificationService } from 'services/gamification';
 
 interface BingoPlayer {
   userId: string;
@@ -50,17 +53,17 @@ export class BingoSpeedSession {
   private drawInterval: ReturnType<typeof setInterval> | null = null;
   private resultRecorded = false;
   private winner: string | null = null;
-  private drawIntervalMs: number;
-  private disconnectGraceMs: number;
+  private readonly drawIntervalMs: number;
+  private readonly disconnectGraceMs: number;
   private disconnectGrace = new DisconnectGraceTimer<string>();
-  private onSessionEnded?: () => void;
+  private readonly onSessionEnded?: () => void;
   // Mirrors Pong's "freeze the whole loop" rule (§6.2): while any multi
   // player is in disconnect grace, drawing stops so the board doesn't move
   // on without them. Tracked as a set because more than one player can be
   // mid-grace at once; the loop only resumes once it's empty.
   private pausedForDisconnect = new Set<string>();
   private everStarted = false;
-  private emptyRoomGraceMs: number;
+  private readonly emptyRoomGraceMs: number;
   private emptyRoomTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(

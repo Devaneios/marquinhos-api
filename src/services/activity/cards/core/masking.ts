@@ -1,7 +1,7 @@
-import type { Card } from './card';
-import type { Seat } from './seating';
-import type { VisibilityLevel, Zone } from './zone';
-import type { ZoneSet } from './zoneSet';
+import type { Card } from 'services/activity/cards/core/card';
+import type { Seat } from 'services/activity/cards/core/seating';
+import type { VisibilityLevel, Zone } from 'services/activity/cards/core/zone';
+import type { ZoneSet } from 'services/activity/cards/core/zoneSet';
 
 // A card the viewer may not see. Hidden cards keep their *position* in the
 // zone — a masked view is the same length and order as the real zone — because
@@ -15,7 +15,7 @@ export type MaskedCard<TProps = Record<string, unknown>> =
   Card<TProps> | HiddenCard;
 
 export function isHidden<TProps>(card: MaskedCard<TProps>): card is HiddenCard {
-  return (card as HiddenCard).hidden === true;
+  return (card as HiddenCard).hidden;
 }
 
 export interface ZoneView<TProps = Record<string, unknown>> {

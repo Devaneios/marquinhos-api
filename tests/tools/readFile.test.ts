@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from 'bun:test';
-import { readFileTool } from '../../src/services/aiChat/tools/readFile';
+import { readFileTool } from 'services/aiChat/tools/readFile';
 
 describe('readFileTool', () => {
   it('reads a file by execing head -c against the given path', async () => {

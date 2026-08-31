@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { DominoesSession } from '../src/services/activity/dominoesBlock/DominoesSession';
+import { DominoesSession } from 'services/activity/dominoesBlock/DominoesSession';
 
 function identity() {
   return {
@@ -24,16 +24,24 @@ function fakeBroadcaster() {
 
 function fakeGamification() {
   const recorded: unknown[] = [];
-  return { recordGameResult: (input: unknown) => recorded.push(input), recorded };
+  return {
+    recordGameResult: (input: unknown) => recorded.push(input),
+    recorded,
+  };
 }
 
 describe('DominoesSession seating', () => {
   it('does not start until minPlayers have joined', () => {
     const broadcaster = fakeBroadcaster();
-    const session = new DominoesSession(identity(), broadcaster, fakeGamification(), {
-      minPlayers: 2,
-      maxPlayers: 4,
-    });
+    const session = new DominoesSession(
+      identity(),
+      broadcaster,
+      fakeGamification(),
+      {
+        minPlayers: 2,
+        maxPlayers: 4,
+      },
+    );
     session.addPlayer('a', 'conn-a');
     expect(broadcaster.perPlayer.a).toBeUndefined();
     session.addPlayer('b', 'conn-b');
@@ -43,10 +51,15 @@ describe('DominoesSession seating', () => {
 
   it('seats up to maxPlayers and turns extra joiners into spectators', () => {
     const broadcaster = fakeBroadcaster();
-    const session = new DominoesSession(identity(), broadcaster, fakeGamification(), {
-      minPlayers: 4,
-      maxPlayers: 4,
-    });
+    const session = new DominoesSession(
+      identity(),
+      broadcaster,
+      fakeGamification(),
+      {
+        minPlayers: 4,
+        maxPlayers: 4,
+      },
+    );
     for (const id of ['a', 'b', 'c', 'd']) session.addPlayer(id, `conn-${id}`);
     expect(session.playerCount).toBe(4);
     const seated = session.addPlayer('e', 'conn-e');
@@ -56,9 +69,14 @@ describe('DominoesSession seating', () => {
 
   it('rejoining with the same userId reuses the seat instead of adding a new one', () => {
     const broadcaster = fakeBroadcaster();
-    const session = new DominoesSession(identity(), broadcaster, fakeGamification(), {
-      minPlayers: 2,
-    });
+    const session = new DominoesSession(
+      identity(),
+      broadcaster,
+      fakeGamification(),
+      {
+        minPlayers: 2,
+      },
+    );
     session.addPlayer('a', 'conn-a1');
     const result = session.addPlayer('a', 'conn-a2');
     expect(result).toBe(true);
@@ -69,9 +87,14 @@ describe('DominoesSession seating', () => {
 describe('DominoesSession moves', () => {
   it('rejects a move from someone not seated at the table', () => {
     const broadcaster = fakeBroadcaster();
-    const session = new DominoesSession(identity(), broadcaster, fakeGamification(), {
-      minPlayers: 2,
-    });
+    const session = new DominoesSession(
+      identity(),
+      broadcaster,
+      fakeGamification(),
+      {
+        minPlayers: 2,
+      },
+    );
     session.addPlayer('a', 'conn-a');
     session.addPlayer('b', 'conn-b');
     session.playTile('stranger', { a: 0, b: 0 });
@@ -81,10 +104,15 @@ describe('DominoesSession moves', () => {
 
   it('broadcasts a masked state where only the recipient sees their own hand', () => {
     const broadcaster = fakeBroadcaster();
-    const session = new DominoesSession(identity(), broadcaster, fakeGamification(), {
-      minPlayers: 2,
-      rng: () => 0,
-    });
+    const session = new DominoesSession(
+      identity(),
+      broadcaster,
+      fakeGamification(),
+      {
+        minPlayers: 2,
+        rng: () => 0,
+      },
+    );
     session.addPlayer('a', 'conn-a');
     session.addPlayer('b', 'conn-b');
 
@@ -124,10 +152,15 @@ describe('DominoesSession moves', () => {
 describe('DominoesSession disconnect handling', () => {
   it('holds the seat open on disconnect and resumes it on reconnect', () => {
     const broadcaster = fakeBroadcaster();
-    const session = new DominoesSession(identity(), broadcaster, fakeGamification(), {
-      minPlayers: 2,
-      disconnectGraceMs: 5_000,
-    });
+    const session = new DominoesSession(
+      identity(),
+      broadcaster,
+      fakeGamification(),
+      {
+        minPlayers: 2,
+        disconnectGraceMs: 5_000,
+      },
+    );
     session.addPlayer('a', 'conn-a');
     session.addPlayer('b', 'conn-b');
 
@@ -136,19 +169,26 @@ describe('DominoesSession disconnect handling', () => {
 
     session.addPlayer('a', 'conn-a2');
     expect(
-      broadcaster.publicMessages.some((m: any) => m.type === 'opponent_reconnected'),
+      broadcaster.publicMessages.some(
+        (m: any) => m.type === 'opponent_reconnected',
+      ),
     ).toBe(true);
   });
 
   it('ends the session once every seat and spectator is gone', () => {
     const broadcaster = fakeBroadcaster();
     let ended = false;
-    const session = new DominoesSession(identity(), broadcaster, fakeGamification(), {
-      minPlayers: 2,
-      onSessionEnded: () => {
-        ended = true;
+    const session = new DominoesSession(
+      identity(),
+      broadcaster,
+      fakeGamification(),
+      {
+        minPlayers: 2,
+        onSessionEnded: () => {
+          ended = true;
+        },
       },
-    });
+    );
     session.addPlayer('a', 'conn-a');
     session.addPlayer('b', 'conn-b');
     session.leave('a', 'conn-a');

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { buildActivityTokenExchangeBody } from '../src/services/discord';
+import { buildActivityTokenExchangeBody } from 'services/discord';
 
 describe('buildActivityTokenExchangeBody', () => {
   it('includes the authorization code and grant_type', () => {

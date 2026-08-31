@@ -1,5 +1,5 @@
-import { isPathAllowed } from './pathValidation';
-import type { AgentTool } from './types';
+import { isPathAllowed } from 'services/aiChat/tools/pathValidation';
+import type { AgentTool } from 'services/aiChat/tools/types';
 
 export const grepSearchTool: AgentTool = {
   name: 'grep_search',

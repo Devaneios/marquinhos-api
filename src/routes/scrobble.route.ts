@@ -1,8 +1,8 @@
+import ScrobbleController from 'controllers/scrobble.controller';
 import express from 'express';
-import ScrobbleController from '../controllers/scrobble.controller';
-import { checkToken } from '../middlewares/botAuth';
-import { validateRequest } from '../middlewares/validateRequest';
-import { addScrobbleToQueueSchema } from '../schemas/scrobble.schema';
+import { checkToken } from 'middlewares/botAuth';
+import { validateRequest } from 'middlewares/validateRequest';
+import { addScrobbleToQueueSchema } from 'schemas/scrobble.schema';
 
 const router = express.Router();
 const scrobbleController = new ScrobbleController();

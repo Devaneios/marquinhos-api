@@ -1,11 +1,11 @@
 import { Room, type Client } from 'colyseus';
-import { ConnectFourSession } from '../services/activity/connectFour/ConnectFourSession';
-import { roomKey } from '../services/activity/roomKey';
-import { RateLimiter } from '../services/activity/shared/RateLimiter';
+import { ConnectFourSession } from 'services/activity/connectFour/ConnectFourSession';
+import { roomKey } from 'services/activity/roomKey';
+import { RateLimiter } from 'services/activity/shared/RateLimiter';
 import {
   verifyWsSessionToken,
   type WsSessionPayload,
-} from '../services/activity/wsSessionToken';
+} from 'services/activity/wsSessionToken';
 
 const MOVE_RATE_LIMIT_WINDOW_MS = 1000;
 const MOVE_RATE_LIMIT_MAX = 10;
@@ -30,7 +30,7 @@ export class ConnectFourRoom extends Room {
   }
 
   override onCreate(options: { roomKey: string; token?: string }) {
-    this.setMetadata({ roomKey: options.roomKey });
+    void this.setMetadata({ roomKey: options.roomKey });
 
     const initialSession = options.token
       ? verifyWsSessionToken(options.token)

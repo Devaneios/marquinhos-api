@@ -1,22 +1,22 @@
 import { describe, expect, it, mock } from 'bun:test';
-import type { ResponsesClient } from '../../src/services/aiChat/llm/ResponsesClient';
+import type { ResponsesClient } from 'services/aiChat/llm/ResponsesClient';
 import {
   DeepResearchService,
   MAX_FRONTIER_DEPTH,
   MIN_RELEVANT_SOURCES,
   relaxQuery,
   sanitizeQuery,
-} from '../../src/services/aiChat/research/DeepResearchService';
+} from 'services/aiChat/research/DeepResearchService';
 import {
   FetchPageError,
   type FetchedPage,
   type PageFetcher,
-} from '../../src/services/aiChat/web/fetchPage';
+} from 'services/aiChat/web/fetchPage';
 import {
   SearxngError,
   type SearchHit,
   type SearxngClient,
-} from '../../src/services/aiChat/web/SearxngClient';
+} from 'services/aiChat/web/SearxngClient';
 
 function hit(url: string, title = url): SearchHit {
   return { url, title, snippet: '', engines: ['google'], score: 1 };
@@ -874,9 +874,9 @@ describe('DeepResearchService resilience', () => {
       throw new TypeError('bug de programacao');
     });
 
-    await expect(
-      service({ searxng, fetcher }).run({ query: 'x' }),
-    ).rejects.toThrow('bug de programacao');
+    expect(service({ searxng, fetcher }).run({ query: 'x' })).rejects.toThrow(
+      'bug de programacao',
+    );
   });
 });
 

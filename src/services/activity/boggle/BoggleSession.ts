@@ -1,15 +1,15 @@
-import { GamificationService } from '../../gamification';
-import type { ActivityMode } from '../gameId';
-import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
-import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
 import {
   BoggleEngine,
   GAME_DURATION_MS,
   type BoggleEngineOptions,
   type Cell,
   type SubmitResult,
-} from './BoggleEngine';
-import { getBoggleWordSet } from './boggleWords';
+} from 'services/activity/boggle/BoggleEngine';
+import { getBoggleWordSet } from 'services/activity/boggle/boggleWords';
+import type { ActivityMode } from 'services/activity/gameId';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import { DisconnectGraceTimer } from 'services/activity/shared/DisconnectGraceTimer';
+import { GamificationService } from 'services/gamification';
 
 interface BogglePlayer {
   userId: string;
@@ -37,8 +37,8 @@ export class BoggleSession {
   private players: BogglePlayer[] = [];
   private resultRecorded = false;
   private disconnectGrace = new DisconnectGraceTimer<string>();
-  private onSessionEnded?: () => void;
-  private disconnectGraceMs: number;
+  private readonly onSessionEnded?: () => void;
+  private readonly disconnectGraceMs: number;
   private endTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(

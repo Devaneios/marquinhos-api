@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { WordChainEngine } from '../src/services/activity/word-chain/WordChainEngine';
+import { WordChainEngine } from 'services/activity/word-chain/WordChainEngine';
 
 describe('WordChainEngine', () => {
   it('initializes with empty players and no current word', () => {

@@ -1,9 +1,9 @@
-import { GamificationService } from '../../gamification';
-import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
 import {
   MinesweeperEngine,
   type MinesweeperEngineConfig,
-} from './MinesweeperEngine';
+} from 'services/activity/minesweeper/MinesweeperEngine';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import { GamificationService } from 'services/gamification';
 
 interface MinesweeperPlayer {
   userId: string;
@@ -36,8 +36,8 @@ export class MinesweeperSession {
   private engine: MinesweeperEngine;
   private players: MinesweeperPlayer[] = [];
   private resultRecorded = false;
-  private onSessionEnded?: () => void;
-  private emptyRoomGraceMs: number;
+  private readonly onSessionEnded?: () => void;
+  private readonly emptyRoomGraceMs: number;
   private emptyRoomTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(

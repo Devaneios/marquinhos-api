@@ -1,9 +1,9 @@
 import type { Request, Response } from 'express';
-import { DiscordService } from '../services/discord';
-import { LastfmService } from '../services/lastfm';
-import { UserService } from '../services/user';
-import type { ApiResponse, LastfmTopListenedPeriod } from '../types';
-import { decryptToken } from '../utils/crypto';
+import { DiscordService } from 'services/discord';
+import { LastfmService } from 'services/lastfm';
+import { UserService } from 'services/user';
+import type { ApiResponse, LastfmTopListenedPeriod } from 'types';
+import { decryptToken } from 'utils/crypto';
 
 interface UserIdParams {
   id: string;

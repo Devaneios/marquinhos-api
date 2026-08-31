@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test';
-import type { ActivityMode } from '../src/services/activity/gameId';
-import type { ShipPlacement } from '../src/services/activity/battleship/BattleshipEngine';
+import type { ShipPlacement } from 'services/activity/battleship/BattleshipEngine';
 import {
   BattleshipSession,
   type BattleshipSessionIdentity,
-} from '../src/services/activity/battleship/BattleshipSession';
-import type { GamificationService } from '../src/services/gamification';
+} from 'services/activity/battleship/BattleshipSession';
+import type { ActivityMode } from 'services/activity/gameId';
+import type { GamificationService } from 'services/gamification';
 
 function identity(mode: ActivityMode = 'multi'): BattleshipSessionIdentity {
   return {
@@ -20,7 +20,10 @@ function fakeBroadcaster() {
   const perPlayer: { userId: string; type: string; payload: any }[] = [];
   const publicMessages: { type: string; payload: any }[] = [];
   return {
-    sendToPlayer: (userId: string, message: { type: string; payload?: unknown }) => {
+    sendToPlayer: (
+      userId: string,
+      message: { type: string; payload?: unknown },
+    ) => {
       perPlayer.push({ userId, type: message.type, payload: message.payload });
     },
     broadcastPublic: (message: { type: string; payload?: unknown }) => {

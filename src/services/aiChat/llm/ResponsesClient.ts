@@ -1,13 +1,13 @@
 import OpenAI from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
-import type { ZodType } from 'zod';
-import { logger } from '../../../utils/logger';
 import {
   NOOP_TRACE,
   type TraceContext,
   type TraceUsage,
-} from '../AiTraceRecorder';
-import { summarizeMessages } from '../promptRegistry';
+} from 'services/aiChat/AiTraceRecorder';
+import { summarizeMessages } from 'services/aiChat/promptRegistry';
+import { logger } from 'utils/logger';
+import type { ZodType } from 'zod';
 
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.4-mini';
 const REQUEST_TIMEOUT_MS = 120_000;

@@ -1,9 +1,9 @@
 import { describe, expect, it, mock } from 'bun:test';
-import AiChatController from '../src/controllers/aiChat.controller';
-import type { AiChatService } from '../src/services/aiChat/AiChatService';
-import type { AiTraceQuery } from '../src/services/aiChat/AiTraceQuery';
-import type { ResearchOrchestrator } from '../src/services/aiChat/research/ResearchOrchestrator';
-import type { AiThreadService } from '../src/services/aiChat/thread/AiThreadService';
+import AiChatController from 'controllers/aiChat.controller';
+import type { AiChatService } from 'services/aiChat/AiChatService';
+import type { AiTraceQuery } from 'services/aiChat/AiTraceQuery';
+import type { ResearchOrchestrator } from 'services/aiChat/research/ResearchOrchestrator';
+import type { AiThreadService } from 'services/aiChat/thread/AiThreadService';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

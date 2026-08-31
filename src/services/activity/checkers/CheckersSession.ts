@@ -1,15 +1,15 @@
-import { GamificationService } from '../../gamification';
-import type { ActivityMode } from '../gameId';
-import type { ActionResult } from '../shared/ActionResult';
-import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
-import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
-import { chooseCheckersMove } from './CheckersBotAI';
+import { chooseCheckersMove } from 'services/activity/checkers/CheckersBotAI';
 import {
   CheckersEngine,
   type CheckersState,
   type Color,
   type Position,
-} from './CheckersEngine';
+} from 'services/activity/checkers/CheckersEngine';
+import type { ActivityMode } from 'services/activity/gameId';
+import type { ActionResult } from 'services/activity/shared/ActionResult';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import { DisconnectGraceTimer } from 'services/activity/shared/DisconnectGraceTimer';
+import { GamificationService } from 'services/gamification';
 
 interface CheckersPlayer {
   userId: string;
@@ -43,8 +43,8 @@ export class CheckersSession {
   private botColor: Color | null = null;
   private restartVotes = new Set<string>();
   private disconnectGrace = new DisconnectGraceTimer<string>();
-  private onSessionEnded?: () => void;
-  private disconnectGraceMs: number;
+  private readonly onSessionEnded?: () => void;
+  private readonly disconnectGraceMs: number;
   private botTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(

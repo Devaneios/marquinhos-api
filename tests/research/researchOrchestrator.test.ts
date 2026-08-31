@@ -1,12 +1,12 @@
 import { Database } from 'bun:sqlite';
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
-import type { AiTraceRecorder } from '../../src/services/aiChat/AiTraceRecorder';
-import { GuardrailService } from '../../src/services/aiChat/GuardrailService';
-import type { DeepResearchService } from '../../src/services/aiChat/research/DeepResearchService';
-import { ResearchJobStore } from '../../src/services/aiChat/research/ResearchJobStore';
-import { ResearchOrchestrator } from '../../src/services/aiChat/research/ResearchOrchestrator';
-import type { ResearchRateLimitService } from '../../src/services/aiChat/research/ResearchRateLimitService';
-import { ThreadSessionStore } from '../../src/services/aiChat/thread/ThreadSessionStore';
+import type { AiTraceRecorder } from 'services/aiChat/AiTraceRecorder';
+import { GuardrailService } from 'services/aiChat/GuardrailService';
+import type { DeepResearchService } from 'services/aiChat/research/DeepResearchService';
+import { ResearchJobStore } from 'services/aiChat/research/ResearchJobStore';
+import { ResearchOrchestrator } from 'services/aiChat/research/ResearchOrchestrator';
+import type { ResearchRateLimitService } from 'services/aiChat/research/ResearchRateLimitService';
+import { ThreadSessionStore } from 'services/aiChat/thread/ThreadSessionStore';
 
 function freshDb(): Database {
   const db = new Database(':memory:');

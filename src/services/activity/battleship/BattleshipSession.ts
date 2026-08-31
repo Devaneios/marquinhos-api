@@ -1,14 +1,14 @@
-import { GamificationService } from '../../gamification';
-import type { PerClientBroadcaster } from '../cards/PerClientBroadcaster';
-import type { ActivityMode } from '../gameId';
-import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
-import { BattleshipBot } from './BattleshipBot';
+import { BattleshipBot } from 'services/activity/battleship/BattleshipBot';
 import {
   BattleshipEngine,
   type BattleshipSide,
   type ShipPlacement,
-} from './BattleshipEngine';
-import { viewFor } from './masking';
+} from 'services/activity/battleship/BattleshipEngine';
+import { viewFor } from 'services/activity/battleship/masking';
+import type { PerClientBroadcaster } from 'services/activity/cards/PerClientBroadcaster';
+import type { ActivityMode } from 'services/activity/gameId';
+import { DisconnectGraceTimer } from 'services/activity/shared/DisconnectGraceTimer';
+import { GamificationService } from 'services/gamification';
 
 export interface BattleshipSessionIdentity {
   sessionKey: string;
@@ -46,13 +46,13 @@ export class BattleshipSession {
   private players: BattleshipPlayer[] = [];
   private resultRecorded = false;
   private disconnectGrace = new DisconnectGraceTimer<string>();
-  private onSessionEnded?: () => void;
-  private disconnectGraceMs: number;
+  private readonly onSessionEnded?: () => void;
+  private readonly disconnectGraceMs: number;
   private botSide: BattleshipSide | null = null;
   private bot: BattleshipBot | null = null;
-  private botMoveDelayMs: number;
+  private readonly botMoveDelayMs: number;
   private botTimer: ReturnType<typeof setTimeout> | null = null;
-  private emptyRoomGraceMs: number;
+  private readonly emptyRoomGraceMs: number;
   private emptyRoomTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(

@@ -1,4 +1,8 @@
-import type { ChainEnd, DominoesEngine, Tile } from './DominoesEngine';
+import type {
+  ChainEnd,
+  DominoesEngine,
+  Tile,
+} from 'services/activity/dominoesBlock/DominoesEngine';
 
 // Sentinel seat id for the bot — never a real Discord snowflake, so it can't
 // collide with an actual player and is easy to filter out of gamification

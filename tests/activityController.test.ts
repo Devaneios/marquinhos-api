@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
-import ActivityController from '../src/controllers/activity.controller';
-import { roomKey } from '../src/services/activity/roomKey';
-import { verifyWsSessionToken } from '../src/services/activity/wsSessionToken';
-import type { DiscordService } from '../src/services/discord';
+import ActivityController from 'controllers/activity.controller';
+import { roomKey } from 'services/activity/roomKey';
+import { verifyWsSessionToken } from 'services/activity/wsSessionToken';
+import type { DiscordService } from 'services/discord';
 
 function makeReq(body: Record<string, unknown>) {
   return { body } as any;

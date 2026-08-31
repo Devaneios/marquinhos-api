@@ -1,6 +1,6 @@
+import { db } from 'database/sqlite';
 import * as fs from 'fs';
 import * as path from 'path';
-import { db } from './sqlite';
 
 export function runMigrations() {
   db.run(
@@ -32,7 +32,7 @@ export function runMigrations() {
 
       db.transaction(() => {
         // exec() handles multiple semicolons effectively in Bun
-        db.exec(sql);
+        db.run(sql);
         db.query(
           'INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)',
         ).run(file, Date.now());

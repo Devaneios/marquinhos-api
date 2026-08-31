@@ -1,8 +1,10 @@
-import { logger } from '../../utils/logger';
-import { AgentToolLoopService } from './AgentToolLoopService';
-import { AiTraceRecorder, type TraceContext } from './AiTraceRecorder';
-import { GuardrailService } from './GuardrailService';
-import { OpenAiClient } from './OpenAiClient';
+import { AgentToolLoopService } from 'services/aiChat/AgentToolLoopService';
+import {
+  AiTraceRecorder,
+  type TraceContext,
+} from 'services/aiChat/AiTraceRecorder';
+import { GuardrailService } from 'services/aiChat/GuardrailService';
+import { OpenAiClient } from 'services/aiChat/OpenAiClient';
 import {
   buildResponsePrompt,
   buildRevisionInput,
@@ -14,14 +16,15 @@ import {
   resolveSpeakerRole,
   revisionSchema,
   SUB_CLASSIFIERS,
-} from './prompts';
-import { RateLimitService } from './RateLimitService';
+} from 'services/aiChat/prompts';
+import { RateLimitService } from 'services/aiChat/RateLimitService';
 import type {
   AiChatRequest,
   AiChatResult,
   MainCategory,
   ResponseCategory,
-} from './types';
+} from 'services/aiChat/types';
+import { logger } from 'utils/logger';
 
 export class AiChatService {
   constructor(

@@ -1,4 +1,4 @@
-import { SeededRng } from '../cards/core/rng';
+import { SeededRng } from 'services/activity/cards/core/rng';
 
 export const TOWER_LEVELS = 18;
 export const BLOCKS_PER_LEVEL = 3;
@@ -60,7 +60,7 @@ export class TowerEngine {
   private pendingBlocks = 0;
   private totalRemoved = 0;
   private rng: SeededRng;
-  private players: string[];
+  private readonly players: string[];
   private currentIndex = 0;
   private eliminated = new Set<string>();
   private status: 'playing' | 'ended' = 'playing';

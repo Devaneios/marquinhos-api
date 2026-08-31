@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { TicTacToeEngine } from '../src/services/activity/ticTacToe/TicTacToeEngine';
+import { TicTacToeEngine } from 'services/activity/ticTacToe/TicTacToeEngine';
 
 describe('TicTacToeEngine', () => {
   let engine: TicTacToeEngine;

@@ -1,7 +1,11 @@
-import { decryptTokenFull, encryptToken } from '../../utils/crypto';
-import { cardGameRegistry } from './cards/registry';
-import { isGameId, type ActivityMode, type GameId } from './gameId';
-import type { BotDifficulty } from './pong/PongBotAI';
+import { cardGameRegistry } from 'services/activity/cards/registry';
+import {
+  isGameId,
+  type ActivityMode,
+  type GameId,
+} from 'services/activity/gameId';
+import type { BotDifficulty } from 'services/activity/pong/PongBotAI';
+import { decryptTokenFull, encryptToken } from 'utils/crypto';
 
 const BOT_DIFFICULTIES = ['easy', 'normal', 'hard'] as const;
 

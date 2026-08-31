@@ -1,13 +1,13 @@
 import { Room, type Client } from 'colyseus';
-import type { Cell } from '../services/activity/boggle/BoggleEngine';
-import { BoggleSession } from '../services/activity/boggle/BoggleSession';
-import { roomKey } from '../services/activity/roomKey';
-import type { ActivityBroadcaster } from '../services/activity/shared/ActivityBroadcaster';
-import { RateLimiter } from '../services/activity/shared/RateLimiter';
+import type { Cell } from 'services/activity/boggle/BoggleEngine';
+import { BoggleSession } from 'services/activity/boggle/BoggleSession';
+import { roomKey } from 'services/activity/roomKey';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import { RateLimiter } from 'services/activity/shared/RateLimiter';
 import {
   verifyWsSessionToken,
   type WsSessionPayload,
-} from '../services/activity/wsSessionToken';
+} from 'services/activity/wsSessionToken';
 
 const SUBMIT_RATE_LIMIT_WINDOW_MS = 1000;
 const SUBMIT_RATE_LIMIT_MAX = 10;
@@ -50,7 +50,7 @@ export class BoggleRoom extends Room {
   }
 
   override onCreate(options: { roomKey: string; token?: string }) {
-    this.setMetadata({ roomKey: options.roomKey });
+    void this.setMetadata({ roomKey: options.roomKey });
 
     const initialSession = options.token
       ? verifyWsSessionToken(options.token)

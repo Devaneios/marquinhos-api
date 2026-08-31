@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { ScrobblerService } from '../services/scrobbler';
+import { ScrobblerService } from 'services/scrobbler';
 
 interface IdParams {
   id: string;

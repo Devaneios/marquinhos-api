@@ -1,4 +1,4 @@
-import type { PongState } from './PongEngine';
+import type { PongState } from 'services/activity/pong/PongEngine';
 
 // Binary layout for the 'state' snapshot broadcast — must be kept in sync by
 // hand with the decoder in marquinhos-activity-client/src/games/pong/pongProtocol.ts.

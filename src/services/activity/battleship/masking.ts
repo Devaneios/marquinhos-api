@@ -4,7 +4,7 @@ import type {
   PlayerBoard,
   Ship,
   ShipType,
-} from './BattleshipEngine';
+} from 'services/activity/battleship/BattleshipEngine';
 
 export interface ShipView {
   type: ShipType;

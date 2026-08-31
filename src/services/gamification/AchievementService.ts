@@ -1,11 +1,11 @@
-import { db } from '../../database/sqlite';
-import { LevelingService } from './LevelingService';
+import { db } from 'database/sqlite';
+import { LevelingService } from 'services/gamification/LevelingService';
 import type {
   Achievement,
   UserAchievement,
   UserLevel,
   UserStats,
-} from './types';
+} from 'services/gamification/types';
 
 const DEFAULT_ACHIEVEMENTS = [
   {

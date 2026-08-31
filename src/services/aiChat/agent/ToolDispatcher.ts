@@ -1,7 +1,7 @@
-import { logger } from '../../../utils/logger';
-import { NOOP_TRACE, type TraceContext } from '../AiTraceRecorder';
-import type { SandboxManager } from '../sandbox/SandboxManager';
-import { findTool } from '../tools/registry';
+import { NOOP_TRACE, type TraceContext } from 'services/aiChat/AiTraceRecorder';
+import type { SandboxManager } from 'services/aiChat/sandbox/SandboxManager';
+import { findTool } from 'services/aiChat/tools/registry';
+import { logger } from 'utils/logger';
 
 export const TOOL_RESULT_MAX_CHARS = 4000;
 

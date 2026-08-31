@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { checkToken } from '../src/middlewares/botAuth';
+import { checkToken } from 'middlewares/botAuth';
 
 function makeReq(headers: Record<string, string>) {
   return { headers } as any;

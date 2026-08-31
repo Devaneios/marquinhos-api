@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import { aiChatRespondSchema } from '../src/schemas/aiChat.schema';
+import { aiChatRespondSchema } from 'schemas/aiChat.schema';
 
 describe('aiChatRespondSchema', () => {
   it('accepts a valid payload', async () => {
-    await expect(
+    expect(
       aiChatRespondSchema.parseAsync({
         body: {
           userId: 'u1',
@@ -19,7 +19,7 @@ describe('aiChatRespondSchema', () => {
   });
 
   it('rejects a payload missing content', async () => {
-    await expect(
+    expect(
       aiChatRespondSchema.parseAsync({
         body: {
           userId: 'u1',
@@ -38,7 +38,7 @@ describe('aiChatRespondSchema', () => {
       author: `user${i}`,
       content: 'msg',
     }));
-    await expect(
+    expect(
       aiChatRespondSchema.parseAsync({
         body: {
           userId: 'u1',

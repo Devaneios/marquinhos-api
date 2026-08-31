@@ -1,7 +1,7 @@
+import { DiscordService } from 'services/discord';
+import { LastfmService } from 'services/lastfm';
+import { ParserService } from 'services/parser';
 import type { PlaybackData } from 'types';
-import { DiscordService } from './discord';
-import { LastfmService } from './lastfm';
-import { ParserService } from './parser';
 
 export class ScrobblerService {
   discordService: DiscordService;

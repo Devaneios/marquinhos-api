@@ -1,4 +1,4 @@
-import type { GameDefinition } from './GameDefinition';
+import type { GameDefinition } from 'services/activity/cards/core/GameDefinition';
 
 // Map<rulesetId, GameDefinition> populated at module load from each
 // concrete ruleset file. This is the single place a new game gets

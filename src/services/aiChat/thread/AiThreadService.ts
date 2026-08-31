@@ -1,27 +1,30 @@
-import { logger } from '../../../utils/logger';
-import { ThreadAgentLoop } from '../agent/ThreadAgentLoop';
-import { ToolDispatcher } from '../agent/ToolDispatcher';
-import { AgentRateLimitService } from '../AgentRateLimitService';
+import { ThreadAgentLoop } from 'services/aiChat/agent/ThreadAgentLoop';
+import { ToolDispatcher } from 'services/aiChat/agent/ToolDispatcher';
+import { AgentRateLimitService } from 'services/aiChat/AgentRateLimitService';
 import {
   AiTraceRecorder,
   NOOP_TRACE,
   type TraceContext,
-} from '../AiTraceRecorder';
-import { GuardrailService } from '../GuardrailService';
-import { ResponsesClient } from '../llm/ResponsesClient';
+} from 'services/aiChat/AiTraceRecorder';
+import { GuardrailService } from 'services/aiChat/GuardrailService';
+import { ResponsesClient } from 'services/aiChat/llm/ResponsesClient';
 import {
   GUARDRAIL_ROAST_PROMPT,
   THREAD_ASK_SYSTEM_PROMPT,
   THREAD_COMPACTION_PROMPT,
-} from '../prompts';
-import { RateLimitService } from '../RateLimitService';
-import { DockerodeSandboxClient } from '../sandbox/DockerodeSandboxClient';
+} from 'services/aiChat/prompts';
+import { RateLimitService } from 'services/aiChat/RateLimitService';
+import { DockerodeSandboxClient } from 'services/aiChat/sandbox/DockerodeSandboxClient';
 import {
   SandboxCapacityError,
   SandboxManager,
-} from '../sandbox/SandboxManager';
-import type { AiChatResult } from '../types';
-import { ThreadSessionStore, type ThreadMode } from './ThreadSessionStore';
+} from 'services/aiChat/sandbox/SandboxManager';
+import {
+  ThreadSessionStore,
+  type ThreadMode,
+} from 'services/aiChat/thread/ThreadSessionStore';
+import type { AiChatResult } from 'services/aiChat/types';
+import { logger } from 'utils/logger';
 
 const EMBED_THRESHOLD_CHARS = 1800;
 const EMBED_TITLE = '🧵 Resposta';
@@ -152,7 +155,7 @@ export class AiThreadService {
             traceId: trace.traceId || undefined,
           };
         }
-        throw error;
+        return Promise.reject(error);
       }
 
       await this.compactIfNeeded(request.threadId, trace);

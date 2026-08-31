@@ -54,10 +54,10 @@ const NEIGHBOR_OFFSETS: [number, number][] = [
 ];
 
 export class MinesweeperEngine {
-  private width: number;
-  private height: number;
-  private mineCount: number;
-  private grid: Cell[][];
+  private readonly width: number;
+  private readonly height: number;
+  private readonly mineCount: number;
+  private readonly grid: Cell[][];
   private scores = new Map<string, number>();
   private safeTilesRemaining: number;
   private gameOver = false;

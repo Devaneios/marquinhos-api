@@ -1,4 +1,4 @@
-import { db } from '../database/sqlite';
+import { db } from 'database/sqlite';
 
 type Rarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythical';
 type StatKey =

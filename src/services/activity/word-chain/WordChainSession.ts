@@ -1,10 +1,16 @@
-import { GamificationService } from '../../gamification';
-import type { ActivityMode } from '../gameId';
-import type { ActionResult } from '../shared/ActionResult';
-import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
-import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
-import { WORD_CHAIN_BOT_USER_ID, WordChainBot } from './WordChainBot';
-import { WordChainEngine, type WordChainState } from './WordChainEngine';
+import type { ActivityMode } from 'services/activity/gameId';
+import type { ActionResult } from 'services/activity/shared/ActionResult';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import { DisconnectGraceTimer } from 'services/activity/shared/DisconnectGraceTimer';
+import {
+  WORD_CHAIN_BOT_USER_ID,
+  WordChainBot,
+} from 'services/activity/word-chain/WordChainBot';
+import {
+  WordChainEngine,
+  type WordChainState,
+} from 'services/activity/word-chain/WordChainEngine';
+import { GamificationService } from 'services/gamification';
 
 export interface WordChainSessionIdentity {
   sessionKey: string;
@@ -47,10 +53,10 @@ export class WordChainSession {
   private gamification = new GamificationService();
   private sessionStartTime = Date.now();
   private resultRecorded = false;
-  private onSessionEnded?: () => void;
-  private disconnectGraceMs: number;
-  private singleModeDisconnectGraceMs: number;
-  private turnTimeoutMs: number;
+  private readonly onSessionEnded?: () => void;
+  private readonly disconnectGraceMs: number;
+  private readonly singleModeDisconnectGraceMs: number;
+  private readonly turnTimeoutMs: number;
   // Gates the turn clock: a solo player waiting for an opponent must not be
   // eliminated by a timer for a turn the match hasn't started yet.
   private started = false;
@@ -59,7 +65,7 @@ export class WordChainSession {
   private eliminationOrder: string[] = [];
   private botUserId: string | null = null;
   private bot: WordChainBot | null = null;
-  private botMoveDelayMs: number;
+  private readonly botMoveDelayMs: number;
   private botTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(

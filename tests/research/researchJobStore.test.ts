@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { beforeEach, describe, expect, it } from 'bun:test';
-import { ResearchJobStore } from '../../src/services/aiChat/research/ResearchJobStore';
+import { ResearchJobStore } from 'services/aiChat/research/ResearchJobStore';
 
 function freshDb(): Database {
   const db = new Database(':memory:');

@@ -1,11 +1,17 @@
-import { GamificationService } from '../../gamification';
-import { SeededRng } from '../cards/core/rng';
-import type { ActivityMode } from '../gameId';
-import type { ActionResult } from '../shared/ActionResult';
-import type { ActivityBroadcaster } from '../shared/ActivityBroadcaster';
-import { DisconnectGraceTimer } from '../shared/DisconnectGraceTimer';
-import { TOWER_BOT_USER_ID, TowerBot } from './TowerBot';
-import { TowerEngine, type TowerState } from './TowerEngine';
+import { SeededRng } from 'services/activity/cards/core/rng';
+import type { ActivityMode } from 'services/activity/gameId';
+import type { ActionResult } from 'services/activity/shared/ActionResult';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import { DisconnectGraceTimer } from 'services/activity/shared/DisconnectGraceTimer';
+import {
+  TOWER_BOT_USER_ID,
+  TowerBot,
+} from 'services/activity/towerUnstable/TowerBot';
+import {
+  TowerEngine,
+  type TowerState,
+} from 'services/activity/towerUnstable/TowerEngine';
+import { GamificationService } from 'services/gamification';
 
 interface TowerPlayer {
   userId: string;
@@ -41,14 +47,14 @@ export class TowerSession {
   private resultRecorded = false;
   private restartVotes = new Set<string>();
   private disconnectGrace = new DisconnectGraceTimer<string>();
-  private onSessionEnded?: () => void;
-  private disconnectGraceMs: number;
-  private seed?: number;
+  private readonly onSessionEnded?: () => void;
+  private readonly disconnectGraceMs: number;
+  private readonly seed?: number;
   private botUserId: string | null = null;
   private bot: TowerBot | null = null;
-  private botMoveDelayMs: number;
+  private readonly botMoveDelayMs: number;
   private botTimer: ReturnType<typeof setTimeout> | null = null;
-  private emptyRoomGraceMs: number;
+  private readonly emptyRoomGraceMs: number;
   private emptyRoomTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(

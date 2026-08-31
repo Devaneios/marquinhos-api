@@ -2,16 +2,16 @@ import { Room, type Client } from 'colyseus';
 import type {
   Color,
   Position,
-} from '../services/activity/checkers/CheckersEngine';
-import { CheckersSession } from '../services/activity/checkers/CheckersSession';
-import { roomKey } from '../services/activity/roomKey';
-import { ACTION_REJECTED } from '../services/activity/shared/ActionResult';
-import type { ActivityBroadcaster } from '../services/activity/shared/ActivityBroadcaster';
-import { RateLimiter } from '../services/activity/shared/RateLimiter';
+} from 'services/activity/checkers/CheckersEngine';
+import { CheckersSession } from 'services/activity/checkers/CheckersSession';
+import { roomKey } from 'services/activity/roomKey';
+import { ACTION_REJECTED } from 'services/activity/shared/ActionResult';
+import type { ActivityBroadcaster } from 'services/activity/shared/ActivityBroadcaster';
+import { RateLimiter } from 'services/activity/shared/RateLimiter';
 import {
   verifyWsSessionToken,
   type WsSessionPayload,
-} from '../services/activity/wsSessionToken';
+} from 'services/activity/wsSessionToken';
 
 const MOVE_RATE_LIMIT_WINDOW_MS = 1000;
 const MOVE_RATE_LIMIT_MAX = 10;
@@ -47,7 +47,7 @@ export class CheckersRoom extends Room {
   }
 
   override onCreate(options: { roomKey: string; token?: string }) {
-    this.setMetadata({ roomKey: options.roomKey });
+    void this.setMetadata({ roomKey: options.roomKey });
 
     const initialSession = options.token
       ? verifyWsSessionToken(options.token)

@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'crypto';
 import type { NextFunction, Request, Response } from 'express';
-import { verifyDiscordToken } from './userAuth';
+import { verifyDiscordToken } from 'middlewares/userAuth';
 
 export function checkToken(req: Request, res: Response, next: NextFunction) {
   const authorization = req.headers['authorization'] as string;

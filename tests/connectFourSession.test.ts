@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import type { ActivityMode } from '../src/services/activity/gameId';
 import {
   ConnectFourSession,
   type ConnectFourSessionIdentity,
-} from '../src/services/activity/connectFour/ConnectFourSession';
+} from 'services/activity/connectFour/ConnectFourSession';
+import type { ActivityMode } from 'services/activity/gameId';
 
 function identity(mode: ActivityMode = 'multi'): ConnectFourSessionIdentity {
   return {
@@ -93,8 +93,8 @@ describe('ConnectFourSession', () => {
     const forfeitMsg = broadcaster.messages.find(
       (m) =>
         (m.message as { type: string }).type === 'state' &&
-        (m.message as { payload: { winner: string | null } }).payload
-          .winner === 'p2',
+        (m.message as { payload: { winner: string | null } }).payload.winner ===
+          'p2',
     );
     expect(forfeitMsg).toBeDefined();
     expect(session.playerCount).toBe(1);
@@ -102,9 +102,14 @@ describe('ConnectFourSession', () => {
 
   it('single-player mode makes the bot move after the human', async () => {
     const broadcaster = fakeBroadcaster();
-    const session = new ConnectFourSession(identity('single'), broadcaster, undefined, {
-      botMoveDelayMs: 5,
-    });
+    const session = new ConnectFourSession(
+      identity('single'),
+      broadcaster,
+      undefined,
+      {
+        botMoveDelayMs: 5,
+      },
+    );
     const disc = session.addPlayer('u1', {});
     expect(disc).toBe('p1');
     session.enableBot(disc!);
@@ -119,9 +124,14 @@ describe('ConnectFourSession', () => {
 
   it('pauses (not forfeits) on disconnect in multi mode, forfeits after grace expires', async () => {
     const broadcaster = fakeBroadcaster();
-    const session = new ConnectFourSession(identity('multi'), broadcaster, undefined, {
-      disconnectGraceMs: 20,
-    });
+    const session = new ConnectFourSession(
+      identity('multi'),
+      broadcaster,
+      undefined,
+      {
+        disconnectGraceMs: 20,
+      },
+    );
     const conn1 = {};
     session.addPlayer('u1', conn1);
     session.addPlayer('u2', {});

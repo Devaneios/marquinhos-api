@@ -140,6 +140,7 @@ ehthumbs_vista.db
 *.pem
 *.crt
 *.key.worktrees/
+.superpowers/
 !.idea/
 .idea/*
 !.idea/inspectionProfiles/

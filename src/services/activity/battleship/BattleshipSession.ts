@@ -4,7 +4,10 @@ import {
   type BattleshipSide,
   type ShipPlacement,
 } from 'services/activity/battleship/BattleshipEngine';
-import { viewFor } from 'services/activity/battleship/masking';
+import {
+  spectatorViewFor,
+  viewFor,
+} from 'services/activity/battleship/masking';
 import type { PerClientBroadcaster } from 'services/activity/cards/PerClientBroadcaster';
 import type { ActivityMode } from 'services/activity/gameId';
 import { DisconnectGraceTimer } from 'services/activity/shared/DisconnectGraceTimer';
@@ -44,7 +47,14 @@ const DEFAULT_DISCONNECT_GRACE_MS = 30_000;
 export class BattleshipSession {
   private engine = new BattleshipEngine();
   private players: BattleshipPlayer[] = [];
+  // Non-participants (Task 14: spectator broadcast extension). Deliberately
+  // not routed through addPlayer/players — this.players.length >= 2 is the
+  // "no free seat" rule for a would-be player, not the room-level
+  // player/spectator/queued authority MatchRoom's seat already resolved
+  // before ever calling into this session.
+  private spectators = new Map<string, Set<unknown>>();
   private resultRecorded = false;
+  private lastWinnerSide: BattleshipSide | null = null;
   private disconnectGrace = new DisconnectGraceTimer<string>();
   private readonly onSessionEnded?: () => void;
   private readonly disconnectGraceMs: number;
@@ -123,6 +133,7 @@ export class BattleshipSession {
 
     if (result.winner && !this.resultRecorded) {
       this.resultRecorded = true;
+      this.lastWinnerSide = result.winner;
       this.recordResult(result.winner);
       return;
     }
@@ -156,6 +167,22 @@ export class BattleshipSession {
     return side;
   }
 
+  addSpectator(userId: string, connection: unknown): void {
+    this.clearEmptyRoomTimer();
+    const existing = this.spectators.get(userId);
+    if (existing) existing.add(connection);
+    else this.spectators.set(userId, new Set([connection]));
+    this.sendSpectatorState(userId);
+  }
+
+  private removeSpectator(userId: string, connection: unknown): boolean {
+    const spectator = this.spectators.get(userId);
+    if (!spectator) return false;
+    spectator.delete(connection);
+    if (spectator.size === 0) this.spectators.delete(userId);
+    return true;
+  }
+
   private releaseConnection(
     player: BattleshipPlayer,
     connection: unknown,
@@ -175,6 +202,11 @@ export class BattleshipSession {
   }
 
   pauseForDisconnect(userId: string, connection: unknown) {
+    if (this.spectators.has(userId)) {
+      this.removeSpectator(userId, connection);
+      this.maybeStartEmptyRoomTimer();
+      return;
+    }
     const player = this.players.find((p) => p.userId === userId);
     if (!player) return;
     if (!this.releaseConnection(player, connection)) return;
@@ -218,29 +250,38 @@ export class BattleshipSession {
     this.broadcastState();
     if (!this.resultRecorded) {
       this.resultRecorded = true;
+      this.lastWinnerSide = remaining.side;
       this.recordResult(remaining.side);
     }
   }
 
   private removePlayer(userId: string) {
     this.players = this.players.filter((p) => p.userId !== userId);
-    if (this.players.length === 0) {
-      this.clearEmptyRoomTimer();
-      // A room reaching zero players is debounced by this grace window
-      // before actually disposing — React 19 StrictMode's dev-only
-      // double-mount briefly connects and disconnects a phantom client
-      // before the real one joins, and without this grace an empty-room
-      // disposal races ahead of that real join and drops it too
-      // (observed as "Connection lost" on first load).
-      this.emptyRoomTimer = setTimeout(() => {
-        this.emptyRoomTimer = null;
-        if (this.players.length !== 0) return;
-        this.onSessionEnded?.();
-      }, this.emptyRoomGraceMs);
-    }
+    this.maybeStartEmptyRoomTimer();
+  }
+
+  // A room reaching zero players AND zero spectators is debounced by this
+  // grace window before actually disposing — React 19 StrictMode's dev-only
+  // double-mount briefly connects and disconnects a phantom client before
+  // the real one joins, and without this grace an empty-room disposal races
+  // ahead of that real join and drops it too (observed as "Connection lost"
+  // on first load).
+  private maybeStartEmptyRoomTimer() {
+    if (this.players.length !== 0 || this.spectators.size !== 0) return;
+    this.clearEmptyRoomTimer();
+    this.emptyRoomTimer = setTimeout(() => {
+      this.emptyRoomTimer = null;
+      if (this.players.length !== 0 || this.spectators.size !== 0) return;
+      this.onSessionEnded?.();
+    }, this.emptyRoomGraceMs);
   }
 
   leave(userId: string, connection: unknown) {
+    if (this.spectators.has(userId)) {
+      this.removeSpectator(userId, connection);
+      this.maybeStartEmptyRoomTimer();
+      return;
+    }
     const player = this.players.find((p) => p.userId === userId);
     if (!player) return;
     if (!this.releaseConnection(player, connection)) return;
@@ -279,6 +320,7 @@ export class BattleshipSession {
     this.broadcastState();
     if (result.winner && !this.resultRecorded) {
       this.resultRecorded = true;
+      this.lastWinnerSide = result.winner;
       this.recordResult(result.winner);
       return;
     }
@@ -292,9 +334,19 @@ export class BattleshipSession {
     });
   }
 
+  private sendSpectatorState(userId: string) {
+    this.broadcaster.sendToPlayer(userId, {
+      type: 'state',
+      payload: spectatorViewFor(this.engine),
+    });
+  }
+
   private broadcastState() {
     for (const player of this.players) {
       this.sendStateTo(player.userId, player.side);
+    }
+    for (const userId of this.spectators.keys()) {
+      this.sendSpectatorState(userId);
     }
   }
 
@@ -317,5 +369,38 @@ export class BattleshipSession {
     this.clearBotTimer();
     this.clearEmptyRoomTimer();
     this.disconnectGrace.clear();
+  }
+
+  getWinnerUserId(): string | null {
+    if (!this.lastWinnerSide) return null;
+    return (
+      this.players.find((p) => p.side === this.lastWinnerSide)?.userId ?? null
+    );
+  }
+
+  // No restart flow exists for Battleship (like RPS) — reset the engine so
+  // the newly-paired players go straight back into ship placement instead
+  // of leaving the room permanently stuck in the 'ended' phase.
+  substitutePlayer(
+    outgoingUserId: string,
+    incomingUserId: string,
+    connection: unknown,
+  ): boolean {
+    const outgoing = this.players.find((p) => p.userId === outgoingUserId);
+    if (!outgoing) return false;
+
+    this.players = this.players.filter((p) => p.userId !== outgoingUserId);
+    this.players.push({
+      userId: incomingUserId,
+      side: outgoing.side,
+      connected: true,
+      connections: new Set([connection]),
+    });
+
+    this.engine = new BattleshipEngine();
+    this.resultRecorded = false;
+    this.lastWinnerSide = null;
+    this.broadcastState();
+    return true;
   }
 }

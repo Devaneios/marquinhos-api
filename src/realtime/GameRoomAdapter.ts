@@ -40,6 +40,11 @@ export interface GameRoomAdapter<TSession> {
   setup(ctx: AdapterContext): {
     session: TSession;
     messageHandlers: Record<string, MessageHandler>;
+    // Per-instance override of the static `maxPlayers` above, for adapters
+    // whose seat count depends on data only known once setup() has resolved
+    // it (e.g. CardTable's per-ruleset seat count). undefined preserves the
+    // static field's value.
+    maxPlayers?: number;
   };
   onJoin(
     session: TSession,

@@ -72,6 +72,15 @@ export interface BattleshipStateView {
   placementReady: Record<BattleshipSide, boolean>;
 }
 
+export interface BattleshipSpectatorStateView {
+  phase: 'placement' | 'battle' | 'ended';
+  turn: BattleshipSide | null;
+  winner: BattleshipSide | null;
+  p1: BoardView;
+  p2: BoardView;
+  placementReady: Record<BattleshipSide, boolean>;
+}
+
 function otherSide(side: BattleshipSide): BattleshipSide {
   return side === 'p1' ? 'p2' : 'p1';
 }
@@ -107,6 +116,32 @@ export function viewFor(
       isOwner: false,
       gameEnded,
     }),
+    placementReady: {
+      p1: engine.isPlaced('p1'),
+      p2: engine.isPlaced('p2'),
+    },
+  };
+}
+
+// A non-participant gets a symmetric fully-masked view — neither fleet is
+// revealed (same shipSunk/gameEnded rule maskBoard already applies to an
+// opponent's board), since a spectator has no "own" side to see in full.
+export function spectatorViewFor(engine: {
+  getPhase(): BattleshipSpectatorStateView['phase'];
+  getTurn(): BattleshipSide | null;
+  getWinner(): BattleshipSide | null;
+  isPlaced(side: BattleshipSide): boolean;
+  getBoardSnapshot(side: BattleshipSide): PlayerBoard;
+}): BattleshipSpectatorStateView {
+  const phase = engine.getPhase();
+  const gameEnded = phase === 'ended';
+
+  return {
+    phase,
+    turn: engine.getTurn(),
+    winner: engine.getWinner(),
+    p1: maskBoard(engine.getBoardSnapshot('p1'), { isOwner: false, gameEnded }),
+    p2: maskBoard(engine.getBoardSnapshot('p2'), { isOwner: false, gameEnded }),
     placementReady: {
       p1: engine.isPlaced('p1'),
       p2: engine.isPlaced('p2'),

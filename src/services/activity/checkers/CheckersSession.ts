@@ -164,6 +164,31 @@ export class CheckersSession {
     this.detach(userId);
   }
 
+  getWinnerUserId(): string | null {
+    const winner = this.engine.getState().winner;
+    if (!winner) return null;
+    return this.players.find((p) => p.color === winner)?.userId ?? null;
+  }
+
+  substitutePlayer(
+    outgoingUserId: string,
+    incomingUserId: string,
+    connection: unknown,
+  ): boolean {
+    const outgoing = this.players.find((p) => p.userId === outgoingUserId);
+    if (!outgoing) return false;
+
+    this.players = this.players.filter((p) => p.userId !== outgoingUserId);
+    this.restartVotes.delete(outgoingUserId);
+    this.players.push({
+      userId: incomingUserId,
+      color: outgoing.color,
+      connected: true,
+      connections: new Set([connection]),
+    });
+    return true;
+  }
+
   enableBot(humanColor?: Color) {
     this.botColor = humanColor === 'black' ? 'red' : 'black';
   }

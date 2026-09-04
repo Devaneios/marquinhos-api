@@ -10,6 +10,7 @@ const CONFIG = {
   ballRadius: 8,
   ballSpeed: 300,
   winningScore: 5,
+  pointPauseMs: 0,
 };
 
 describe('PongEngine', () => {
@@ -19,8 +20,8 @@ describe('PongEngine', () => {
 
     expect(state.ball.x).toBe(400);
     expect(state.ball.y).toBe(240);
-    expect(Math.abs(state.ball.vx)).toBe(300);
-    expect(state.ball.vy).toBe(0);
+    expect(Math.hypot(state.ball.vx, state.ball.vy)).toBeCloseTo(300);
+    expect(Math.abs(state.ball.vy)).toBeLessThan(Math.abs(state.ball.vx));
     expect(state.paddles.left).toBe((480 - 80) / 2);
     expect(state.paddles.right).toBe((480 - 80) / 2);
     expect(state.score).toEqual({ left: 0, right: 0 });
@@ -183,7 +184,7 @@ describe('PongEngine', () => {
 
     engine.tick(1000); // 1s, would move 400px up (more than half the field)
 
-    expect(engine.getState().paddles.left).toBe(0);
+    expect(engine.getState().paddles.left).toBe(engine.getConfig().cornerGap);
   });
 
   it('does not move a paddle with no input', () => {
@@ -226,5 +227,73 @@ describe('PongEngine', () => {
     engine.tick(1000);
 
     expect(engine.getState().paddles.left).toBe(before);
+  });
+
+  it('maps the paddle impact offset to the outgoing angle', () => {
+    const engine = new PongEngine(CONFIG, () => 0.5);
+    (engine as any).state.paddles.left = 200;
+    (engine as any).state.ball = { x: 20, y: 205, vx: -300, vy: 0 };
+
+    engine.tick(40);
+
+    const edge = engine.getState().ball;
+    expect(edge.vx).toBeGreaterThan(0);
+    expect(edge.vy).toBeLessThan(0);
+    expect(Math.abs(edge.vy / edge.vx)).toBeGreaterThan(0.7);
+  });
+
+  it('returns a center impact almost horizontally', () => {
+    const engine = new PongEngine(CONFIG, () => 0.5);
+    (engine as any).state.paddles.left = 200;
+    (engine as any).state.ball = { x: 20, y: 236, vx: -300, vy: 150 };
+
+    engine.tick(40);
+
+    const ball = engine.getState().ball;
+    expect(ball.vx).toBeGreaterThan(0);
+    expect(Math.abs(ball.vy)).toBeLessThan(Math.abs(ball.vx) * 0.1);
+  });
+
+  it('keeps a minimum horizontal component after paddle spin', () => {
+    const engine = new PongEngine(
+      { ...CONFIG, paddleSpinFactor: 10, maxBounceAngleDeg: 85 },
+      () => 0.5,
+    );
+    (engine as any).state.paddles.left = 200;
+    (engine as any).state.ball = { x: 20, y: 201, vx: -300, vy: -500 };
+    engine.setInput('left', -1);
+
+    engine.tick(40);
+
+    const ball = engine.getState().ball;
+    const speed = Math.hypot(ball.vx, ball.vy);
+    expect(Math.abs(ball.vx)).toBeGreaterThanOrEqual(speed * 0.25 - 1e-6);
+  });
+
+  it('leaves a vulnerable gap at both paddle corners', () => {
+    const engine = new PongEngine(CONFIG, () => 0.5);
+    engine.setInput('left', -1);
+
+    engine.tick(1000);
+
+    expect(engine.getState().paddles.left).toBeGreaterThan(0);
+    engine.setInput('left', 1);
+    engine.tick(2000);
+    expect(
+      engine.getState().paddles.left + engine.getConfig().paddleHeight,
+    ).toBeLessThan(CONFIG.height);
+  });
+
+  it('serves toward the player who conceded with a constrained random angle', () => {
+    const engine = new PongEngine(CONFIG, () => 0.75);
+    (engine as any).state.paddles.left = 400;
+    (engine as any).state.ball = { x: -10, y: 240, vx: -300, vy: 0 };
+
+    engine.tick(1);
+
+    const ball = engine.getState().ball;
+    expect(ball.vx).toBeLessThan(0);
+    expect(ball.vy).not.toBe(0);
+    expect(Math.abs(ball.vy)).toBeLessThan(Math.abs(ball.vx));
   });
 });

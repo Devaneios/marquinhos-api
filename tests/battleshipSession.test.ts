@@ -66,6 +66,42 @@ function placedSession() {
   return { broadcaster, session };
 }
 
+// Drives a full placement+fire sequence to a win for user-a (p1): fires at
+// every cell of FLEET_B (17 cells total across all 5 ships) while user-b
+// fires harmless misses into open water (y=5/6, outside FLEET_A's y=0..4
+// footprint) on the alternating turns in between, so p1's fleet is never at
+// risk of being fully sunk first.
+function playToVictory(session: BattleshipSession) {
+  const aShots: [number, number][] = [
+    [5, 0],
+    [5, 1],
+    [5, 2],
+    [5, 3],
+    [5, 4],
+    [6, 0],
+    [6, 1],
+    [6, 2],
+    [6, 3],
+    [7, 0],
+    [7, 1],
+    [7, 2],
+    [8, 0],
+    [8, 1],
+    [8, 2],
+    [9, 0],
+    [9, 1],
+  ];
+  const bMisses: [number, number][] = [];
+  for (let x = 0; x < 10; x++) bMisses.push([x, 5]);
+  for (let x = 0; x < 6; x++) bMisses.push([x, 6]);
+
+  aShots.forEach(([x, y], i) => {
+    session.fire('user-a', x, y);
+    const miss = bMisses[i];
+    if (miss) session.fire('user-b', miss[0], miss[1]);
+  });
+}
+
 describe('BattleshipSession', () => {
   it('assigns p1 to the first joiner and p2 to the second', () => {
     const broadcaster = fakeBroadcaster();
@@ -211,5 +247,95 @@ describe('BattleshipSession', () => {
     const viewA = broadcaster.lastStateFor('user-a');
     expect(viewA.phase).toBe('ended');
     expect(viewA.opponent.ships).toHaveLength(5);
+  });
+
+  describe('getWinnerUserId', () => {
+    it('returns null before a winner exists', () => {
+      const { session } = placedSession();
+      expect(session.getWinnerUserId()).toBe(null);
+    });
+
+    it('resolves the winning side back to the winning userId', () => {
+      const { session } = placedSession();
+      playToVictory(session);
+      expect(session.getWinnerUserId()).toBe('user-a');
+    });
+  });
+
+  describe('spectators', () => {
+    it('sends a spectator an initial masked state on join, with neither fleet revealed', () => {
+      const { broadcaster, session } = placedSession();
+      session.addSpectator('user-c', 'conn-c');
+
+      const viewC = broadcaster.lastStateFor('user-c');
+      expect(viewC).toBeTruthy();
+      expect(viewC.phase).toBe('battle');
+      expect(viewC.p1.ships).toHaveLength(0);
+      expect(viewC.p2.ships).toHaveLength(0);
+    });
+
+    it('sends a spectator an updated masked state on the next move, without leaking an unsunk ship', () => {
+      const { broadcaster, session } = placedSession();
+      session.addSpectator('user-c', 'conn-c');
+      const messagesBefore = broadcaster.perPlayer.filter(
+        (m) => m.userId === 'user-c' && m.type === 'state',
+      ).length;
+
+      session.fire('user-a', 5, 0); // hits p2's carrier, not sunk (carrier is 5 cells)
+
+      const messagesAfter = broadcaster.perPlayer.filter(
+        (m) => m.userId === 'user-c' && m.type === 'state',
+      ).length;
+      expect(messagesAfter).toBeGreaterThan(messagesBefore);
+      const viewC = broadcaster.lastStateFor('user-c');
+      expect(viewC.p2.ships).toHaveLength(0);
+      expect(viewC.p2.shots).toContainEqual(
+        expect.objectContaining({ x: 5, y: 0, hit: true }),
+      );
+    });
+
+    it('reveals a ship to a spectator only once it is fully sunk, same as a player', () => {
+      const { broadcaster, session } = placedSession();
+      session.addSpectator('user-c', 'conn-c');
+      // Destroyer (2 cells) at x=9,y=0 / x=9,y=1 (FLEET_B, vertical). Turns
+      // alternate, so user-b gets a harmless miss (y=5 is outside FLEET_A's
+      // y=0..4 footprint) between user-a's two shots.
+      session.fire('user-a', 9, 0);
+      session.fire('user-b', 0, 5);
+      session.fire('user-a', 9, 1);
+
+      const viewC = broadcaster.lastStateFor('user-c');
+      const destroyer = viewC.p2.ships.find(
+        (s: { type: string }) => s.type === 'destroyer',
+      );
+      expect(destroyer).toBeTruthy();
+      expect(destroyer.sunk).toBe(true);
+    });
+
+    it('stops sending state to a spectator once they leave', () => {
+      const { broadcaster, session } = placedSession();
+      session.addSpectator('user-c', 'conn-c');
+      session.leave('user-c', 'conn-c');
+      const messagesAtLeave = broadcaster.perPlayer.filter(
+        (m) => m.userId === 'user-c' && m.type === 'state',
+      ).length;
+
+      session.fire('user-a', 5, 0);
+
+      const messagesAfter = broadcaster.perPlayer.filter(
+        (m) => m.userId === 'user-c' && m.type === 'state',
+      ).length;
+      expect(messagesAfter).toBe(messagesAtLeave);
+    });
+  });
+
+  describe('substitutePlayer', () => {
+    it('reseats the incoming player and resets the engine for a fresh match', () => {
+      const { session } = placedSession();
+      playToVictory(session);
+      const ok = session.substitutePlayer('user-b', 'user-new', {});
+      expect(ok).toBe(true);
+      expect(session.getWinnerUserId()).toBe(null); // engine reset, no winner yet
+    });
   });
 });

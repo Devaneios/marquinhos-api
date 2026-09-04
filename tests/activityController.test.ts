@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { matchMaker } from 'colyseus';
 import ActivityController from 'controllers/activity.controller';
 import { roomKey } from 'services/activity/roomKey';
 import { verifyWsSessionToken } from 'services/activity/wsSessionToken';
@@ -132,6 +133,33 @@ describe('ActivityController.getWsSessionToken', () => {
       game: 'pong',
       difficulty: 'easy',
     });
+  });
+
+  it('includes the Discord display name in the minted token', async () => {
+    const fakeService = {
+      getDiscordUser: async () => ({
+        id: 'user-1',
+        global_name: 'Marquinhos',
+        username: 'fallback-name',
+      }),
+      isGuildMember: async () => true,
+    } as unknown as DiscordService;
+    const controller = new ActivityController(fakeService);
+    const req = makeReq({
+      accessToken: 'tok_abc',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'multi',
+      game: 'pong',
+    });
+    const res = makeRes();
+
+    await controller.getWsSessionToken(req, res as any);
+
+    const payload = res.getPayload() as { data: { token: string } };
+    expect(verifyWsSessionToken(payload.data.token)?.displayName).toBe(
+      'Marquinhos',
+    );
   });
 
   it('returns 401 when the access token does not resolve to a Discord user', async () => {
@@ -338,6 +366,84 @@ describe('ActivityController.getWsSessionToken', () => {
     await controller.getWsSessionToken(req, res as any);
 
     expect(res.getStatus()).toBe(500);
+  });
+});
+
+describe('ActivityController.listRooms', () => {
+  it('lists match rooms for this instance, mapped from room metadata', async () => {
+    const fakeService = {
+      getDiscordUser: async () => ({ id: 'user-1' }),
+      isGuildMember: async () => true,
+    } as unknown as DiscordService;
+    const queryRooms = (async (conditions: Record<string, unknown>) => {
+      expect(conditions).toEqual({
+        name: 'match',
+        instanceId: 'inst-1',
+        mode: 'multi',
+        locked: false,
+      });
+      return [
+        {
+          metadata: {
+            instanceId: 'inst-1',
+            roomId: 'ROOM01',
+            game: 'tic-tac-toe',
+            hostUserId: 'u2',
+            playerCount: 1,
+            spectatorCount: 0,
+            queueDepth: 0,
+            queueEnabled: false,
+            mode: 'multi',
+          },
+        },
+      ];
+    }) as unknown as typeof matchMaker.query;
+    const controller = new ActivityController(fakeService, queryRooms);
+
+    const req = makeReq({
+      accessToken: 'token',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+    });
+    const res = makeRes();
+
+    await controller.listRooms(req, res as any);
+
+    expect(res.getStatus()).toBe(200);
+    expect(res.getPayload()).toEqual({
+      data: [
+        {
+          instanceId: 'inst-1',
+          roomId: 'ROOM01',
+          game: 'tic-tac-toe',
+          hostUserId: 'u2',
+          playerCount: 1,
+          spectatorCount: 0,
+          queueDepth: 0,
+          queueEnabled: false,
+          mode: 'multi',
+        },
+      ],
+    });
+  });
+
+  it('rejects with 403 when the user is not a guild member', async () => {
+    const fakeService = {
+      getDiscordUser: async () => ({ id: 'user-1' }),
+      isGuildMember: async () => false,
+    } as unknown as DiscordService;
+    const controller = new ActivityController(fakeService, async () => []);
+
+    const req = makeReq({
+      accessToken: 'token',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+    });
+    const res = makeRes();
+
+    await controller.listRooms(req, res as any);
+
+    expect(res.getStatus()).toBe(403);
   });
 });
 

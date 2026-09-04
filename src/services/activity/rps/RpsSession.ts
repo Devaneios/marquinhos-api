@@ -37,6 +37,7 @@ export class RpsSession {
   private engine: RpsEngine;
   private players: RpsPlayer[] = [];
   private resultRecorded = false;
+  private lastWinnerUserId: string | null = null;
   private disconnectGrace = new DisconnectGraceTimer<string>();
   private readonly onSessionEnded?: () => void;
   private readonly disconnectGraceMs: number;
@@ -169,6 +170,7 @@ export class RpsSession {
     this.clearBotTimer();
 
     const winner = this.players.find((p) => p.playerId === winnerId);
+    this.lastWinnerUserId = winner?.userId ?? null;
 
     this.broadcaster.broadcast(this.roomKey, {
       type: 'match_end',
@@ -259,6 +261,37 @@ export class RpsSession {
 
   getRoundState() {
     return this.engine.getRoundState();
+  }
+
+  getWinnerUserId(): string | null {
+    return this.lastWinnerUserId;
+  }
+
+  // Unlike the other 5 queue-eligible games, RPS has no restart-vote flow at
+  // all — without resetting the round here, a room would be permanently
+  // stuck in "match ended" after the very first round, since nothing else
+  // can ever start a new one.
+  substitutePlayer(
+    outgoingUserId: string,
+    incomingUserId: string,
+    connection: unknown,
+  ): boolean {
+    const outgoing = this.players.find((p) => p.userId === outgoingUserId);
+    if (!outgoing) return false;
+
+    this.players = this.players.filter((p) => p.userId !== outgoingUserId);
+    this.players.push({
+      userId: incomingUserId,
+      playerId: outgoing.playerId,
+      connected: true,
+      connections: new Set([connection]),
+    });
+
+    this.engine = new RpsEngine({ bestOf: this.engine.getRoundState().bestOf });
+    this.resultRecorded = false;
+    this.lastWinnerUserId = null;
+    this.broadcastState();
+    return true;
   }
 
   // MANDATORY per §6.2: clears disconnect grace so it can't outlive a

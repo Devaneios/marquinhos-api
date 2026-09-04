@@ -42,6 +42,25 @@ describe('mintWsSessionToken / verifyWsSessionToken', () => {
     });
   });
 
+  it('round-trips an optional display name', () => {
+    const token = mintWsSessionToken({
+      userId: 'user-1',
+      displayName: 'Marquinhos',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'multi',
+      game: 'pong',
+    });
+    expect(verifyWsSessionToken(token)).toEqual({
+      userId: 'user-1',
+      displayName: 'Marquinhos',
+      instanceId: 'inst-1',
+      guildId: 'guild-1',
+      mode: 'multi',
+      game: 'pong',
+    });
+  });
+
   it('round-trips an optional winningScore', () => {
     const token = mintWsSessionToken({
       userId: 'user-1',

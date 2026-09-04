@@ -42,5 +42,5 @@ export function roomKey({
   } else {
     base = `${instanceId}:${game}:${mode}:${userId}`;
   }
-  return ruleset ? `${base}:${ruleset}` : base;
+  return game === 'cards' && ruleset ? `${base}:${ruleset}` : base;
 }

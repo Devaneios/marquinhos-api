@@ -21,6 +21,12 @@ const CONFIG: Required<PongEngineConfig> = {
   paddleHitAcceleration: 1.05,
   paddleSpinFactor: 0.3,
   maxBallSpeed: 750,
+  maxBounceAngleDeg: 60,
+  minHorizontalSpeedRatio: 0.25,
+  cornerGap: 14.4,
+  maxServeAngleDeg: 25,
+  pointPauseMs: 0,
+  serveDelayMs: 0,
 };
 
 function state(overrides: Partial<PongState> = {}): PongState {
@@ -31,6 +37,9 @@ function state(overrides: Partial<PongState> = {}): PongState {
     paddles: { left: 200, right: 200 },
     score: { left: 0, right: 0 },
     winner: null,
+    phase: 'rally',
+    phaseRemainingMs: 0,
+    lastScorer: null,
     ...overrides,
   };
 }

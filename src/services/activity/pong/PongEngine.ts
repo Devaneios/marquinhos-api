@@ -13,6 +13,12 @@ export interface PongEngineConfig {
   paddleHitAcceleration?: number;
   paddleSpinFactor?: number;
   maxBallSpeed?: number;
+  maxBounceAngleDeg?: number;
+  minHorizontalSpeedRatio?: number;
+  cornerGap?: number;
+  maxServeAngleDeg?: number;
+  pointPauseMs?: number;
+  serveDelayMs?: number;
 }
 
 interface Ball {
@@ -29,6 +35,9 @@ export interface PongState {
   paddles: { left: number; right: number };
   score: { left: number; right: number };
   winner: PaddleSide | null;
+  phase: 'serving' | 'rally' | 'point-scored' | 'game-over';
+  phaseRemainingMs: number;
+  lastScorer: PaddleSide | null;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -44,8 +53,16 @@ export class PongEngine {
     left: 0,
     right: 0,
   };
+  private target: { left: number | null; right: number | null } = {
+    left: null,
+    right: null,
+  };
+  private serveTarget: PaddleSide = 'right';
 
-  constructor(config: PongEngineConfig = {}) {
+  constructor(
+    config: PongEngineConfig = {},
+    private readonly rng: () => number = Math.random,
+  ) {
     const ballSpeed = config.ballSpeed ?? 300;
     this.config = {
       width: config.width ?? 800,
@@ -62,18 +79,28 @@ export class PongEngine {
       // stop it: a long rally eventually moves the ball further in one tick
       // than the paddle is wide, which the collision check can't see past.
       maxBallSpeed: config.maxBallSpeed ?? ballSpeed * 2.5,
+      maxBounceAngleDeg: config.maxBounceAngleDeg ?? 60,
+      minHorizontalSpeedRatio: config.minHorizontalSpeedRatio ?? 0.25,
+      cornerGap: config.cornerGap ?? (config.height ?? 480) * 0.03,
+      maxServeAngleDeg: config.maxServeAngleDeg ?? 25,
+      pointPauseMs: config.pointPauseMs ?? 0,
+      serveDelayMs: config.serveDelayMs ?? 0,
     };
     this.state = this.initState();
   }
 
   reset() {
     this.input = { left: 0, right: 0 };
+    this.target = { left: null, right: null };
+    this.serveTarget = 'right';
     this.state = this.initState();
   }
 
   forceWinner(side: PaddleSide) {
     if (this.state.winner) return;
     this.state.winner = side;
+    this.state.phase = 'game-over';
+    this.state.phaseRemainingMs = 0;
   }
 
   private initState(): PongState {
@@ -87,6 +114,9 @@ export class PongEngine {
       },
       score: { left: 0, right: 0 },
       winner: null,
+      phase: this.config.serveDelayMs > 0 ? 'serving' : 'rally',
+      phaseRemainingMs: this.config.serveDelayMs,
+      lastScorer: null,
     };
   }
 
@@ -102,15 +132,24 @@ export class PongEngine {
       paddles: { ...this.state.paddles },
       score: { ...this.state.score },
       winner: this.state.winner,
+      phase: this.state.phase,
+      phaseRemainingMs: this.state.phaseRemainingMs,
+      lastScorer: this.state.lastScorer,
     };
   }
 
   setInput(side: PaddleSide, direction: PaddleInput) {
     this.input[side] = direction;
+    this.target[side] = null;
+  }
+
+  setTarget(side: PaddleSide, target: number) {
+    this.target[side] = clamp(target, 0, 1);
   }
 
   tick(dtMs: number) {
     if (this.state.winner) return;
+    if (!this.advancePhase(dtMs)) return;
     const dt = dtMs / 1000;
 
     this.movePaddles(dt);
@@ -122,16 +161,44 @@ export class PongEngine {
     this.handleScoring();
   }
 
+  private advancePhase(dtMs: number): boolean {
+    if (this.state.phase === 'rally') return true;
+    this.state.phaseRemainingMs = Math.max(
+      0,
+      this.state.phaseRemainingMs - dtMs,
+    );
+    if (this.state.phaseRemainingMs > 0) return false;
+    if (this.state.phase === 'point-scored') {
+      this.state.ball = this.servingBall(this.serveTarget);
+      this.state.phase = this.config.serveDelayMs > 0 ? 'serving' : 'rally';
+      this.state.phaseRemainingMs = this.config.serveDelayMs;
+      return this.state.phase === 'rally';
+    }
+    if (this.state.phase === 'serving') {
+      this.state.phase = 'rally';
+      return true;
+    }
+    return false;
+  }
+
   private movePaddles(dt: number) {
     for (const side of PADDLE_SIDES) {
-      const next =
-        this.state.paddles[side] +
-        this.input[side] * this.config.paddleSpeed * dt;
-      this.state.paddles[side] = clamp(
-        next,
-        0,
-        this.config.height - this.config.paddleHeight,
-      );
+      const min = this.config.cornerGap;
+      const max =
+        this.config.height - this.config.paddleHeight - this.config.cornerGap;
+      const target = this.target[side];
+      let next: number;
+      if (target === null) {
+        next =
+          this.state.paddles[side] +
+          this.input[side] * this.config.paddleSpeed * dt;
+      } else {
+        const desired = min + target * (max - min);
+        const delta = desired - this.state.paddles[side];
+        const maxStep = this.config.paddleSpeed * dt;
+        next = this.state.paddles[side] + clamp(delta, -maxStep, maxStep);
+      }
+      this.state.paddles[side] = clamp(next, min, max);
     }
   }
 
@@ -183,24 +250,32 @@ export class PongEngine {
       impactY >= paddleY && impactY <= paddleY + this.config.paddleHeight;
     if (!withinY) return;
 
-    this.state.ball.vx =
-      -this.state.ball.vx * this.config.paddleHitAcceleration;
-    this.state.ball.vy *= this.config.paddleHitAcceleration;
+    const incomingSpeed = Math.hypot(this.state.ball.vx, this.state.ball.vy);
+    const outgoingSpeed = Math.min(
+      incomingSpeed * this.config.paddleHitAcceleration,
+      this.config.maxBallSpeed,
+    );
+    const paddleCenter = paddleY + this.config.paddleHeight / 2;
+    const rawOffset = (impactY - paddleCenter) / (this.config.paddleHeight / 2);
+    const spinOffset = this.input[side] * this.config.paddleSpinFactor * 0.25;
+    const offset = clamp(rawOffset + spinOffset, -1, 1);
+    const angle = offset * ((this.config.maxBounceAngleDeg * Math.PI) / 180);
+    const direction = side === 'left' ? 1 : -1;
+    let vx = direction * outgoingSpeed * Math.cos(angle);
+    let vy = outgoingSpeed * Math.sin(angle);
+    const minimumHorizontal =
+      outgoingSpeed * this.config.minHorizontalSpeedRatio;
+    if (Math.abs(vx) < minimumHorizontal) {
+      vx = direction * minimumHorizontal;
+      const verticalMagnitude = Math.sqrt(
+        Math.max(0, outgoingSpeed ** 2 - minimumHorizontal ** 2),
+      );
+      vy = Math.sign(vy || offset || 1) * verticalMagnitude;
+    }
+    this.state.ball.vx = vx;
+    this.state.ball.vy = vy;
     this.state.ball.x = side === 'left' ? paddleX + r : paddleX - r;
     this.state.ball.y = impactY;
-
-    const paddleVelocity = this.input[side] * this.config.paddleSpeed;
-    this.state.ball.vy += paddleVelocity * this.config.paddleSpinFactor;
-
-    this.clampBallSpeed();
-  }
-
-  private clampBallSpeed() {
-    const speed = Math.hypot(this.state.ball.vx, this.state.ball.vy);
-    if (speed <= this.config.maxBallSpeed) return;
-    const scale = this.config.maxBallSpeed / speed;
-    this.state.ball.vx *= scale;
-    this.state.ball.vy *= scale;
   }
 
   private handleScoring() {
@@ -213,22 +288,35 @@ export class PongEngine {
 
   private score(side: PaddleSide) {
     this.state.score[side] += 1;
+    this.state.lastScorer = side;
     if (this.state.score[side] >= this.config.winningScore) {
       this.state.winner = side;
+      this.state.phase = 'game-over';
+      this.state.phaseRemainingMs = 0;
       return;
     }
-    this.state.ball = this.servingBall(side === 'left' ? 'right' : 'left');
+    this.serveTarget = side === 'left' ? 'right' : 'left';
+    this.state.ball = {
+      x: this.config.width / 2,
+      y: this.config.height / 2,
+      vx: 0,
+      vy: 0,
+    };
+    this.state.phase = 'point-scored';
+    this.state.phaseRemainingMs = this.config.pointPauseMs;
+    if (this.config.pointPauseMs === 0) this.advancePhase(0);
   }
 
   private servingBall(servingTo: PaddleSide): Ball {
-    const maxAngle = 0;
-    const angle = (Math.random() * 2 - 1) * maxAngle;
+    const maxAngle = (this.config.maxServeAngleDeg * Math.PI) / 180;
+    const angle = (this.rng() * 2 - 1) * maxAngle;
     const direction = servingTo === 'right' ? 1 : -1;
+    const vy = this.config.ballSpeed * Math.sin(angle);
     return {
       x: this.config.width / 2,
       y: this.config.height / 2,
       vx: direction * this.config.ballSpeed * Math.cos(angle),
-      vy: this.config.ballSpeed * Math.sin(angle),
+      vy: Math.abs(vy) < Number.EPSILON ? 0 : vy,
     };
   }
 }

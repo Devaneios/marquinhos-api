@@ -33,17 +33,31 @@ function wait(ms: number): Promise<void> {
 function sessionFor(
   userId: string,
   mode: 'single' | 'multi' | 'local',
-  extra: { difficulty?: string; winningScore?: number } = {},
+  extra: {
+    difficulty?: string;
+    winningScore?: number;
+    ruleset?: string;
+    options?: Record<string, unknown>;
+  } = {},
 ) {
   const instanceId = 'inst-1';
   const game = 'pong' as const;
-  const key = roomKey({ instanceId, game, mode, userId });
+  const roomId = mode === 'multi' ? 'PONG' : undefined;
+  const key = roomKey({
+    instanceId,
+    game,
+    mode,
+    userId,
+    ...(roomId ? { roomId } : {}),
+    ...(extra.ruleset ? { ruleset: extra.ruleset } : {}),
+  });
   const token = mintWsSessionToken({
     userId,
     instanceId,
     guildId: 'guild-1',
     mode,
     game,
+    ...(roomId ? { roomId } : {}),
     ...extra,
   } as any);
   return { token, roomKey: key };
@@ -67,6 +81,7 @@ describe('PongRoom', () => {
     const session = sessionFor('user-a', 'multi');
     const room = await colyseus.createRoom('pong', {
       roomKey: session.roomKey,
+      token: session.token,
     });
     const clientA = await colyseus.connectTo(room, session);
     const [, initA] = await clientA.waitForNextMessage();
@@ -80,7 +95,7 @@ describe('PongRoom', () => {
 
   it('admits a third joiner as a spectator with a null side', async () => {
     const room = await colyseus.createRoom('pong', {
-      roomKey: 'inst-1:pong:multi',
+      ...sessionFor('user-a', 'multi'),
     });
     await colyseus.connectTo(room, sessionFor('user-a', 'multi'));
     await colyseus.connectTo(room, sessionFor('user-b', 'multi'));
@@ -97,6 +112,7 @@ describe('PongRoom', () => {
     const session = sessionFor('user-a', 'single', { difficulty: 'easy' });
     const room = await colyseus.createRoom('pong', {
       roomKey: session.roomKey,
+      token: session.token,
     });
     const client = await colyseus.connectTo(room, session);
     await client.waitForNextMessage();
@@ -105,7 +121,7 @@ describe('PongRoom', () => {
     client.onMessage('state', () => {
       stateMessages += 1;
     });
-    await wait(30);
+    await wait(70);
 
     expect(stateMessages).toBeGreaterThan(0);
   });
@@ -114,6 +130,7 @@ describe('PongRoom', () => {
     const session = sessionFor('user-a', 'multi');
     const room = await colyseus.createRoom('pong', {
       roomKey: session.roomKey,
+      token: session.token,
     });
     const client = await colyseus.connectTo(room, session);
     await client.waitForNextMessage();
@@ -122,7 +139,7 @@ describe('PongRoom', () => {
     client.onMessage('state', () => {
       stateMessages += 1;
     });
-    await wait(30);
+    await wait(70);
 
     expect(stateMessages).toBe(0);
   });
@@ -131,6 +148,7 @@ describe('PongRoom', () => {
     const sessionA = sessionFor('user-a', 'multi');
     const room = await colyseus.createRoom('pong', {
       roomKey: sessionA.roomKey,
+      token: sessionA.token,
     });
     const clientA = await colyseus.connectTo(room, sessionA);
     await clientA.waitForNextMessage();
@@ -141,15 +159,16 @@ describe('PongRoom', () => {
     await clientB.waitForNextMessage();
     await wait(20);
 
-    let opponentDisconnected = false;
-    clientB.onMessage('opponent_disconnected', () => {
-      opponentDisconnected = true;
+    clientA.send('ready', { ready: true });
+    clientB.send('ready', { ready: true });
+    let playerDisconnected = false;
+    clientB.onMessage('player_disconnected', () => {
+      playerDisconnected = true;
     });
 
     clientA.send('leave');
     await wait(30);
 
-    // Explicit leave forfeits immediately — no disconnect grace period.
-    expect(opponentDisconnected).toBe(false);
+    expect(playerDisconnected).toBe(false);
   });
 });

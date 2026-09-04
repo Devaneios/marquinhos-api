@@ -34,6 +34,11 @@ const SWITCHABLE_GAMES: ReadonlySet<GameId> = new Set(
 export class MatchRoom extends Room {
   private adapter!: GameRoomAdapter<unknown>;
   private session!: unknown;
+  // Per-instance override of `adapter.maxPlayers`, set from setup()'s return
+  // value when an adapter's seat count depends on data only known once
+  // setup() resolves it (e.g. CardTable's per-ruleset seat count). undefined
+  // falls back to the static `adapter.maxPlayers` at every read site.
+  private setupMaxPlayers: number | undefined;
   // The per-room AdapterContext, re-captured here (not on the adapter
   // object) because ADAPTER_REGISTRY holds one shared adapter instance
   // across every concurrent room of that game — a module-level capture
@@ -219,8 +224,9 @@ export class MatchRoom extends Room {
     this.messageUnsubscribers = [];
 
     this.ctx = ctx;
-    const { session, messageHandlers } = this.adapter.setup(ctx);
+    const { session, messageHandlers, maxPlayers } = this.adapter.setup(ctx);
     this.session = session;
+    this.setupMaxPlayers = maxPlayers;
     this.rateLimiters.clear();
 
     for (const [type, { rateLimit, handle }] of Object.entries(
@@ -331,10 +337,16 @@ export class MatchRoom extends Room {
     });
   }
 
+  // Prefers the per-instance value setup() returned (e.g. CardTable's
+  // per-ruleset seat count) over the adapter's static field.
+  private get maxPlayers(): number {
+    return this.setupMaxPlayers ?? this.adapter.maxPlayers;
+  }
+
   private isMatchInProgress(): boolean {
     if (!this.adapter.getWinnerUserId) return false;
     const playerCount = this.members.filter((m) => m.role === 'player').length;
-    if (playerCount < this.adapter.maxPlayers) return false;
+    if (playerCount < this.maxPlayers) return false;
     return this.adapter.getWinnerUserId(this.session) === null;
   }
 
@@ -392,7 +404,7 @@ export class MatchRoom extends Room {
   private assignSeat(): SeatRole {
     if (this.mode !== 'multi') return 'player';
     const playerCount = this.members.filter((m) => m.role === 'player').length;
-    if (playerCount < this.adapter.maxPlayers) return 'player';
+    if (playerCount < this.maxPlayers) return 'player';
     if (this.queueEnabled && this.adapter.supportsQueue) return 'queued';
     return 'spectator';
   }

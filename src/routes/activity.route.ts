@@ -4,8 +4,13 @@ import rateLimit from 'express-rate-limit';
 import { validateRequest } from 'middlewares/validateRequest';
 import {
   activityCreateRoomSchema,
+  activityListRoomsSchema,
   activityTokenExchangeSchema,
   activityWsSessionSchema,
+  pongLeaderboardSchema,
+  pongTournamentCreateSchema,
+  pongTournamentListSchema,
+  pongTournamentReportSchema,
 } from 'schemas/activity.schema';
 
 const router = express.Router();
@@ -34,10 +39,40 @@ router.post(
   activity.getWsSessionToken,
 );
 router.post(
+  '/pong/leaderboard',
+  activityLimiter,
+  validateRequest(pongLeaderboardSchema),
+  activity.getPongLeaderboard,
+);
+router.post(
+  '/pong/tournaments/create',
+  activityLimiter,
+  validateRequest(pongTournamentCreateSchema),
+  activity.createPongTournament,
+);
+router.post(
+  '/pong/tournaments/list',
+  activityLimiter,
+  validateRequest(pongTournamentListSchema),
+  activity.listPongTournaments,
+);
+router.post(
+  '/pong/tournaments/report',
+  activityLimiter,
+  validateRequest(pongTournamentReportSchema),
+  activity.reportPongTournamentMatch,
+);
+router.post(
   '/rooms',
   activityLimiter,
   validateRequest(activityCreateRoomSchema),
   activity.createRoom,
+);
+router.post(
+  '/rooms/list',
+  activityLimiter,
+  validateRequest(activityListRoomsSchema),
+  activity.listRooms,
 );
 
 export default router;

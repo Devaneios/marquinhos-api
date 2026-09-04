@@ -5,12 +5,14 @@ import {
   type GameId,
 } from 'services/activity/gameId';
 import type { BotDifficulty } from 'services/activity/pong/PongBotAI';
+import { isPongRulesetId } from 'services/activity/pong/PongRulesetRegistry';
 import { decryptTokenFull, encryptToken } from 'utils/crypto';
 
 const BOT_DIFFICULTIES = ['easy', 'normal', 'hard'] as const;
 
 export interface WsSessionPayload {
   userId: string;
+  displayName?: string;
   instanceId: string;
   guildId: string;
   mode: ActivityMode;
@@ -57,12 +59,25 @@ export function verifyWsSessionToken(token: string): WsSessionPayload | null {
         parsed.winningScore >= 1 &&
         parsed.winningScore <= 99);
     const hasValidRuleset =
-      parsed?.game !== 'cards'
-        ? parsed?.ruleset === undefined
-        : typeof parsed?.ruleset === 'string' &&
-          cardGameRegistry.isKnownRuleset(parsed.ruleset);
+      parsed?.game === 'cards'
+        ? typeof parsed?.ruleset === 'string' &&
+          cardGameRegistry.isKnownRuleset(parsed.ruleset)
+        : parsed?.game === 'pong'
+          ? parsed?.ruleset === undefined || isPongRulesetId(parsed.ruleset)
+          : parsed?.ruleset === undefined;
     const hasValidRoomId =
-      typeof parsed?.roomId === 'string' || parsed?.roomId === undefined;
+      (typeof parsed?.roomId === 'string' && parsed.roomId.length > 0) ||
+      parsed?.roomId === undefined;
+    const hasValidOptions =
+      parsed?.options === undefined ||
+      (typeof parsed.options === 'object' &&
+        parsed.options !== null &&
+        !Array.isArray(parsed.options));
+    const hasValidDisplayName =
+      parsed?.displayName === undefined ||
+      (typeof parsed.displayName === 'string' &&
+        parsed.displayName.length > 0 &&
+        parsed.displayName.length <= 80);
     if (
       typeof parsed?.userId === 'string' &&
       typeof parsed?.instanceId === 'string' &&
@@ -71,13 +86,18 @@ export function verifyWsSessionToken(token: string): WsSessionPayload | null {
         parsed?.mode === 'multi' ||
         parsed?.mode === 'local') &&
       isGameId(parsed?.game) &&
+      hasValidDisplayName &&
       hasValidDifficulty &&
       hasValidWinningScore &&
       hasValidRuleset &&
-      hasValidRoomId
+      hasValidRoomId &&
+      hasValidOptions
     ) {
       return {
         userId: parsed.userId,
+        ...(parsed.displayName !== undefined
+          ? { displayName: parsed.displayName }
+          : {}),
         instanceId: parsed.instanceId,
         guildId: parsed.guildId,
         mode: parsed.mode,

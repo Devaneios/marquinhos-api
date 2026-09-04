@@ -1,7 +1,12 @@
 import { Room, type Client } from 'colyseus';
-import type { PaddleSide } from 'services/activity/pong/PongEngine';
+import type { PongArenaEngineConfig } from 'services/activity/pong/PongArenaEngine';
+import {
+  getPongRuleset,
+  isPongRulesetId,
+} from 'services/activity/pong/PongRulesetRegistry';
 import type { ActivityBroadcaster } from 'services/activity/pong/PongSession';
 import { PongSession } from 'services/activity/pong/PongSession';
+import type { PongSide } from 'services/activity/pong/PongTypes';
 import { roomKey } from 'services/activity/roomKey';
 import { RateLimiter } from 'services/activity/shared/RateLimiter';
 import {
@@ -11,6 +16,20 @@ import {
 
 const INPUT_RATE_LIMIT_WINDOW_MS = 1000;
 const INPUT_RATE_LIMIT_MAX = 120;
+
+function pongConfig(session: WsSessionPayload): Partial<PongArenaEngineConfig> {
+  const options = session.options ?? {};
+  return {
+    ruleset: isPongRulesetId(session.ruleset) ? session.ruleset : 'classic-1v1',
+    ...(session.winningScore !== undefined
+      ? { targetScore: session.winningScore }
+      : {}),
+    ...(options.bestOf === 1 || options.bestOf === 3 || options.bestOf === 5
+      ? { bestOf: options.bestOf }
+      : {}),
+    ...(typeof options.ranked === 'boolean' ? { ranked: options.ranked } : {}),
+  };
+}
 
 export class PongRoom extends Room {
   private session!: PongSession;
@@ -34,18 +53,10 @@ export class PongRoom extends Room {
   override onCreate(options: { roomKey: string; token?: string }) {
     void this.setMetadata({ roomKey: options.roomKey });
 
-    // `onCreate` receives the same join options the first client passed to
-    // `joinOrCreate` — before that client's own `onAuth` has run. Decoding
-    // the token here too (rather than waiting for `onJoin`) lets the session
-    // carry its real instanceId/guildId from the start, instead of mutating
-    // it later.
     const initialSession = options.token
       ? verifyWsSessionToken(options.token)
       : null;
 
-    // PongSession only depends on this abstract interface, never on
-    // ActivityRealtimeServer directly, so it's reused untouched here — this
-    // adapter just forwards its broadcast calls onto the Room itself.
     const broadcaster: ActivityBroadcaster = {
       broadcast: (_key, message) => {
         this.broadcast(message.type, message.payload);
@@ -64,9 +75,7 @@ export class PongRoom extends Room {
       },
       broadcaster,
       undefined,
-      initialSession?.winningScore !== undefined
-        ? { winningScore: initialSession.winningScore }
-        : undefined,
+      initialSession ? pongConfig(initialSession) : undefined,
       { onSessionEnded: () => this.disconnect() },
     );
 
@@ -74,16 +83,92 @@ export class PongRoom extends Room {
       'input',
       (
         client,
-        payload: { direction?: -1 | 0 | 1; seq?: number; side?: PaddleSide },
+        payload: {
+          direction?: -1 | 0 | 1;
+          seq?: number;
+          side?: PongSide;
+          target?: number;
+          action?: 'move' | 'release';
+        },
       ) => {
         if (this.inputRateLimiter.isOverLimit(client)) return;
+        if (!Number.isInteger(payload?.seq) || payload.seq! < 0) return;
+        if (
+          payload.direction !== undefined &&
+          payload.direction !== -1 &&
+          payload.direction !== 0 &&
+          payload.direction !== 1
+        ) {
+          return;
+        }
+        if (
+          payload.target !== undefined &&
+          (typeof payload.target !== 'number' ||
+            !Number.isFinite(payload.target))
+        ) {
+          return;
+        }
+        if (
+          payload.side !== undefined &&
+          payload.side !== 'left' &&
+          payload.side !== 'right' &&
+          payload.side !== 'top' &&
+          payload.side !== 'bottom'
+        ) {
+          return;
+        }
         const auth = client.auth as WsSessionPayload;
         this.session.handleInput(
           auth.userId,
           payload?.direction ?? 0,
           payload?.seq ?? 0,
           payload?.side,
+          payload?.target,
+          payload?.action === 'release',
         );
+      },
+    );
+
+    this.onMessage('ready', (client, payload: { ready?: boolean }) => {
+      const auth = client.auth as WsSessionPayload;
+      this.session.setReady(auth.userId, payload?.ready === true);
+    });
+
+    this.onMessage('sync', (client) => {
+      const auth = client.auth as WsSessionPayload;
+      const assignment = this.session.getAssignment(auth.userId);
+      client.send('init', {
+        selfUserId: auth.userId,
+        side: assignment?.side ?? null,
+        assignment,
+        config: this.session.getPublicConfig(),
+        lobby: this.session.getLobbyState(),
+      });
+    });
+
+    this.onMessage(
+      'lobby_config',
+      (client, payload: Partial<PongArenaEngineConfig>) => {
+        const auth = client.auth as WsSessionPayload;
+        const config: Partial<PongArenaEngineConfig> = {};
+        if (isPongRulesetId(payload?.ruleset)) config.ruleset = payload.ruleset;
+        if (
+          Number.isInteger(payload?.targetScore) &&
+          payload.targetScore! >= 1 &&
+          payload.targetScore! <= 99
+        ) {
+          config.targetScore = payload.targetScore;
+        }
+        if (
+          payload?.bestOf === 1 ||
+          payload?.bestOf === 3 ||
+          payload?.bestOf === 5
+        ) {
+          config.bestOf = payload.bestOf;
+        }
+        if (typeof payload?.ranked === 'boolean')
+          config.ranked = payload.ranked;
+        this.session.configure(auth.userId, config);
       },
     );
 
@@ -99,19 +184,33 @@ export class PongRoom extends Room {
   }
 
   override onJoin(client: Client, _options: unknown, auth: WsSessionPayload) {
-    const side = this.session.addPlayer(auth.userId, client);
-    client.send('init', { side, config: this.session.getPublicConfig() });
-    if (!side) return;
-
-    if (auth.mode === 'single') {
-      this.session.enableBot(side, auth.difficulty);
+    const side = this.session.addPlayer(
+      auth.userId,
+      client,
+      auth.displayName ?? auth.userId,
+      false,
+    );
+    const assignment = this.session.getAssignment(auth.userId);
+    if (assignment && auth.mode === 'single') {
+      const definition = getPongRuleset(this.session.getPublicConfig().ruleset);
+      if (definition.maxPlayers > 1 && definition.supportsBot) {
+        this.session.enableBot(side ?? undefined, auth.difficulty);
+      }
       this.session.start();
     } else if (auth.mode === 'local') {
       this.session.enableLocalTwoPlayer();
       this.session.start();
-    } else if (this.session.playerCount === 2) {
-      this.session.start();
     }
+    setTimeout(() => {
+      client.send('init', {
+        selfUserId: auth.userId,
+        side,
+        assignment,
+        config: this.session.getPublicConfig(),
+        lobby: this.session.getLobbyState(),
+      });
+      this.session.publishLobby();
+    }, 0);
   }
 
   override onLeave(client: Client) {

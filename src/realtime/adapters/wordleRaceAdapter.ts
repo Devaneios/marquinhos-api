@@ -1,5 +1,5 @@
-import { ACTION_REJECTED } from '../../services/activity/shared/ActionResult';
-import { WordleRaceSession } from '../../services/activity/wordle-race/WordleRaceSession';
+import { ACTION_REJECTED } from 'services/activity/shared/ActionResult';
+import { WordleRaceSession } from 'services/activity/wordle-race/WordleRaceSession';
 import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 
 const GUESS_RATE_LIMIT_WINDOW_MS = 1000;

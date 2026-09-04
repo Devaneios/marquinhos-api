@@ -1,6 +1,6 @@
 import type { Client } from 'colyseus';
-import type { WsSessionPayload } from '../../services/activity/wsSessionToken';
-import { WordleService } from '../../services/wordle';
+import type { WsSessionPayload } from 'services/activity/wsSessionToken';
+import { WordleService } from 'services/wordle';
 import type {
   AdapterContext,
   GameRoomAdapter,

@@ -1,5 +1,5 @@
-import type { Cell } from '../../services/activity/word-search-race/WordSearchRaceEngine';
-import { WordSearchRaceSession } from '../../services/activity/word-search-race/WordSearchRaceSession';
+import type { Cell } from 'services/activity/word-search-race/WordSearchRaceEngine';
+import { WordSearchRaceSession } from 'services/activity/word-search-race/WordSearchRaceSession';
 import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 
 const SELECT_RATE_LIMIT_WINDOW_MS = 1000;

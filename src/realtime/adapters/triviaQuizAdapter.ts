@@ -1,5 +1,5 @@
-import { TriviaQuizSession } from '../../services/activity/trivia-quiz/TriviaQuizSession';
-import { GamificationService } from '../../services/gamification/GamificationService';
+import { TriviaQuizSession } from 'services/activity/trivia-quiz/TriviaQuizSession';
+import { GamificationService } from 'services/gamification/GamificationService';
 import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 
 const ANSWER_RATE_LIMIT_WINDOW_MS = 1000;

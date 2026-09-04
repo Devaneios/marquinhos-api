@@ -1,5 +1,5 @@
-import type { SnakeDirection } from '../../services/activity/snake-game/SnakeEngine';
-import { SnakeSession } from '../../services/activity/snake-game/SnakeSession';
+import type { SnakeDirection } from 'services/activity/snake-game/SnakeEngine';
+import { SnakeSession } from 'services/activity/snake-game/SnakeSession';
 import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 
 const INPUT_RATE_LIMIT_WINDOW_MS = 1000;

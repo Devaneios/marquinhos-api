@@ -1,7 +1,7 @@
-import { CardTableSession } from '../../services/activity/cards/CardTableSession';
-import type { PerClientBroadcaster } from '../../services/activity/cards/PerClientBroadcaster';
-import { cardGameRegistry } from '../../services/activity/cards/registry';
-import { GamificationService } from '../../services/gamification/GamificationService';
+import { CardTableSession } from 'services/activity/cards/CardTableSession';
+import type { PerClientBroadcaster } from 'services/activity/cards/PerClientBroadcaster';
+import { cardGameRegistry } from 'services/activity/cards/registry';
+import { GamificationService } from 'services/gamification/GamificationService';
 import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 
 const MOVE_RATE_LIMIT_WINDOW_MS = 1000;

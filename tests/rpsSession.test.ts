@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { RpsSession } from '../src/services/activity/rps/RpsSession';
+import { RpsSession } from 'services/activity/rps/RpsSession';
 
 function noopBroadcaster() {
   return { broadcast: () => {} };

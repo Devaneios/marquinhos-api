@@ -1,5 +1,5 @@
-import type { Cell } from '../../services/activity/boggle/BoggleEngine';
-import { BoggleSession } from '../../services/activity/boggle/BoggleSession';
+import type { Cell } from 'services/activity/boggle/BoggleEngine';
+import { BoggleSession } from 'services/activity/boggle/BoggleSession';
 import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 
 const SUBMIT_RATE_LIMIT_WINDOW_MS = 1000;

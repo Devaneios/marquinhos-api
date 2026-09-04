@@ -1,4 +1,4 @@
-import { MinesweeperSession } from '../../services/activity/minesweeper/MinesweeperSession';
+import { MinesweeperSession } from 'services/activity/minesweeper/MinesweeperSession';
 import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 
 const REVEAL_RATE_LIMIT_WINDOW_MS = 1000;

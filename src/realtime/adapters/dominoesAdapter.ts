@@ -1,8 +1,8 @@
 import type {
   ChainEnd,
   Tile,
-} from '../../services/activity/dominoesBlock/DominoesEngine';
-import { DominoesSession } from '../../services/activity/dominoesBlock/DominoesSession';
+} from 'services/activity/dominoesBlock/DominoesEngine';
+import { DominoesSession } from 'services/activity/dominoesBlock/DominoesSession';
 import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 
 const MOVE_RATE_LIMIT_WINDOW_MS = 1000;

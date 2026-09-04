@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { TicTacToeSession } from '../src/services/activity/ticTacToe/TicTacToeSession';
+import { TicTacToeSession } from 'services/activity/ticTacToe/TicTacToeSession';
 
 function noopBroadcaster() {
   return { broadcast: () => {} };

@@ -1,5 +1,5 @@
-import { ACTION_REJECTED } from '../../services/activity/shared/ActionResult';
-import { TowerSession } from '../../services/activity/towerUnstable/TowerSession';
+import { ACTION_REJECTED } from 'services/activity/shared/ActionResult';
+import { TowerSession } from 'services/activity/towerUnstable/TowerSession';
 import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 
 const PULL_RATE_LIMIT_WINDOW_MS = 1000;

@@ -1,5 +1,5 @@
-import { HangmanSession } from '../../services/activity/hangman/HangmanSession';
-import { getHangmanWord } from '../../services/activity/hangman/wordList';
+import { HangmanSession } from 'services/activity/hangman/HangmanSession';
+import { getHangmanWord } from 'services/activity/hangman/wordList';
 import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 
 const GUESS_RATE_LIMIT_WINDOW_MS = 1000;

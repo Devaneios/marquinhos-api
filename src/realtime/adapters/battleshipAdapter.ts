@@ -1,6 +1,6 @@
-import type { ShipPlacement } from '../../services/activity/battleship/BattleshipEngine';
-import { BattleshipSession } from '../../services/activity/battleship/BattleshipSession';
-import type { PerClientBroadcaster } from '../../services/activity/cards/PerClientBroadcaster';
+import type { ShipPlacement } from 'services/activity/battleship/BattleshipEngine';
+import { BattleshipSession } from 'services/activity/battleship/BattleshipSession';
+import type { PerClientBroadcaster } from 'services/activity/cards/PerClientBroadcaster';
 import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 
 const FIRE_RATE_LIMIT_WINDOW_MS = 1000;

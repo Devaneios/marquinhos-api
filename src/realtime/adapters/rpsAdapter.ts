@@ -1,4 +1,4 @@
-import { RpsSession } from '../../services/activity/rps/RpsSession';
+import { RpsSession } from 'services/activity/rps/RpsSession';
 import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 
 const PICK_RATE_LIMIT_WINDOW_MS = 1000;

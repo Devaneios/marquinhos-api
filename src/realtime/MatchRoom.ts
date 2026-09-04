@@ -1,12 +1,12 @@
 import { Room, type Client } from 'colyseus';
-import type { ActivityMode, GameId } from '../services/activity/gameId';
-import { roomKey } from '../services/activity/roomKey';
-import { ACTION_REJECTED } from '../services/activity/shared/ActionResult';
-import { RateLimiter } from '../services/activity/shared/RateLimiter';
+import type { ActivityMode, GameId } from 'services/activity/gameId';
+import { roomKey } from 'services/activity/roomKey';
+import { ACTION_REJECTED } from 'services/activity/shared/ActionResult';
+import { RateLimiter } from 'services/activity/shared/RateLimiter';
 import {
   verifyWsSessionToken,
   type WsSessionPayload,
-} from '../services/activity/wsSessionToken';
+} from 'services/activity/wsSessionToken';
 import { ADAPTER_REGISTRY } from './adapters/registry';
 import type {
   AdapterContext,

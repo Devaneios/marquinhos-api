@@ -1,5 +1,5 @@
-import { ACTION_REJECTED } from '../../services/activity/shared/ActionResult';
-import { WordChainSession } from '../../services/activity/word-chain/WordChainSession';
+import { ACTION_REJECTED } from 'services/activity/shared/ActionResult';
+import { WordChainSession } from 'services/activity/word-chain/WordChainSession';
 import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 
 const WORD_RATE_LIMIT_WINDOW_MS = 1000;

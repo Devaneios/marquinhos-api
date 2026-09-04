@@ -1,4 +1,4 @@
-import { ConnectFourSession } from '../../services/activity/connectFour/ConnectFourSession';
+import { ConnectFourSession } from 'services/activity/connectFour/ConnectFourSession';
 import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 
 const MOVE_RATE_LIMIT_WINDOW_MS = 1000;

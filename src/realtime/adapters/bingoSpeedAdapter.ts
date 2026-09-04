@@ -1,4 +1,4 @@
-import { BingoSpeedSession } from '../../services/activity/bingoSpeed/BingoSpeedSession';
+import { BingoSpeedSession } from 'services/activity/bingoSpeed/BingoSpeedSession';
 import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 
 const CLAIM_RATE_LIMIT_WINDOW_MS = 1000;

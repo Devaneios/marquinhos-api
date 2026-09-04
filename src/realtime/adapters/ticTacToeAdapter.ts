@@ -1,5 +1,5 @@
-import { ACTION_REJECTED } from '../../services/activity/shared/ActionResult';
-import { TicTacToeSession } from '../../services/activity/ticTacToe/TicTacToeSession';
+import { ACTION_REJECTED } from 'services/activity/shared/ActionResult';
+import { TicTacToeSession } from 'services/activity/ticTacToe/TicTacToeSession';
 import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 
 const MOVE_RATE_LIMIT_WINDOW_MS = 1000;

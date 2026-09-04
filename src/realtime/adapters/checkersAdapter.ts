@@ -1,6 +1,6 @@
-import type { Position } from '../../services/activity/checkers/CheckersEngine';
-import { CheckersSession } from '../../services/activity/checkers/CheckersSession';
-import { ACTION_REJECTED } from '../../services/activity/shared/ActionResult';
+import type { Position } from 'services/activity/checkers/CheckersEngine';
+import { CheckersSession } from 'services/activity/checkers/CheckersSession';
+import { ACTION_REJECTED } from 'services/activity/shared/ActionResult';
 import type { AdapterContext, GameRoomAdapter } from '../GameRoomAdapter';
 
 const MOVE_RATE_LIMIT_WINDOW_MS = 1000;
